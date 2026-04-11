@@ -37,7 +37,21 @@ class CredentialsRequest(BaseModel):
     lookback_days: int = 30
 
 
+class ManualTokenRequest(BaseModel):
+    carrier: str
+    access_token: str
+    refresh_token: str | None = None
+    lookback_days: int = 30
+
+
 # --- Carrier endpoints ---
+
+MANUAL_TOKEN_HELP = (
+    "Log in at the carrier's website, open browser DevTools (F12) > "
+    "Network tab, look for API requests with an Authorization header, "
+    "and use POST /api/v1/accounts/token with the Bearer token value."
+)
+
 
 @router.get("/carriers")
 async def list_carriers(
@@ -46,10 +60,13 @@ async def list_carriers(
     carriers = []
     for name in service.list_carriers():
         carrier = service.get_carrier(name)
-        carriers.append({
+        entry: dict = {
             "name": name,
             "auth_type": carrier.auth_type if carrier else "unknown",
-        })
+        }
+        if carrier and carrier.auth_type == "manual_token":
+            entry["auth_hint"] = MANUAL_TOKEN_HELP
+        carriers.append(entry)
     return carriers
 
 
@@ -92,6 +109,19 @@ async def connect_credentials(
         )
     except CarrierAuthError as exc:
         raise HTTPException(status_code=502, detail=exc.message)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/accounts/token", status_code=201)
+async def connect_manual_token(
+    body: ManualTokenRequest,
+    service: TrackingService = Depends(get_tracking_service),
+) -> dict:
+    try:
+        return await service.connect_account_manual_token(
+            body.carrier, body.access_token, body.refresh_token, body.lookback_days
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

@@ -55,13 +55,17 @@ async def test_parse_json_response():
     assert result.estimated_delivery is not None
 
 
-def test_postnl_is_oauth():
-    assert PostNL().auth_type == AuthType.OAUTH
+def test_postnl_is_manual_token():
+    assert PostNL().auth_type == AuthType.MANUAL_TOKEN
 
 
-async def test_get_auth_url():
+async def test_postnl_rejects_oauth():
     carrier = PostNL()
-    url = await carrier.get_auth_url("http://localhost/callback")
-    assert "login.postnl.nl" in url
-    assert "redirect_uri=http://localhost/callback" in url
-    assert "response_type=code" in url
+    with pytest.raises(NotImplementedError):
+        await carrier.get_auth_url("http://callback")
+
+
+async def test_postnl_rejects_login():
+    carrier = PostNL()
+    with pytest.raises(NotImplementedError):
+        await carrier.login("user", "pass")

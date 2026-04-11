@@ -105,6 +105,31 @@ class TrackingService:
         assert account is not None
         return account
 
+    async def connect_account_manual_token(
+        self,
+        carrier_name: str,
+        access_token: str,
+        refresh_token: str | None = None,
+        lookback_days: int = 30,
+    ) -> dict:
+        if carrier_name not in self._carriers:
+            raise ValueError(f"Unknown carrier: {carrier_name}")
+
+        tokens = AuthTokens(
+            access_token=access_token,
+            refresh_token=refresh_token,
+        )
+
+        account_id = await self._repository.add_account(
+            carrier=carrier_name,
+            auth_type="manual_token",
+            tokens=asdict(tokens),
+            lookback_days=lookback_days,
+        )
+        account = await self._repository.get_account(account_id)
+        assert account is not None
+        return account
+
     async def list_accounts(self) -> list[dict]:
         return await self._repository.list_accounts()
 

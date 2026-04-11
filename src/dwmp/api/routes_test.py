@@ -14,9 +14,9 @@ from dwmp.storage.repository import PackageRepository
 from dwmp.services.tracking import TrackingService
 
 
-class StubOAuthCarrier(CarrierBase):
+class StubPostNLCarrier(CarrierBase):
     name = "postnl"
-    auth_type = AuthType.OAUTH
+    auth_type = AuthType.MANUAL_TOKEN
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
         return TrackingResult(
@@ -27,12 +27,6 @@ class StubOAuthCarrier(CarrierBase):
         return [
             TrackingResult(tracking_number="SYNCED-1", carrier=self.name, status=TrackingStatus.IN_TRANSIT),
         ]
-
-    async def get_auth_url(self, callback_url: str) -> str:
-        return f"https://fake.postnl.nl/auth?redirect={callback_url}"
-
-    async def handle_callback(self, code: str, callback_url: str) -> AuthTokens:
-        return AuthTokens(access_token="test-token", refresh_token="test-refresh")
 
 
 class StubCredCarrier(CarrierBase):
@@ -64,7 +58,7 @@ def app(repo):
     application = create_app()
     service = TrackingService(
         repository=repo,
-        carriers={"postnl": StubOAuthCarrier(), "dpd": StubCredCarrier()},
+        carriers={"postnl": StubPostNLCarrier(), "dpd": StubCredCarrier()},
     )
     application.dependency_overrides[get_repository] = lambda: repo
     application.dependency_overrides[get_tracking_service] = lambda: service
@@ -163,36 +157,19 @@ async def test_list_carriers_with_auth_type(client: AsyncClient):
     names = {c["name"] for c in carriers}
     assert names == {"postnl", "dpd"}
     postnl = next(c for c in carriers if c["name"] == "postnl")
-    assert postnl["auth_type"] == "oauth"
+    assert postnl["auth_type"] == "manual_token"
+    assert "auth_hint" in postnl
 
 
 # --- Account tests ---
 
-async def test_oauth_start(client: AsyncClient):
+async def test_manual_token_creates_postnl_account(client: AsyncClient):
     response = await client.post(
-        "/api/v1/accounts/oauth/start",
-        json={"carrier": "postnl", "callback_url": "http://localhost/callback"},
-    )
-    assert response.status_code == 200
-    assert "auth_url" in response.json()
-    assert "fake.postnl.nl" in response.json()["auth_url"]
-
-
-async def test_oauth_start_unknown_carrier(client: AsyncClient):
-    response = await client.post(
-        "/api/v1/accounts/oauth/start",
-        json={"carrier": "unknown", "callback_url": "http://x"},
-    )
-    assert response.status_code == 400
-
-
-async def test_oauth_callback_creates_account(client: AsyncClient):
-    response = await client.post(
-        "/api/v1/accounts/oauth/callback",
+        "/api/v1/accounts/token",
         json={
             "carrier": "postnl",
-            "code": "auth-code-123",
-            "callback_url": "http://localhost/callback",
+            "access_token": "my-postnl-token",
+            "refresh_token": "my-refresh",
             "lookback_days": 14,
         },
     )
@@ -203,7 +180,7 @@ async def test_oauth_callback_creates_account(client: AsyncClient):
     assert data["lookback_days"] == 14
 
 
-async def test_credentials_creates_account(client: AsyncClient):
+async def test_credentials_creates_dpd_account(client: AsyncClient):
     response = await client.post(
         "/api/v1/accounts/credentials",
         json={
@@ -219,10 +196,35 @@ async def test_credentials_creates_account(client: AsyncClient):
     assert data["status"] == "connected"
 
 
+async def test_manual_token_creates_account(client: AsyncClient):
+    response = await client.post(
+        "/api/v1/accounts/token",
+        json={
+            "carrier": "postnl",
+            "access_token": "my-access-token",
+            "refresh_token": "my-refresh-token",
+            "lookback_days": 30,
+        },
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["carrier"] == "postnl"
+    assert data["status"] == "connected"
+    assert data["auth_type"] == "manual_token"
+
+
+async def test_manual_token_unknown_carrier(client: AsyncClient):
+    response = await client.post(
+        "/api/v1/accounts/token",
+        json={"carrier": "unknown", "access_token": "tok"},
+    )
+    assert response.status_code == 400
+
+
 async def test_list_accounts_strips_tokens(client: AsyncClient):
     await client.post(
-        "/api/v1/accounts/oauth/callback",
-        json={"carrier": "postnl", "code": "c", "callback_url": "http://x"},
+        "/api/v1/accounts/token",
+        json={"carrier": "postnl", "access_token": "tok"},
     )
     response = await client.get("/api/v1/accounts")
     assert response.status_code == 200
@@ -232,8 +234,8 @@ async def test_list_accounts_strips_tokens(client: AsyncClient):
 
 async def test_delete_account(client: AsyncClient):
     create_resp = await client.post(
-        "/api/v1/accounts/oauth/callback",
-        json={"carrier": "postnl", "code": "c", "callback_url": "http://x"},
+        "/api/v1/accounts/token",
+        json={"carrier": "postnl", "access_token": "tok"},
     )
     account_id = create_resp.json()["id"]
 
@@ -243,8 +245,8 @@ async def test_delete_account(client: AsyncClient):
 
 async def test_sync_account(client: AsyncClient):
     create_resp = await client.post(
-        "/api/v1/accounts/oauth/callback",
-        json={"carrier": "postnl", "code": "c", "callback_url": "http://x"},
+        "/api/v1/accounts/token",
+        json={"carrier": "postnl", "access_token": "tok"},
     )
     account_id = create_resp.json()["id"]
 

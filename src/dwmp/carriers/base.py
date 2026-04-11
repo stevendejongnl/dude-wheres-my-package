@@ -18,6 +18,7 @@ class TrackingStatus(StrEnum):
 class AuthType(StrEnum):
     OAUTH = "oauth"
     CREDENTIALS = "credentials"
+    MANUAL_TOKEN = "manual_token"
 
 
 class AccountStatus(StrEnum):

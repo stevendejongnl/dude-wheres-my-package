@@ -40,42 +40,10 @@ def _parse_status(text: str) -> TrackingStatus:
 
 class PostNL(CarrierBase):
     name = "postnl"
-    auth_type = AuthType.OAUTH
+    auth_type = AuthType.MANUAL_TOKEN
 
     def __init__(self, http_client: httpx.AsyncClient | None = None) -> None:
         self._client = http_client
-
-    async def get_auth_url(self, callback_url: str) -> str:
-        return (
-            f"{POSTNL_AUTH_URL}"
-            f"?audience=poa-profiles-api"
-            f"&client_id={POSTNL_CLIENT_ID}"
-            f"&redirect_uri={callback_url}"
-            f"&response_type=code"
-            f"&scope=openid profile"
-            f"&ui_locales=nl-NL"
-        )
-
-    async def handle_callback(self, code: str, callback_url: str) -> AuthTokens:
-        async with self._get_client() as client:
-            response = await client.post(
-                POSTNL_TOKEN_URL,
-                data={
-                    "grant_type": "authorization_code",
-                    "client_id": POSTNL_CLIENT_ID,
-                    "code": code,
-                    "redirect_uri": callback_url,
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-
-        expires_in = data.get("expires_in", 3600)
-        return AuthTokens(
-            access_token=data["access_token"],
-            refresh_token=data.get("refresh_token"),
-            expires_at=datetime.now(timezone.utc) + timedelta(seconds=expires_in),
-        )
 
     async def refresh_tokens(self, tokens: AuthTokens) -> AuthTokens:
         if not tokens.refresh_token:
