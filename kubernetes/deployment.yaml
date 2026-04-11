@@ -15,11 +15,13 @@ spec:
       labels:
         app: dwmp
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       nodeSelector:
         kubernetes.io/hostname: worker-02
       containers:
         - name: dwmp
-          image: 192.168.1.7:5000/dude-wheres-my-package:latest
+          image: ghcr.io/stevendejongnl/dude-wheres-my-package:latest
           ports:
             - containerPort: 8000
           envFrom:

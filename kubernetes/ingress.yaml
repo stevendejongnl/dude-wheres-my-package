@@ -6,7 +6,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: packages.madebysteven.nl
+    - host: dwmp.madebysteven.nl
       http:
         paths:
           - path: /
