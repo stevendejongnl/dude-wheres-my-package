@@ -69,3 +69,40 @@ async def test_postnl_rejects_login():
     carrier = PostNL()
     with pytest.raises(NotImplementedError):
         await carrier.login("user", "pass")
+
+
+def test_parse_graphql_shipment_delivered():
+    carrier = PostNL()
+    shipment = {
+        "key": "abc123",
+        "barcode": "3STEST000001",
+        "title": "Pakket van bol",
+        "delivered": True,
+        "deliveredTimeStamp": "2026-04-10T14:30:00+02:00",
+        "deliveryWindowFrom": "2026-04-10T12:00:00+02:00",
+        "deliveryWindowTo": "2026-04-10T16:00:00+02:00",
+        "creationDateTime": "2026-04-09T08:00:00+02:00",
+        "shipmentType": "PARCEL",
+    }
+    result = carrier._parse_graphql_shipment(shipment)
+    assert result.tracking_number == "3STEST000001"
+    assert result.status == TrackingStatus.DELIVERED
+    assert len(result.events) == 2
+    assert result.events[0].status == TrackingStatus.PRE_TRANSIT
+    assert result.events[1].status == TrackingStatus.DELIVERED
+
+
+def test_parse_graphql_shipment_in_transit():
+    carrier = PostNL()
+    shipment = {
+        "key": "def456",
+        "barcode": "3STEST000002",
+        "title": "Pakket van Amazon",
+        "delivered": False,
+        "deliveryWindowFrom": "2026-04-12T09:00:00+02:00",
+        "creationDateTime": "2026-04-11T10:00:00+02:00",
+    }
+    result = carrier._parse_graphql_shipment(shipment)
+    assert result.tracking_number == "3STEST000002"
+    assert result.status == TrackingStatus.IN_TRANSIT
+    assert result.estimated_delivery is not None

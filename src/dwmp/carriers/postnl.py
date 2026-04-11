@@ -10,13 +10,35 @@ from dwmp.carriers.base import (
     TrackingStatus,
 )
 
-# PostNL OAuth / API endpoints
-POSTNL_STS_SERVER = "https://login.postnl.nl/101112a0-4a0f-4bbb-8176-2f1b2d370d7c"
-POSTNL_CLIENT_ID = "bd9f1610-b56d-4e05-a09b-f696f05ddade"
-POSTNL_AUTH_URL = f"{POSTNL_STS_SERVER}/auth-ui/v2/login"
-POSTNL_TOKEN_URL = f"{POSTNL_STS_SERVER}/oauth2/v2.0/token"
-POSTNL_API = "https://jouw.postnl.nl/web/api"
+# PostNL API endpoints
+POSTNL_GRAPHQL_URL = "https://jouw.postnl.nl/account/api/graphql"
 POSTNL_TRACK_URL = "https://jouw.postnl.nl/track-and-trace"
+
+SHIPMENTS_QUERY = """
+{
+  trackedShipments {
+    receiverShipments {
+      ...parcelShipment
+    }
+    senderShipments {
+      ...parcelShipment
+    }
+  }
+}
+
+fragment parcelShipment on TrackedShipmentResultType {
+  key
+  barcode
+  title
+  delivered
+  deliveredTimeStamp
+  deliveryWindowFrom
+  deliveryWindowTo
+  shipmentType
+  detailsUrl
+  creationDateTime
+}
+"""
 
 # Ordered most-specific first to avoid partial matches
 STATUS_MAP: list[tuple[str, TrackingStatus]] = [
@@ -29,6 +51,12 @@ STATUS_MAP: list[tuple[str, TrackingStatus]] = [
     ("Niet bezorgd", TrackingStatus.FAILED_ATTEMPT),
     ("Retour", TrackingStatus.RETURNED),
 ]
+
+
+def _ensure_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def _parse_status(text: str) -> TrackingStatus:
@@ -45,36 +73,19 @@ class PostNL(CarrierBase):
     def __init__(self, http_client: httpx.AsyncClient | None = None) -> None:
         self._client = http_client
 
-    async def refresh_tokens(self, tokens: AuthTokens) -> AuthTokens:
-        if not tokens.refresh_token:
-            raise ValueError("No refresh token available")
-
-        async with self._get_client() as client:
-            response = await client.post(
-                POSTNL_TOKEN_URL,
-                data={
-                    "grant_type": "refresh_token",
-                    "client_id": POSTNL_CLIENT_ID,
-                    "refresh_token": tokens.refresh_token,
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-
-        expires_in = data.get("expires_in", 3600)
-        return AuthTokens(
-            access_token=data["access_token"],
-            refresh_token=data.get("refresh_token", tokens.refresh_token),
-            expires_at=datetime.now(timezone.utc) + timedelta(seconds=expires_in),
-        )
-
     async def sync_packages(
         self, tokens: AuthTokens, lookback_days: int = 30
     ) -> list[TrackingResult]:
         async with self._get_client() as client:
-            response = await client.get(
-                f"{POSTNL_API}/shipments",
-                headers={"Authorization": f"Bearer {tokens.access_token}"},
+            response = await client.post(
+                POSTNL_GRAPHQL_URL,
+                json={"variables": {}, "query": SHIPMENTS_QUERY},
+                headers={
+                    "Authorization": f"Bearer {tokens.access_token}",
+                    "Accept": "application/json",
+                    "Accept-Language": "nl-NL",
+                    "Content-Type": "application/json",
+                },
             )
             response.raise_for_status()
             data = response.json()
@@ -82,13 +93,13 @@ class PostNL(CarrierBase):
         results: list[TrackingResult] = []
         cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
 
-        for shipment in data.get("shipments", data.get("colli", [])):
-            result = self._parse_shipment(shipment)
-            # Filter by lookback window
+        tracked = data.get("data", {}).get("trackedShipments", {})
+        all_shipments = tracked.get("receiverShipments", []) + tracked.get("senderShipments", [])
+
+        for shipment in all_shipments:
+            result = self._parse_graphql_shipment(shipment)
             if result.events:
                 latest = max(e.timestamp for e in result.events)
-                if latest.tzinfo is None:
-                    latest = latest.replace(tzinfo=timezone.utc)
                 if latest < cutoff:
                     continue
             results.append(result)
@@ -130,9 +141,51 @@ class PostNL(CarrierBase):
             status=TrackingStatus.UNKNOWN,
         )
 
-    def _parse_shipment(self, shipment: dict) -> TrackingResult:
-        tracking_number = shipment.get("barcode", shipment.get("key", "unknown"))
-        return self._parse_json(tracking_number, shipment)
+    def _parse_graphql_shipment(self, shipment: dict) -> TrackingResult:
+        barcode = shipment.get("barcode", shipment.get("key", "unknown"))
+        delivered = shipment.get("delivered", False)
+        status = TrackingStatus.DELIVERED if delivered else TrackingStatus.IN_TRANSIT
+        title = shipment.get("title", "")
+
+        events: list[TrackingEvent] = []
+
+        created = shipment.get("creationDateTime")
+        if created:
+            try:
+                events.append(TrackingEvent(
+                    timestamp=_ensure_utc(datetime.fromisoformat(created)),
+                    status=TrackingStatus.PRE_TRANSIT,
+                    description=title or "Shipment registered",
+                ))
+            except ValueError:
+                pass
+
+        delivered_ts = shipment.get("deliveredTimeStamp")
+        if delivered_ts:
+            try:
+                events.append(TrackingEvent(
+                    timestamp=_ensure_utc(datetime.fromisoformat(delivered_ts)),
+                    status=TrackingStatus.DELIVERED,
+                    description="Bezorgd",
+                ))
+            except ValueError:
+                pass
+
+        estimated = None
+        window_from = shipment.get("deliveryWindowFrom")
+        if window_from:
+            try:
+                estimated = datetime.fromisoformat(window_from)
+            except ValueError:
+                pass
+
+        return TrackingResult(
+            tracking_number=barcode,
+            carrier=self.name,
+            status=status,
+            estimated_delivery=estimated,
+            events=sorted(events, key=lambda e: e.timestamp),
+        )
 
     def _parse_json(self, tracking_number: str, data: dict) -> TrackingResult:
         events: list[TrackingEvent] = []
