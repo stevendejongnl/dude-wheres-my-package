@@ -2,11 +2,79 @@
 
 Package tracking service for Dutch carriers. Runs as a container with a REST API and background poller.
 
-## Supported Carriers
+## Carrier Setup
 
-- PostNL
-- DHL
-- DPD
+### PostNL
+
+**Auth type:** `manual_token` (browser login required)
+
+PostNL uses Akamai Identity Cloud with no public API registration. Tokens must be captured from the browser after logging in.
+
+**Steps:**
+
+1. Open https://jouw.postnl.nl/account/mijn-pakketten in your browser
+2. Log in with your PostNL account
+3. Open DevTools (F12) > **Application** tab > **Session Storage** > `jouw.postnl.nl`
+4. Find the key `akamai:1e450c3d-5bbb-4f34-9264-dd51fa9fd066:oidc-tokens`
+5. Copy the `access_token` and `refresh_token` values
+6. Connect:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "carrier": "postnl",
+    "access_token": "<paste access_token>",
+    "refresh_token": "<paste refresh_token>"
+  }'
+```
+
+7. Sync your packages:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
+```
+
+**API:** GraphQL at `jouw.postnl.nl/account/api/graphql` — returns all tracked shipments (sent and received).
+
+**Token lifetime:** Short-lived (~5 min). The refresh token can extend the session. If sync fails with `auth_failed`, repeat the browser login.
+
+### DHL
+
+**Auth type:** `oauth` (not yet fully implemented)
+
+DHL uses OAuth. The redirect URI registration is pending. For now, use the manual token approach (same as PostNL — log in at My DHL, grab the token from DevTools).
+
+### DPD
+
+**Auth type:** `credentials`
+
+DPD supports direct username/password login.
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/credentials \
+  -H "Content-Type: application/json" \
+  -d '{
+    "carrier": "dpd",
+    "username": "<your DPD username>",
+    "password": "<your DPD password>"
+  }'
+```
+
+### Manual Tracking (any carrier)
+
+You can also track individual packages without an account:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/packages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tracking_number": "3SXXXX123456789",
+    "carrier": "postnl",
+    "label": "New headphones",
+    "postal_code": "1234AB"
+  }'
+```
 
 ## Quick Start
 
@@ -18,14 +86,39 @@ uv run uvicorn dwmp.api.app:app --reload
 
 ## API
 
+### Carriers
+
+```
+GET    /api/v1/carriers               # List carriers with auth_type and setup hints
+```
+
+### Accounts (connect carrier accounts)
+
+```
+POST   /api/v1/accounts/token         # Connect with manual token {carrier, access_token, refresh_token?}
+POST   /api/v1/accounts/credentials   # Connect with login {carrier, username, password}
+POST   /api/v1/accounts/oauth/start   # Start OAuth flow {carrier, callback_url}
+POST   /api/v1/accounts/oauth/callback # Complete OAuth {carrier, code, callback_url}
+GET    /api/v1/accounts               # List connected accounts (tokens stripped)
+GET    /api/v1/accounts/{id}          # Account details
+DELETE /api/v1/accounts/{id}          # Disconnect account
+POST   /api/v1/accounts/{id}/sync     # Force sync packages from account
+```
+
+### Packages
+
+```
+GET    /api/v1/packages               # List all packages (from accounts + manual)
+POST   /api/v1/packages               # Manually add {tracking_number, carrier, label?, postal_code?}
+GET    /api/v1/packages/{id}          # Package details + event history
+DELETE /api/v1/packages/{id}          # Stop tracking
+POST   /api/v1/packages/{id}/refresh  # Force refresh single package
+```
+
+### Health
+
 ```
 GET    /health                        # Health check
-GET    /api/v1/carriers               # List supported carriers
-GET    /api/v1/packages               # List tracked packages
-POST   /api/v1/packages               # Add package
-GET    /api/v1/packages/{id}          # Package details + events
-DELETE /api/v1/packages/{id}          # Stop tracking
-POST   /api/v1/packages/{id}/refresh  # Force refresh
 ```
 
 ## Docker
