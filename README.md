@@ -41,25 +41,11 @@ curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
 
 ### DHL
 
-**Auth type:** `oauth` (not yet fully implemented)
-
-DHL uses OAuth. The redirect URI registration is pending. For now, use the manual token approach (same as PostNL — log in at My DHL, grab the token from DevTools).
+Not yet implemented. Auth flow and API endpoints need to be researched and tested.
 
 ### DPD
 
-**Auth type:** `credentials`
-
-DPD supports direct username/password login.
-
-```bash
-curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/credentials \
-  -H "Content-Type: application/json" \
-  -d '{
-    "carrier": "dpd",
-    "username": "<your DPD username>",
-    "password": "<your DPD password>"
-  }'
-```
+Not yet implemented. Auth flow and API endpoints need to be researched and tested.
 
 ### Manual Tracking (any carrier)
 
