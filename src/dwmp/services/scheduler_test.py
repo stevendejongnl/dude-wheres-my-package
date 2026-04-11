@@ -1,0 +1,133 @@
+import pytest
+
+from dwmp.services.scheduler import PackageScheduler
+from dwmp.services.tracking import TrackingService
+from dwmp.storage.repository import PackageRepository
+from dwmp.carriers.base import (
+    AuthTokens,
+    AuthType,
+    CarrierAuthError,
+    CarrierBase,
+    TrackingResult,
+    TrackingStatus,
+)
+
+
+class StubCarrier(CarrierBase):
+    name = "stub"
+    auth_type = AuthType.CREDENTIALS
+    track_count = 0
+    sync_count = 0
+
+    async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        self.track_count += 1
+        return TrackingResult(
+            tracking_number=tracking_number,
+            carrier="stub",
+            status=TrackingStatus.IN_TRANSIT,
+        )
+
+    async def sync_packages(
+        self, tokens: AuthTokens, lookback_days: int = 30
+    ) -> list[TrackingResult]:
+        self.sync_count += 1
+        return [
+            TrackingResult(
+                tracking_number="FROM-ACCOUNT",
+                carrier="stub",
+                status=TrackingStatus.IN_TRANSIT,
+            )
+        ]
+
+    async def login(self, username: str, password: str) -> AuthTokens:
+        return AuthTokens(access_token="stub-token")
+
+
+class FailingCarrier(CarrierBase):
+    name = "failing"
+    auth_type = AuthType.CREDENTIALS
+
+    async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        return TrackingResult(
+            tracking_number=tracking_number, carrier="failing", status=TrackingStatus.UNKNOWN
+        )
+
+    async def sync_packages(
+        self, tokens: AuthTokens, lookback_days: int = 30
+    ) -> list[TrackingResult]:
+        raise RuntimeError("Carrier API changed")
+
+    async def login(self, username: str, password: str) -> AuthTokens:
+        return AuthTokens(access_token="fail-token")
+
+
+@pytest.fixture
+async def repo(tmp_path):
+    r = PackageRepository(db_path=tmp_path / "test.db")
+    await r.init()
+    yield r
+    await r.close()
+
+
+async def test_poll_syncs_accounts_and_manual_packages(repo):
+    carrier = StubCarrier()
+    service = TrackingService(repository=repo, carriers={"stub": carrier})
+    scheduler = PackageScheduler(tracking_service=service)
+
+    # Add a connected account
+    account = await service.connect_account_credentials(
+        "stub", "user", "pass", lookback_days=30
+    )
+
+    # Add a manual package
+    await service.add_package(tracking_number="MANUAL1", carrier="stub")
+
+    await scheduler._poll_all()
+
+    # Account was synced
+    assert carrier.sync_count == 1
+    # Manual package was refreshed
+    assert carrier.track_count == 1
+
+
+async def test_poll_skips_auth_failed_accounts(repo):
+    carrier = StubCarrier()
+    service = TrackingService(repository=repo, carriers={"stub": carrier})
+    scheduler = PackageScheduler(tracking_service=service)
+
+    account_id = await repo.add_account(
+        carrier="stub", auth_type="credentials",
+        tokens={"access_token": "old"}, username="user",
+    )
+    await repo.update_account_status(
+        account_id, "auth_failed", "Login flow changed"
+    )
+
+    await scheduler._poll_all()
+    # Should NOT have tried to sync
+    assert carrier.sync_count == 0
+
+
+async def test_poll_handles_sync_failure_gracefully(repo):
+    """When a carrier's API fails, the account is marked auth_failed
+    and a descriptive error message is stored."""
+    carrier = FailingCarrier()
+    service = TrackingService(repository=repo, carriers={"failing": carrier})
+    scheduler = PackageScheduler(tracking_service=service)
+
+    account_id = await repo.add_account(
+        carrier="failing", auth_type="credentials",
+        tokens={"access_token": "tok"}, username="user",
+    )
+
+    await scheduler._poll_all()
+
+    account = await repo.get_account(account_id)
+    assert account["status"] == "auth_failed"
+    assert "login flow may have changed" in account["status_message"]
+
+
+async def test_poll_handles_empty(repo):
+    service = TrackingService(repository=repo, carriers={})
+    scheduler = PackageScheduler(tracking_service=service)
+    await scheduler._poll_all()  # Should not raise

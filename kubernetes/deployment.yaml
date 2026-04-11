@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dwmp
+  namespace: package-tracking
+  labels:
+    app: dwmp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dwmp
+  template:
+    metadata:
+      labels:
+        app: dwmp
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: worker-02
+      containers:
+        - name: dwmp
+          image: 192.168.1.7:5000/dude-wheres-my-package:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: dwmp-config
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          env:
+            - name: DB_PATH
+              value: /app/data/dwmp.db
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: dwmp-data-pvc

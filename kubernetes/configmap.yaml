@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dwmp-config
+  namespace: package-tracking
+data:
+  POLL_INTERVAL_MINUTES: "30"

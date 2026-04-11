@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dwmp
+  namespace: package-tracking
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: packages.madebysteven.nl
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dwmp
+                port:
+                  number: 8000
