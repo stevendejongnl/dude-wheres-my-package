@@ -10,24 +10,36 @@ from dwmp.carriers.base import (
     TrackingStatus,
 )
 
-# DHL OAuth / API endpoints
-DHL_AUTH_URL = "https://api.dhl.com/authorize"
-DHL_TOKEN_URL = "https://api.dhl.com/oauth/token"
-DHL_SHIPMENTS_URL = "https://api.dhl.com/shipments"
+# DHL eCommerce NL endpoints
+DHL_BASE = "https://my.dhlecommerce.nl"
+DHL_LOGIN_URL = f"{DHL_BASE}/api/user/login"
+DHL_PARCELS_URL = f"{DHL_BASE}/receiver-parcel-api/parcels"
 DHL_TRACKING_URL = "https://www.dhl.com/shipmentTracking"
 
 STATUS_MAP: list[tuple[str, TrackingStatus]] = [
     ("delivered", TrackingStatus.DELIVERED),
+    ("out_for_delivery", TrackingStatus.OUT_FOR_DELIVERY),
     ("out for delivery", TrackingStatus.OUT_FOR_DELIVERY),
+    ("door_delivery", TrackingStatus.OUT_FOR_DELIVERY),
+    ("in_transit", TrackingStatus.IN_TRANSIT),
     ("in transit", TrackingStatus.IN_TRANSIT),
     ("transit", TrackingStatus.IN_TRANSIT),
-    ("processed", TrackingStatus.IN_TRANSIT),
-    ("picked up", TrackingStatus.IN_TRANSIT),
-    ("shipment information received", TrackingStatus.PRE_TRANSIT),
+    ("sorting", TrackingStatus.IN_TRANSIT),
+    ("prenotification_received", TrackingStatus.PRE_TRANSIT),
+    ("data_received", TrackingStatus.PRE_TRANSIT),
     ("pre-transit", TrackingStatus.PRE_TRANSIT),
+    ("shipment information received", TrackingStatus.PRE_TRANSIT),
+    ("failed_delivery", TrackingStatus.FAILED_ATTEMPT),
     ("failed delivery", TrackingStatus.FAILED_ATTEMPT),
     ("returned", TrackingStatus.RETURNED),
+    ("returned_to_shipper", TrackingStatus.RETURNED),
 ]
+
+
+def _ensure_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def _parse_status(text: str) -> TrackingStatus:
@@ -40,68 +52,48 @@ def _parse_status(text: str) -> TrackingStatus:
 
 class DHL(CarrierBase):
     name = "dhl"
-    auth_type = AuthType.OAUTH
+    auth_type = AuthType.CREDENTIALS
 
     def __init__(self, http_client: httpx.AsyncClient | None = None) -> None:
         self._client = http_client
 
-    async def get_auth_url(self, callback_url: str) -> str:
-        return (
-            f"{DHL_AUTH_URL}"
-            f"?redirect_uri={callback_url}"
-            f"&response_type=code"
-            f"&scope=shipments"
-        )
+    async def login(self, username: str, password: str) -> AuthTokens:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            # GET the login page first to get XSRF cookie
+            await client.get(f"{DHL_BASE}/account/sign-in")
+            xsrf = client.cookies.get("XSRF-TOKEN", "")
 
-    async def handle_callback(self, code: str, callback_url: str) -> AuthTokens:
-        async with self._get_client() as client:
             response = await client.post(
-                DHL_TOKEN_URL,
-                data={
-                    "grant_type": "authorization_code",
-                    "code": code,
-                    "redirect_uri": callback_url,
-                },
+                DHL_LOGIN_URL,
+                json={"email": username, "password": password},
+                headers={"x-xsrf-token": xsrf},
             )
             response.raise_for_status()
-            data = response.json()
 
-        expires_in = data.get("expires_in", 3600)
+            # Store all cookies as the "token" — DHL uses cookie-based sessions
+            cookies = {name: value for name, value in client.cookies.items()}
+
         return AuthTokens(
-            access_token=data["access_token"],
-            refresh_token=data.get("refresh_token"),
-            expires_at=datetime.now(timezone.utc) + timedelta(seconds=expires_in),
-        )
-
-    async def refresh_tokens(self, tokens: AuthTokens) -> AuthTokens:
-        if not tokens.refresh_token:
-            raise ValueError("No refresh token available")
-
-        async with self._get_client() as client:
-            response = await client.post(
-                DHL_TOKEN_URL,
-                data={
-                    "grant_type": "refresh_token",
-                    "refresh_token": tokens.refresh_token,
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-
-        expires_in = data.get("expires_in", 3600)
-        return AuthTokens(
-            access_token=data["access_token"],
-            refresh_token=data.get("refresh_token", tokens.refresh_token),
-            expires_at=datetime.now(timezone.utc) + timedelta(seconds=expires_in),
+            access_token=cookies.get("XSRF-TOKEN", ""),
+            refresh_token=None,
         )
 
     async def sync_packages(
         self, tokens: AuthTokens, lookback_days: int = 30
     ) -> list[TrackingResult]:
+        # DHL uses cookie sessions — we need to re-login each sync
+        # The "access_token" field stores the XSRF token from the last login
+        # But cookies expire, so we store email/password in the account and re-login
+
+        # For now, use the stored XSRF token + cookie session approach
         async with self._get_client() as client:
             response = await client.get(
-                DHL_SHIPMENTS_URL,
-                headers={"Authorization": f"Bearer {tokens.access_token}"},
+                DHL_PARCELS_URL,
+                params={"tab": "incoming"},
+                headers={
+                    "Accept": "application/json",
+                    "x-xsrf-token": tokens.access_token,
+                },
             )
             response.raise_for_status()
             data = response.json()
@@ -109,12 +101,10 @@ class DHL(CarrierBase):
         results: list[TrackingResult] = []
         cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
 
-        for shipment in data.get("shipments", data.get("results", [])):
-            result = self._parse_shipment(shipment)
+        for parcel in data.get("parcels", []):
+            result = self._parse_parcel(parcel)
             if result.events:
                 latest = max(e.timestamp for e in result.events)
-                if latest.tzinfo is None:
-                    latest = latest.replace(tzinfo=timezone.utc)
                 if latest < cutoff:
                     continue
             results.append(result)
@@ -140,18 +130,62 @@ class DHL(CarrierBase):
             )
             response.raise_for_status()
 
-        return self._parse_response(tracking_number, response.json())
+        return self._parse_tracking_response(tracking_number, response.json())
 
     def _get_client(self):
         if self._client:
             return _noop_ctx(self._client)
         return httpx.AsyncClient()
 
-    def _parse_shipment(self, shipment: dict) -> TrackingResult:
-        tracking_number = shipment.get("id", shipment.get("trackingNumber", "unknown"))
-        return self._parse_response(tracking_number, {"results": [shipment]})
+    def _parse_parcel(self, parcel: dict) -> TrackingResult:
+        barcode = parcel.get("barcode", "unknown")
+        status_text = parcel.get("status", "")
+        status = _parse_status(status_text)
 
-    def _parse_response(self, tracking_number: str, data: dict) -> TrackingResult:
+        sender_name = parcel.get("sender", {}).get("name", "")
+
+        events: list[TrackingEvent] = []
+
+        created = parcel.get("createdAt")
+        if created:
+            try:
+                events.append(TrackingEvent(
+                    timestamp=_ensure_utc(datetime.fromisoformat(created)),
+                    status=TrackingStatus.PRE_TRANSIT,
+                    description=sender_name or "Shipment registered",
+                ))
+            except ValueError:
+                pass
+
+        receiving = parcel.get("receivingTimeIndication", {})
+        if receiving and receiving.get("moment"):
+            try:
+                events.append(TrackingEvent(
+                    timestamp=_ensure_utc(datetime.fromisoformat(receiving["moment"])),
+                    status=TrackingStatus.DELIVERED,
+                    description="Bezorgd",
+                ))
+            except ValueError:
+                pass
+
+        estimated = None
+        if receiving and receiving.get("indicationType") != "MomentIndication":
+            moment = receiving.get("moment")
+            if moment:
+                try:
+                    estimated = _ensure_utc(datetime.fromisoformat(moment))
+                except ValueError:
+                    pass
+
+        return TrackingResult(
+            tracking_number=barcode,
+            carrier=self.name,
+            status=status,
+            estimated_delivery=estimated,
+            events=sorted(events, key=lambda e: e.timestamp),
+        )
+
+    def _parse_tracking_response(self, tracking_number: str, data: dict) -> TrackingResult:
         events: list[TrackingEvent] = []
         status = TrackingStatus.UNKNOWN
 
@@ -183,9 +217,9 @@ class DHL(CarrierBase):
                 location_parts.append(loc)
 
             try:
-                ts = datetime.fromisoformat(ts_str) if ts_str else datetime.now()
+                ts = _ensure_utc(datetime.fromisoformat(ts_str)) if ts_str else datetime.now(timezone.utc)
             except ValueError:
-                ts = datetime.now()
+                ts = datetime.now(timezone.utc)
 
             events.append(
                 TrackingEvent(
@@ -196,21 +230,10 @@ class DHL(CarrierBase):
                 )
             )
 
-        estimated_str = shipment.get("estimatedDeliveryDate") or shipment.get(
-            "estimatedTimeOfDelivery"
-        )
-        estimated = None
-        if estimated_str:
-            try:
-                estimated = datetime.fromisoformat(estimated_str)
-            except ValueError:
-                pass
-
         return TrackingResult(
             tracking_number=tracking_number,
             carrier=self.name,
             status=status,
-            estimated_delivery=estimated,
             events=sorted(events, key=lambda e: e.timestamp),
         )
 

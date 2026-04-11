@@ -41,7 +41,32 @@ curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
 
 ### DHL
 
-Not yet implemented. Auth flow and API endpoints need to be researched and tested.
+**Auth type:** `credentials` (email + password)
+
+DHL eCommerce NL (`my.dhlecommerce.nl`) uses cookie-based sessions with email/password login.
+
+**Steps:**
+
+1. Create a Mijn DHL account at https://my.dhlecommerce.nl/account/sign-up (if you don't have one)
+2. Connect:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/credentials \
+  -H "Content-Type: application/json" \
+  -d '{
+    "carrier": "dhl",
+    "username": "<your email>",
+    "password": "<your password>"
+  }'
+```
+
+3. Sync your packages:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
+```
+
+**API:** REST at `my.dhlecommerce.nl/receiver-parcel-api/parcels` — returns incoming and outgoing parcels.
 
 ### DPD
 
