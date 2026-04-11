@@ -59,7 +59,6 @@ class DHL(CarrierBase):
 
     async def login(self, username: str, password: str) -> AuthTokens:
         async with httpx.AsyncClient(follow_redirects=True) as client:
-            # GET the login page first to get XSRF cookie
             await client.get(f"{DHL_BASE}/account/sign-in")
             xsrf = client.cookies.get("XSRF-TOKEN", "")
 
@@ -70,33 +69,44 @@ class DHL(CarrierBase):
             )
             response.raise_for_status()
 
-            # Store all cookies as the "token" — DHL uses cookie-based sessions
-            cookies = {name: value for name, value in client.cookies.items()}
-
+        # Store credentials so we can re-login during sync (cookie sessions expire)
         return AuthTokens(
-            access_token=cookies.get("XSRF-TOKEN", ""),
+            access_token=f"{username}:{password}",
             refresh_token=None,
         )
 
-    async def sync_packages(
-        self, tokens: AuthTokens, lookback_days: int = 30
-    ) -> list[TrackingResult]:
-        # DHL uses cookie sessions — we need to re-login each sync
-        # The "access_token" field stores the XSRF token from the last login
-        # But cookies expire, so we store email/password in the account and re-login
+    async def _login_and_fetch_parcels(self, tokens: AuthTokens) -> dict:
+        """Login and fetch parcels in a single HTTP session (cookies don't transfer)."""
+        parts = tokens.access_token.split(":", 1)
+        email, password = parts[0], parts[1] if len(parts) > 1 else ""
 
-        # For now, use the stored XSRF token + cookie session approach
-        async with self._get_client() as client:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            await client.get(f"{DHL_BASE}/account/sign-in")
+            xsrf = client.cookies.get("XSRF-TOKEN", "")
+
+            response = await client.post(
+                DHL_LOGIN_URL,
+                json={"email": email, "password": password},
+                headers={"x-xsrf-token": xsrf},
+            )
+            response.raise_for_status()
+
+            xsrf = client.cookies.get("XSRF-TOKEN", xsrf)
             response = await client.get(
                 DHL_PARCELS_URL,
                 params={"tab": "incoming"},
                 headers={
                     "Accept": "application/json",
-                    "x-xsrf-token": tokens.access_token,
+                    "x-xsrf-token": xsrf,
                 },
             )
             response.raise_for_status()
-            data = response.json()
+            return response.json()
+
+    async def sync_packages(
+        self, tokens: AuthTokens, lookback_days: int = 30
+    ) -> list[TrackingResult]:
+        data = await self._login_and_fetch_parcels(tokens)
 
         results: list[TrackingResult] = []
         cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
