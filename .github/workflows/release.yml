@@ -50,11 +50,6 @@ jobs:
 
       - run: pip install python-semantic-release
 
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
       - name: Semantic Release
         id: release
         env:
@@ -65,11 +60,7 @@ jobs:
             echo "released=true" >> "$GITHUB_OUTPUT"
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
             echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-            # Update uv.lock so the installed package version matches
-            uv lock
-            git add uv.lock
-            git commit --amend --no-edit
-            git push --force-with-lease
+            git push
             git push --tags
             semantic-release publish
           else
