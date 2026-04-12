@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.15.1 (2026-04-12)
+
+### Bug Fixes
+
+- **ci**: Add retry mechanism for Docker push to GHCR
+  ([`13c7398`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/13c7398506226cba55e249e4147516afd891d5ca))
+
+
 ## v1.15.0 (2026-04-12)
 
 ### Features
