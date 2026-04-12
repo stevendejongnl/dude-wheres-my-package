@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.1 (2026-04-12)
+
+### Bug Fixes
+
+- **ui**: Larger header icon, remove DWMP text, version badge pill
+  ([`67929e9`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/67929e9e83f203277ad0ac5674c461f26e90f425))
+
+
 ## v1.5.0 (2026-04-12)
 
 ### Features
