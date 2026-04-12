@@ -3,6 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DWMP">
+  <meta name="theme-color" content="#0f1117">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
   <title>{% block title %}DWMP{% endblock %}</title>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <style>
@@ -168,7 +174,11 @@
 <body>
   <header>
     <div class="container">
-      <h1><span>DWMP</span> Dude, Where's My Package? <span style="font-size:0.6rem;color:var(--text-dim);font-weight:400;vertical-align:middle;">v{{ version }}</span></h1>
+      <h1>
+        <img src="/static/icon-64.png" alt="" style="width:28px;height:28px;vertical-align:middle;margin-right:8px;border-radius:6px;">
+        <span>DWMP</span> Dude, Where's My Package?
+        <span style="font-size:0.6rem;color:var(--text-dim);font-weight:400;vertical-align:middle;">v{{ version }}</span>
+      </h1>
       <nav>
         <a href="/" class="{% if active_nav == 'packages' %}active{% endif %}">Packages</a>
         <a href="/accounts" class="{% if active_nav == 'accounts' %}active{% endif %}">Accounts</a>
