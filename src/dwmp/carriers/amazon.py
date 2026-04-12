@@ -84,6 +84,11 @@ def _parse_status(text: str) -> TrackingStatus:
     lower = text.lower()
     for key, status in STATUS_MAP:
         if key in lower:
+            # "Wordt morgen bezorgd" / "Wordt 14 apr. bezorgd" is future tense,
+            # not a completed delivery.  "Wordt vandaag bezorgd" already matched
+            # OUT_FOR_DELIVERY above, so this only catches the remaining cases.
+            if status == TrackingStatus.DELIVERED and "wordt" in lower:
+                return TrackingStatus.IN_TRANSIT
             return status
     return TrackingStatus.UNKNOWN
 

@@ -34,6 +34,17 @@ def test_parse_status_in_transit():
     assert _parse_status("Verwacht op woensdag 16 april") == TrackingStatus.IN_TRANSIT
 
 
+def test_parse_status_future_delivery_is_not_delivered():
+    """'Wordt morgen bezorgd' is future tense — NOT delivered."""
+    assert _parse_status("Wordt morgen bezorgd") == TrackingStatus.IN_TRANSIT
+    assert _parse_status("Wordt 14 apr. bezorgd") == TrackingStatus.IN_TRANSIT
+    assert _parse_status("Wordt dinsdag bezorgd") == TrackingStatus.IN_TRANSIT
+    # But actual past-tense delivery is still DELIVERED
+    assert _parse_status("Bezorgd op 8 apr.") == TrackingStatus.DELIVERED
+    # And "vandaag" is the existing OUT_FOR_DELIVERY
+    assert _parse_status("Wordt vandaag bezorgd") == TrackingStatus.OUT_FOR_DELIVERY
+
+
 def test_parse_status_pre_transit():
     assert _parse_status("Besteld op 5 april 2026") == TrackingStatus.PRE_TRANSIT
     assert _parse_status("Wordt momenteel verzonden") == TrackingStatus.PRE_TRANSIT

@@ -106,8 +106,20 @@ async def packages_page(
             pkg["events"] = full.get("events", [])
         _enrich_package(pkg)
 
-    active = [p for p in packages if p["current_status"] not in ("delivered", "returned")]
-    delivered = [p for p in packages if p["current_status"] in ("delivered", "returned")]
+    def _last_event_ts(pkg: dict) -> str:
+        events = pkg.get("events", [])
+        if events:
+            return events[-1].get("timestamp", "")
+        return pkg.get("updated_at", "")
+
+    active = sorted(
+        [p for p in packages if p["current_status"] not in ("delivered", "returned")],
+        key=_last_event_ts, reverse=True,
+    )
+    delivered = sorted(
+        [p for p in packages if p["current_status"] in ("delivered", "returned")],
+        key=_last_event_ts, reverse=True,
+    )
 
     accounts = await service.list_accounts()
 
