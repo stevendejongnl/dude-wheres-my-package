@@ -11,6 +11,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from dwmp.api.auth import is_authenticated
 
+from importlib.metadata import version as pkg_version
+
 from dwmp.api.routes import router
 from dwmp.api.views import router as views_router, _LoginRequired
 from dwmp.api.dependencies import get_repository, get_tracking_service
@@ -54,7 +56,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Dude, Where's My Package?",
-        version="0.1.0",
+        version=pkg_version("dude-wheres-my-package"),
         lifespan=lifespan,
     )
 
