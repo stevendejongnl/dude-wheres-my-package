@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.9.1 (2026-04-12)
+
+### Bug Fixes
+
+- **ci**: Add explicit packages:write permission to docker job and use repository_owner for GHCR
+  login
+  ([`f90289e`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/f90289e3496b4490630c19bc4a2e091ba7ae4bb6))
+
+
 ## v1.9.0 (2026-04-12)
 
 ### Features
