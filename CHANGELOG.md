@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.14.5 (2026-04-12)
+
+### Bug Fixes
+
+- **ci**: Stage uv.lock in build_command so it's included in release commit
+  ([`286d99e`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/286d99e1089071a95e924ddd04ba72aa76453f1d))
+
+
 ## v1.14.4 (2026-04-12)
 
 ### Bug Fixes
