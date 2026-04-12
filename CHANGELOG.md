@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.0 (2026-04-12)
+
+### Features
+
+- **dpd**: Implement DPD carrier with Keycloak auth and HTML scraping
+  ([`4e8b56f`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/4e8b56f6f645e218441c2fb8b452da8c14bba5cc))
+
+
 ## v1.1.1 (2026-04-11)
 
 ### Bug Fixes
