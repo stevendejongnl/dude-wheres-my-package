@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.14.0 (2026-04-12)
+
+### Features
+
+- **api**: Add POST /api/v1/auth/token endpoint for machine-to-machine auth
+  ([`e8392b0`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/e8392b0f4008bbdacb9be5b8d4b9c6a995d6e323))
+
+
 ## v1.13.0 (2026-04-12)
 
 ### Features
