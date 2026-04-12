@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.12.4 (2026-04-12)
+
+### Bug Fixes
+
+- **ui**: Convert timestamps to configured TZ (default Europe/Amsterdam)
+  ([`38c2114`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/38c21145b4a2ba3cb310ba785785095d4c764747))
+
+
 ## v1.12.3 (2026-04-12)
 
 ### Bug Fixes
