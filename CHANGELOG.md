@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.9.2 (2026-04-12)
+
+### Bug Fixes
+
+- **k8s**: Pin deployment to 1.9.1 (tag that exists in GHCR)
+  ([`f17563c`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/f17563cfa8057c7dcadd1f564007aede6aa5f8d7))
+
+
 ## v1.9.1 (2026-04-12)
 
 ### Bug Fixes
