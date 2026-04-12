@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.14.6 (2026-04-12)
+
+### Bug Fixes
+
+- **ci**: Build Docker in release job to fix version mismatch
+  ([`549c232`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/549c232cc1183f297cb1bcb7d2b0652e1f5c2683))
+
+
 ## v1.14.5 (2026-04-12)
 
 ### Bug Fixes
