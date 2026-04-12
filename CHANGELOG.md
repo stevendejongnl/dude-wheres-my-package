@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.2 (2026-04-12)
+
+### Bug Fixes
+
+- **ui**: Larger header icon (48px CSS, 96px retina)
+  ([`fb6023d`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/fb6023d54fbe9f826f7c118ae2d69e28314df1c4))
+
+
 ## v1.5.1 (2026-04-12)
 
 ### Bug Fixes
