@@ -121,10 +121,21 @@ class DPD(CarrierBase):
             sender = sender_el.get_text(strip=True) if sender_el else ""
             sender = sender.replace("Parcel from ", "").strip()
 
+            # Create a PRE_TRANSIT event with sender name so the UI
+            # can display "from <sender>" (same pattern as PostNL/DHL).
+            events: list[TrackingEvent] = []
+            if sender:
+                events.append(TrackingEvent(
+                    timestamp=datetime.now(timezone.utc),
+                    status=TrackingStatus.PRE_TRANSIT,
+                    description=sender,
+                ))
+
             result = TrackingResult(
                 tracking_number=tracking_number,
                 carrier=self.name,
                 status=TrackingStatus.IN_TRANSIT,
+                events=events,
             )
             results.append(result)
 
@@ -182,15 +193,26 @@ class DPD(CarrierBase):
             if status == TrackingStatus.UNKNOWN and sorted_events:
                 status = sorted_events[-1].status
 
-            # Update the matching result or add new one
+            # Update the matching result or add new one.
+            # Preserve the sender PRE_TRANSIT event from the list if the
+            # detailed tracking events don't already contain one.
             found = False
             for i, r in enumerate(results):
                 if r.tracking_number == barcode:
+                    merged = list(sorted_events)
+                    has_pre = any(
+                        e.status == TrackingStatus.PRE_TRANSIT for e in merged
+                    )
+                    if not has_pre:
+                        for e in r.events:
+                            if e.status == TrackingStatus.PRE_TRANSIT:
+                                merged.insert(0, e)
+                                break
                     results[i] = TrackingResult(
                         tracking_number=barcode,
                         carrier=self.name,
                         status=status,
-                        events=sorted_events,
+                        events=sorted(merged, key=lambda e: e.timestamp),
                     )
                     found = True
                     break
