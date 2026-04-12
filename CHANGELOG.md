@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.7.0 (2026-04-12)
+
+### Features
+
+- **ui**: Add notification center with unread badge and browser push notifications
+  ([`fd111af`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/fd111afac5e349c216b6b34656e6d5d7b5e7f0b9))
+
+
 ## v1.6.1 (2026-04-12)
 
 ### Bug Fixes
