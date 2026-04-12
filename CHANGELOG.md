@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.12.3 (2026-04-12)
+
+### Bug Fixes
+
+- **ui**: Fixed-width carrier labels for alignment, each detail on its own line
+  ([`89e6b91`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/89e6b91916be2c70ade469dd84d1ce559f1d71fb))
+
+
 ## v1.12.2 (2026-04-12)
 
 ### Bug Fixes
