@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
+from dwmp.api.auth import create_token, verify_password
 from dwmp.api.dependencies import get_tracking_service
 from dwmp.carriers.base import CarrierAuthError
 from dwmp.services.tracking import TrackingService
@@ -43,6 +44,20 @@ class ManualTokenRequest(BaseModel):
     access_token: str
     refresh_token: str | None = None
     lookback_days: int = 30
+
+
+class AuthTokenRequest(BaseModel):
+    password: str
+
+
+# --- Auth endpoints ---
+
+
+@router.post("/auth/token")
+async def get_auth_token(body: AuthTokenRequest) -> dict:
+    if not verify_password(body.password):
+        raise HTTPException(status_code=401, detail="Invalid password")
+    return {"token": create_token()}
 
 
 # --- Carrier endpoints ---

@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await repo.close()
 
 
-OPEN_PATHS = {"/health", "/login", "/static", "/docs", "/openapi.json", "/redoc"}
+OPEN_PATHS = {"/health", "/login", "/api/v1/auth/token", "/static", "/docs", "/openapi.json", "/redoc"}
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
