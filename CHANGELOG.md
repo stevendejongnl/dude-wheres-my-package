@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.12.1 (2026-04-12)
+
+### Bug Fixes
+
+- **docker**: Install project after copying src so version metadata is correct, move API link to
+  footer
+  ([`e475f06`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/e475f062166da55af2dc4f011c5b67fad5fec948))
+
+
 ## v1.12.0 (2026-04-12)
 
 ### Features
