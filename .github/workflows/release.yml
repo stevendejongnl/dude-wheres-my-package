@@ -73,10 +73,17 @@ jobs:
 
       - name: Build and push Docker image
         if: steps.release.outputs.released == 'true'
-        uses: docker/build-push-action@v6
+        uses: nick-fields/retry@v3
+        env:
+          IMAGE_TAG_LATEST: ghcr.io/${{ github.repository }}:latest
+          IMAGE_TAG_VERSION: ghcr.io/${{ github.repository }}:${{ steps.release.outputs.version }}
         with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ steps.release.outputs.version }}
+          timeout_minutes: 15
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            docker buildx build \
+              --push \
+              --tag "$IMAGE_TAG_LATEST" \
+              --tag "$IMAGE_TAG_VERSION" \
+              .
