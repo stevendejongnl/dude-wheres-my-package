@@ -1,6 +1,8 @@
-from datetime import datetime
+import os
+from datetime import UTC, datetime
 from importlib.metadata import version as pkg_version
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
@@ -22,11 +24,18 @@ class _LoginRequired(Exception):
     pass
 
 
+_DISPLAY_TZ = ZoneInfo(os.environ.get("TZ", "Europe/Amsterdam"))
+
+
 def _format_time(ts_str: str) -> str:
-    """Format ISO timestamp to human-readable."""
+    """Format ISO timestamp to human-readable in the configured timezone."""
     try:
         dt = datetime.fromisoformat(ts_str)
-        now = datetime.now(dt.tzinfo)
+        # Assume UTC if no timezone info, then convert to display timezone
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        dt = dt.astimezone(_DISPLAY_TZ)
+        now = datetime.now(_DISPLAY_TZ)
         diff = now - dt
 
         if diff.days == 0:
