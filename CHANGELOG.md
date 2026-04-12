@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.15.0 (2026-04-12)
+
+### Features
+
+- **carriers**: Add GLS tracking support
+  ([`85e807e`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/85e807e5f43f6be8760af00287171de33340b9de))
+
+
 ## v1.14.6 (2026-04-12)
 
 ### Bug Fixes
