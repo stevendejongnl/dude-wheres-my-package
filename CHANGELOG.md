@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.0 (2026-04-12)
+
+### Features
+
+- **ui**: Add header icon, apple-touch-icon, favicon, PWA meta tags
+  ([`4abdd69`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/4abdd69c35616e728e41e4ebedf941c3e08b110d))
+
+
 ## v1.4.0 (2026-04-12)
 
 ### Features
