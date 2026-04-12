@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 
 from dwmp.api.routes import router
+from dwmp.api.views import router as views_router
 from dwmp.api.dependencies import get_repository, get_tracking_service
 from dwmp.services.scheduler import PackageScheduler
 
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(router)
+    app.include_router(views_router)
     return app
 
 

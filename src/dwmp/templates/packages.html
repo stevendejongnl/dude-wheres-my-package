@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Packages — DWMP{% endblock %}
+{% block content %}
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-value">{{ packages | length }}</div>
+    <div class="stat-label">Total Packages</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">{{ packages | selectattr('current_status', 'ne', 'delivered') | list | length }}</div>
+    <div class="stat-label">Active</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">{{ accounts | length }}</div>
+    <div class="stat-label">Connected Accounts</div>
+  </div>
+</div>
+
+<div class="section-header">
+  <h2>Packages</h2>
+</div>
+
+{% if not packages %}
+<div class="empty">
+  <p>No packages tracked yet.</p>
+  <p>Connect a carrier account or add a tracking number via the API.</p>
+</div>
+{% endif %}
+
+{% for pkg in packages %}
+<div class="card" id="pkg-{{ pkg.id }}">
+  <div class="card-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+    <div class="pkg-main">
+      <span class="pkg-carrier {{ pkg.carrier }}">{{ pkg.carrier }}</span>
+      <div class="pkg-info">
+        <div class="pkg-tracking">{{ pkg.tracking_number }}</div>
+        {% if pkg.label %}
+        <div class="pkg-label">{{ pkg.label }}</div>
+        {% elif pkg.events and pkg.events[0].description and pkg.events[0].status == 'pre_transit' %}
+        <div class="pkg-label">{{ pkg.events[0].description }}</div>
+        {% endif %}
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="status status-{{ pkg.current_status }}">{{ pkg.current_status | replace('_', ' ') }}</span>
+      <span class="pkg-source">{{ pkg.source }}</span>
+    </div>
+  </div>
+  <div class="card-body collapsed">
+    {% if pkg.events %}
+    <div class="timeline">
+      {% for event in pkg.events | reverse %}
+      <div class="timeline-event">
+        <div class="timeline-dot"></div>
+        <div>
+          <div class="timeline-desc">{{ event.description }}</div>
+          <div class="timeline-time">{{ event.timestamp[:16] | replace('T', ' ') }}</div>
+          {% if event.location %}
+          <div class="timeline-loc">{{ event.location }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:var(--text-dim);font-size:0.85rem;">No tracking events yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+{% endblock %}
