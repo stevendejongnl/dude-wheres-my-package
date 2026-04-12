@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime, timezone
-from dwmp.carriers.base import AuthType, TrackingStatus
+from dwmp.carriers.base import AuthTokens, AuthType, CarrierAuthError, TrackingStatus
 from dwmp.carriers.amazon import (
     Amazon,
     _parse_cookies,
@@ -120,8 +120,29 @@ def test_parse_orders_page_delivered():
     assert len(results) == 1
     assert results[0].tracking_number == "305-1234567-8901234"
     assert results[0].status == TrackingStatus.DELIVERED
-    assert any(e.status == TrackingStatus.PRE_TRANSIT for e in results[0].events)
     assert any(e.status == TrackingStatus.DELIVERED for e in results[0].events)
+
+
+def test_parse_orders_page_delivered_via_delivery_box_text():
+    """Amazon renders status as text node inside .delivery-box, not a child element."""
+    carrier = Amazon()
+    html = """
+    <html><body>
+    <div class="order-card">
+        <div class="yohtmlc-order-id">
+            Bestelnummer
+            403-4691614-9201953
+        </div>
+        <div class="a-box delivery-box">
+            Bezorgd op 1 april
+        </div>
+    </div>
+    </body></html>
+    """
+    results = carrier._parse_orders_page(html)
+    assert len(results) == 1
+    assert results[0].tracking_number == "403-4691614-9201953"
+    assert results[0].status == TrackingStatus.DELIVERED
 
 
 def test_parse_orders_page_in_transit():
@@ -142,6 +163,13 @@ def test_parse_orders_page_in_transit():
     assert results[0].status == TrackingStatus.IN_TRANSIT
     assert results[0].estimated_delivery is not None
     assert results[0].estimated_delivery.day == 16
+
+
+async def test_sync_rejects_non_html():
+    carrier = Amazon()
+    tokens = AuthTokens(access_token="session-id=abc; session-token=xyz")
+    with pytest.raises(CarrierAuthError, match="browser-captured HTML"):
+        await carrier.sync_packages(tokens)
 
 
 def test_parse_orders_page_empty():

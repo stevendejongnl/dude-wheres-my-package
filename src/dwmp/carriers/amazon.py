@@ -125,45 +125,19 @@ class Amazon(CarrierBase):
     async def sync_packages(
         self, tokens: AuthTokens, lookback_days: int = 30
     ) -> list[TrackingResult]:
-        cookies = _parse_cookies(tokens.access_token)
-        if not cookies:
+        # Amazon uses client-side decryption — httpx can't see order data.
+        # Like DPD, the access_token stores browser-captured HTML.
+        html = tokens.access_token
+        if not html or not html.strip().startswith("<"):
             raise CarrierAuthError(
                 carrier=self.name,
                 message=(
-                    "Invalid cookie string. Copy the full Cookie header "
-                    "from your browser's dev tools while on amazon.nl."
+                    "Amazon requires browser-captured HTML. "
+                    "Log in to amazon.nl/your-orders/orders in a browser "
+                    "and capture the rendered page HTML."
                 ),
             )
-
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-            ),
-            "Accept": "text/html,application/xhtml+xml",
-            "Accept-Language": "nl-NL,nl;q=0.9,en;q=0.8",
-        }
-
-        time_filter = "months-6" if lookback_days > 90 else "months-3"
-
-        async with self._get_client() as client:
-            response = await client.get(
-                AMAZON_ORDERS_URL,
-                params={"timeFilter": time_filter, "startIndex": 0},
-                headers=headers,
-                cookies=cookies,
-                follow_redirects=True,
-            )
-
-            if "ap/signin" in str(response.url) or response.status_code == 401:
-                raise CarrierAuthError(
-                    carrier=self.name,
-                    message="Session expired. Capture fresh cookies from amazon.nl.",
-                )
-
-            response.raise_for_status()
-
-        return self._parse_orders_page(response.text, lookback_days)
+        return self._parse_orders_page(html, lookback_days)
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
         # Amazon has no public tracking endpoint.
@@ -228,13 +202,26 @@ class Amazon(CarrierBase):
         status = TrackingStatus.UNKNOWN
         status_text = ""
 
+        # Amazon uses .delivery-box with nested text; also try specific elements
         delivery_el = card.select_one(  # type: ignore[union-attr]
             ".delivery-box__primary-text, "
             ".shipment-is-delivered, "
             "[data-component='deliveryMessage'], "
-            ".a-color-success, "
-            ".delivery-box"
+            ".a-color-success"
         )
+        if not delivery_el:
+            # Fallback: .delivery-box first child text
+            delivery_box = card.select_one(".delivery-box")  # type: ignore[union-attr]
+            if delivery_box:
+                # Get first meaningful text from the delivery box
+                for child in delivery_box.descendants:
+                    if isinstance(child, str):
+                        text = child.strip()
+                        if text and _parse_status(text) != TrackingStatus.UNKNOWN:
+                            delivery_el = None
+                            status_text = text
+                            status = _parse_status(text)
+                            break
         if delivery_el:
             status_text = delivery_el.get_text(strip=True)
             status = _parse_status(status_text)
@@ -245,10 +232,18 @@ class Amazon(CarrierBase):
         # --- events ---
         events: list[TrackingEvent] = []
 
-        # Order date
+        # Order date — look for the value next to "Bestelling geplaatst"
         order_date_el = card.select_one(  # type: ignore[union-attr]
-            ".a-color-secondary, .order-date-text"
+            ".a-color-secondary.value, .order-date-text"
         )
+        if not order_date_el:
+            # Fallback: find date near "Bestelling geplaatst" label
+            for el in card.select(".a-color-secondary"):  # type: ignore[union-attr]
+                text = el.get_text(strip=True)
+                if _parse_dutch_date(text):
+                    order_date_el = el
+                    break
+
         if order_date_el:
             order_date_text = order_date_el.get_text(strip=True)
             order_date = _parse_dutch_date(order_date_text)

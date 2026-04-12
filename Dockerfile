@@ -11,6 +11,8 @@ RUN uv sync --no-dev --frozen
 
 COPY src/ src/
 
+ENV PYTHONIOENCODING=utf-8
+ENV LANG=C.UTF-8
 ENV POLL_INTERVAL_MINUTES=30
 
 EXPOSE 8000
