@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.12.2 (2026-04-12)
+
+### Bug Fixes
+
+- **ui**: Move sender below tracking number, add first event date, align carrier labels
+  ([`f51fb0b`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/f51fb0b860e9a37f74a3d3bd15dd751e9d0468f9))
+
+
 ## v1.12.1 (2026-04-12)
 
 ### Bug Fixes
