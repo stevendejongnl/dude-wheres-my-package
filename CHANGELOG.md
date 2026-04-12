@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.15.2 (2026-04-12)
+
+### Bug Fixes
+
+- **gls**: Remove unused sender variable
+  ([`d0a07cb`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/d0a07cbdb38f2cb4c4d94c53e40fd65f742295cc))
+
+- **gls**: Use correct apm.gls.nl API with postal code requirement
+  ([`caddf03`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/caddf039f5717d509807b3dc1229c1eecb757a51))
+
+
 ## v1.15.1 (2026-04-12)
 
 ### Bug Fixes
