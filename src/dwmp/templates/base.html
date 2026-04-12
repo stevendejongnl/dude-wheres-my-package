@@ -86,7 +86,9 @@
     .pkg-info { flex: 1; min-width: 0; }
     .pkg-tracking { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85rem; }
     .pkg-label { font-size: 0.8rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .pkg-source { font-size: 0.7rem; color: var(--text-dim); }
+    .pkg-sender { font-weight: 400; color: var(--text-dim); font-size: 0.8rem; margin-left: 8px; }
+    .pkg-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .pkg-date { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; }
 
     /* Status badges */
     .status {
@@ -102,23 +104,25 @@
     .status-unknown { background: #636e7220; color: var(--text-dim); }
 
     /* Timeline */
-    .timeline { padding: 8px 0; }
+    .timeline { padding: 12px 0 4px; }
     .timeline-event {
-      display: flex; gap: 14px; padding: 8px 0;
+      display: flex; gap: 14px; padding: 10px 0;
       position: relative;
     }
     .timeline-event::before {
-      content: ''; position: absolute; left: 5px; top: 28px; bottom: -8px;
+      content: ''; position: absolute; left: 5px; top: 30px; bottom: -10px;
       width: 2px; background: var(--border);
     }
     .timeline-event:last-child::before { display: none; }
     .timeline-dot {
-      width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; flex-shrink: 0;
+      width: 12px; height: 12px; border-radius: 50%; margin-top: 5px; flex-shrink: 0;
       border: 2px solid var(--border); background: var(--surface);
     }
-    .timeline-event:last-child .timeline-dot { border-color: var(--accent); background: var(--accent); }
+    .timeline-dot.active { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 8px #6c5ce740; }
+    .timeline-content { flex: 1; }
+    .timeline-desc { font-size: 0.875rem; }
+    .timeline-details { display: flex; gap: 12px; margin-top: 2px; }
     .timeline-time { font-size: 0.75rem; color: var(--text-dim); }
-    .timeline-desc { font-size: 0.85rem; }
     .timeline-loc { font-size: 0.75rem; color: var(--text-dim); }
 
     /* Accounts */
@@ -164,10 +168,10 @@
 <body>
   <header>
     <div class="container">
-      <h1><span>DWMP</span> Dude, Where's My Package?</h1>
+      <h1><span>DWMP</span> Dude, Where's My Package? <span style="font-size:0.6rem;color:var(--text-dim);font-weight:400;vertical-align:middle;">v{{ version }}</span></h1>
       <nav>
-        <a href="/" class="{% if active == 'packages' %}active{% endif %}">Packages</a>
-        <a href="/accounts" class="{% if active == 'accounts' %}active{% endif %}">Accounts</a>
+        <a href="/" class="{% if active_nav == 'packages' %}active{% endif %}">Packages</a>
+        <a href="/accounts" class="{% if active_nav == 'accounts' %}active{% endif %}">Accounts</a>
         <a href="/docs" target="_blank">API</a>
       </nav>
     </div>

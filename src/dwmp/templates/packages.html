@@ -4,47 +4,39 @@
 
 <div class="stats">
   <div class="stat">
-    <div class="stat-value">{{ packages | length }}</div>
-    <div class="stat-label">Total Packages</div>
-  </div>
-  <div class="stat">
-    <div class="stat-value">{{ packages | selectattr('current_status', 'ne', 'delivered') | list | length }}</div>
+    <div class="stat-value">{{ active | length }}</div>
     <div class="stat-label">Active</div>
   </div>
   <div class="stat">
-    <div class="stat-value">{{ accounts | length }}</div>
-    <div class="stat-label">Connected Accounts</div>
+    <div class="stat-value">{{ delivered | length }}</div>
+    <div class="stat-label">Delivered</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">{{ accounts }}</div>
+    <div class="stat-label">Accounts</div>
   </div>
 </div>
 
-<div class="section-header">
-  <h2>Packages</h2>
-</div>
-
-{% if not packages %}
-<div class="empty">
-  <p>No packages tracked yet.</p>
-  <p>Connect a carrier account or add a tracking number via the API.</p>
-</div>
-{% endif %}
-
-{% for pkg in packages %}
+{% macro package_card(pkg) %}
 <div class="card" id="pkg-{{ pkg.id }}">
   <div class="card-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
     <div class="pkg-main">
       <span class="pkg-carrier {{ pkg.carrier }}">{{ pkg.carrier }}</span>
       <div class="pkg-info">
-        <div class="pkg-tracking">{{ pkg.tracking_number }}</div>
+        <div class="pkg-tracking">
+          {{ pkg.tracking_number }}
+          {% if pkg.sender %}
+          <span class="pkg-sender">from {{ pkg.sender }}</span>
+          {% endif %}
+        </div>
         {% if pkg.label %}
         <div class="pkg-label">{{ pkg.label }}</div>
-        {% elif pkg.events and pkg.events[0].description and pkg.events[0].status == 'pre_transit' %}
-        <div class="pkg-label">{{ pkg.events[0].description }}</div>
         {% endif %}
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;">
+    <div class="pkg-meta">
       <span class="status status-{{ pkg.current_status }}">{{ pkg.current_status | replace('_', ' ') }}</span>
-      <span class="pkg-source">{{ pkg.source }}</span>
+      <span class="pkg-date">{{ pkg.last_update }}</span>
     </div>
   </div>
   <div class="card-body collapsed">
@@ -52,13 +44,15 @@
     <div class="timeline">
       {% for event in pkg.events | reverse %}
       <div class="timeline-event">
-        <div class="timeline-dot"></div>
-        <div>
+        <div class="timeline-dot {% if loop.first %}active{% endif %}"></div>
+        <div class="timeline-content">
           <div class="timeline-desc">{{ event.description }}</div>
-          <div class="timeline-time">{{ event.timestamp[:16] | replace('T', ' ') }}</div>
-          {% if event.location %}
-          <div class="timeline-loc">{{ event.location }}</div>
-          {% endif %}
+          <div class="timeline-details">
+            <span class="timeline-time">{{ event.formatted_time }}</span>
+            {% if event.location %}
+            <span class="timeline-loc">{{ event.location }}</span>
+            {% endif %}
+          </div>
         </div>
       </div>
       {% endfor %}
@@ -68,6 +62,31 @@
     {% endif %}
   </div>
 </div>
+{% endmacro %}
+
+{% if active %}
+<div class="section-header">
+  <h2>Active</h2>
+</div>
+{% for pkg in active %}
+{{ package_card(pkg) }}
 {% endfor %}
+{% endif %}
+
+{% if delivered %}
+<div class="section-header" style="margin-top:32px;">
+  <h2>Delivered</h2>
+</div>
+{% for pkg in delivered %}
+{{ package_card(pkg) }}
+{% endfor %}
+{% endif %}
+
+{% if not active and not delivered %}
+<div class="empty">
+  <p>No packages tracked yet.</p>
+  <p>Connect a carrier account or add a tracking number via the API.</p>
+</div>
+{% endif %}
 
 {% endblock %}

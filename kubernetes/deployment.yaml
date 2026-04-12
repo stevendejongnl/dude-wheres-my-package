@@ -27,6 +27,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: dwmp-config
+            - secretRef:
+                name: dwmp-auth
           volumeMounts:
             - name: data
               mountPath: /app/data
