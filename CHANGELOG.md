@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.6.0 (2026-04-12)
+
+### Features
+
+- **ui**: Mobile responsive, hide nav on login, protect API with auth middleware
+  ([`d47c678`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/d47c678c35c1bb0abbb4bbf7fea6f24a26002c17))
+
+
 ## v1.5.2 (2026-04-12)
 
 ### Bug Fixes
