@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.8.0 (2026-04-12)
+
+### Features
+
+- **amazon**: Add Amazon.nl carrier with session cookie auth and enable Keel auto-updates
+  ([`56dc398`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/56dc398fde50fb6b6b107fb3ccc8cf6690aff0e7))
+
+
 ## v1.7.0 (2026-04-12)
 
 ### Features
