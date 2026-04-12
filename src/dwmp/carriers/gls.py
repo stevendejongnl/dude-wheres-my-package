@@ -156,9 +156,6 @@ class GLS(CarrierBase):
         else:
             status = TrackingStatus.UNKNOWN
 
-        # Sender name as label context
-        sender = data.get("addressInfo", {}).get("from", {}).get("name")
-
         return TrackingResult(
             tracking_number=tracking_number,
             carrier=self.name,
