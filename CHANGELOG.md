@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.12.0 (2026-04-12)
+
+### Features
+
+- **ts**: Convert inline JS to TypeScript with Vitest tests, add ruff linting to CI
+  ([`5ca85e8`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/5ca85e887bf1e743815273029ecb82f9ee41f51b))
+
+
 ## v1.11.0 (2026-04-12)
 
 ### Features
