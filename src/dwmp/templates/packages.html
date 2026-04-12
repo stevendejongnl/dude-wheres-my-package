@@ -23,15 +23,18 @@
     <div class="pkg-main">
       <span class="pkg-carrier {{ pkg.carrier }}">{{ pkg.carrier }}</span>
       <div class="pkg-info">
-        <div class="pkg-tracking">
-          {{ pkg.tracking_number }}
+        <div class="pkg-tracking">{{ pkg.tracking_number }}</div>
+        <div class="pkg-details">
           {% if pkg.sender %}
           <span class="pkg-sender"><strong>From:</strong> {{ pkg.sender }}</span>
           {% endif %}
+          {% if pkg.first_event_date %}
+          <span class="pkg-first-event">{{ pkg.first_event_date }}</span>
+          {% endif %}
+          {% if pkg.label %}
+          <span class="pkg-label">{{ pkg.label }}</span>
+          {% endif %}
         </div>
-        {% if pkg.label %}
-        <div class="pkg-label">{{ pkg.label }}</div>
-        {% endif %}
       </div>
     </div>
     <div class="pkg-meta">

@@ -73,7 +73,13 @@ def _enrich_package(pkg: dict) -> dict:
     for event in events:
         event["formatted_time"] = _format_time(event.get("timestamp", ""))
 
+    # First event date
+    first_event_date = ""
+    if events:
+        first_event_date = _format_time(events[0].get("timestamp", ""))
+
     pkg["sender"] = sender
+    pkg["first_event_date"] = first_event_date
     pkg["last_update"] = last_update
     return pkg
 
