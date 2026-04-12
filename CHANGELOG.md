@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.14.2 (2026-04-12)
+
+### Bug Fixes
+
+- **ci**: Configure git identity and force-push amended release commit
+  ([`62f862f`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/62f862f045a861a5e6f9b4c9c8eebd99e7cda40c))
+
+
 ## v1.14.1 (2026-04-12)
 
 ### Bug Fixes
