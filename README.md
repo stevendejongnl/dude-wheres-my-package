@@ -70,7 +70,32 @@ curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
 
 ### DPD
 
-Not yet implemented. Auth flow and API endpoints need to be researched and tested.
+**Auth type:** `credentials` (email + password)
+
+DPD uses Keycloak SSO at `login.dpdgroup.com`. Server-side rendered — no JSON API, parcels are scraped from the HTML.
+
+**Steps:**
+
+1. Create a myDPD account at https://www.dpdgroup.com/nl/mydpd/login (click "New user? Register!")
+2. Connect:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/credentials \
+  -H "Content-Type: application/json" \
+  -d '{
+    "carrier": "dpd",
+    "username": "<your email>",
+    "password": "<your password>"
+  }'
+```
+
+3. Sync your packages:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
+```
+
+**Note:** DPD has no JSON API — the service logs into myDPD via Keycloak and scrapes the parcels page HTML.
 
 ### Manual Tracking (any carrier)
 
