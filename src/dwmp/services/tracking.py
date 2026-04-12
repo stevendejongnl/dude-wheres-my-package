@@ -52,6 +52,17 @@ class TrackingService:
                 label=label,
             )
 
+    async def notify_auth_failure(self, carrier: str, message: str) -> None:
+        """Create a notification when a carrier account fails to authenticate."""
+        await self._repository.add_notification(
+            package_id=None,
+            old_status="connected",
+            new_status="auth_failed",
+            tracking_number="Account",
+            carrier=carrier,
+            label=message,
+        )
+
     # --- Account management ---
 
     async def connect_account_oauth(

@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS tracking_events (
 
 CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    package_id INTEGER NOT NULL REFERENCES packages(id) ON DELETE CASCADE,
+    package_id INTEGER REFERENCES packages(id) ON DELETE CASCADE,
     old_status TEXT NOT NULL,
     new_status TEXT NOT NULL,
     tracking_number TEXT NOT NULL,
@@ -72,10 +72,35 @@ class PackageRepository:
         self._db.row_factory = aiosqlite.Row
         await self._db.execute("PRAGMA foreign_keys = ON")
         await self._db.executescript(SCHEMA)
+        await self._migrate()
 
     async def close(self) -> None:
         if self._db:
             await self._db.close()
+
+    async def _migrate(self) -> None:
+        """Run schema migrations for existing databases."""
+        # v1.8: make notifications.package_id nullable for auth-failure notifications
+        cursor = await self.db.execute("PRAGMA table_info(notifications)")
+        for col in await cursor.fetchall():
+            if col["name"] == "package_id" and col["notnull"]:
+                await self.db.executescript("""
+                    CREATE TABLE notifications_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        package_id INTEGER REFERENCES packages(id) ON DELETE CASCADE,
+                        old_status TEXT NOT NULL,
+                        new_status TEXT NOT NULL,
+                        tracking_number TEXT NOT NULL,
+                        carrier TEXT NOT NULL,
+                        label TEXT,
+                        is_read INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL
+                    );
+                    INSERT INTO notifications_new SELECT * FROM notifications;
+                    DROP TABLE notifications;
+                    ALTER TABLE notifications_new RENAME TO notifications;
+                """)
+                break
 
     @property
     def db(self) -> aiosqlite.Connection:
@@ -257,7 +282,7 @@ class PackageRepository:
 
     async def add_notification(
         self,
-        package_id: int,
+        package_id: int | None,
         old_status: str,
         new_status: str,
         tracking_number: str,

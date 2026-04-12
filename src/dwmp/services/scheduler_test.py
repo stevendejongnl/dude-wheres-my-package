@@ -127,6 +127,28 @@ async def test_poll_handles_sync_failure_gracefully(repo):
     assert "login flow may have changed" in account["status_message"]
 
 
+async def test_poll_creates_auth_failure_notification(repo):
+    """When sync fails, a notification is created so the user sees it."""
+    carrier = FailingCarrier()
+    service = TrackingService(repository=repo, carriers={"failing": carrier})
+    scheduler = PackageScheduler(tracking_service=service)
+
+    await repo.add_account(
+        carrier="failing", auth_type="credentials",
+        tokens={"access_token": "tok"}, username="user",
+    )
+
+    await scheduler._poll_all()
+
+    notifications = await repo.list_notifications()
+    assert len(notifications) == 1
+    assert notifications[0]["carrier"] == "failing"
+    assert notifications[0]["old_status"] == "connected"
+    assert notifications[0]["new_status"] == "auth_failed"
+    assert notifications[0]["package_id"] is None
+    assert notifications[0]["tracking_number"] == "Account"
+
+
 async def test_poll_handles_empty(repo):
     service = TrackingService(repository=repo, carriers={})
     scheduler = PackageScheduler(tracking_service=service)

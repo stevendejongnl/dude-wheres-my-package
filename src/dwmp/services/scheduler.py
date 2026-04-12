@@ -59,6 +59,10 @@ class PackageScheduler:
                     account["carrier"],
                     exc.message,
                 )
+                await self._service.notify_auth_failure(
+                    carrier=account["carrier"],
+                    message=exc.message,
+                )
             except Exception:
                 logger.exception(
                     "Failed to sync account %s (%s)",

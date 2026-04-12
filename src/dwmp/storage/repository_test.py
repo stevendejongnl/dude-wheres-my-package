@@ -291,6 +291,24 @@ async def test_delete_package_cascades_notifications(repo: PackageRepository):
     assert len(await repo.list_notifications()) == 0
 
 
+async def test_auth_failure_notification_without_package(repo: PackageRepository):
+    """Auth failure notifications have no package_id."""
+    notif_id = await repo.add_notification(
+        package_id=None,
+        old_status="connected",
+        new_status="auth_failed",
+        tracking_number="Account",
+        carrier="amazon",
+        label="Session expired",
+    )
+    notifications = await repo.list_notifications()
+    assert len(notifications) == 1
+    assert notifications[0]["package_id"] is None
+    assert notifications[0]["carrier"] == "amazon"
+    assert notifications[0]["new_status"] == "auth_failed"
+    assert await repo.get_unread_count() == 1
+
+
 async def test_delete_old_notifications(repo: PackageRepository):
     pkg_id = await repo.add_package(tracking_number="OLD1", carrier="dhl")
     await repo.add_notification(pkg_id, "unknown", "in_transit", "OLD1", "dhl")
