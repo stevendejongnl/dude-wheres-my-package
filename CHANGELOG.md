@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.9.3 (2026-04-12)
+
+### Bug Fixes
+
+- **amazon**: Use browser-captured HTML like DPD and fix UTF-8 encoding in Docker
+  ([`4ac94ce`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/4ac94ceb11f659277723238ad937ca58d49e2410))
+
+
 ## v1.9.2 (2026-04-12)
 
 ### Bug Fixes
