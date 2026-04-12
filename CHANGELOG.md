@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.10.3 (2026-04-12)
+
+### Bug Fixes
+
+- **notifications**: Auto-mark all read on page visit, remove read buttons
+  ([`2c03ce5`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/2c03ce52d24b63202a9fae6e1acfb061db7c309a))
+
+### Documentation
+
+- Add Amazon carrier setup and update API reference
+  ([`acb030a`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/acb030a0fc844caaf1c63ca1d184f21293c92ca7))
+
+
 ## v1.10.2 (2026-04-12)
 
 ### Bug Fixes
