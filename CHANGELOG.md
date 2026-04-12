@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.13.0 (2026-04-12)
+
+### Features
+
+- **ui**: Auto-reload page when new version is deployed
+  ([`bfa4dbc`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/bfa4dbc249f32a0a696ca36422494039f97fd234))
+
+
 ## v1.12.4 (2026-04-12)
 
 ### Bug Fixes
