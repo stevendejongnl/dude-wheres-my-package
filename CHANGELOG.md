@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.14.1 (2026-04-12)
+
+### Bug Fixes
+
+- **ci**: Sync uv.lock version during release to fix reported version
+  ([`eeca44a`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/eeca44af8f8e1c7a8ccc39b4496652fafe7dd24c))
+
+
 ## v1.14.0 (2026-04-12)
 
 ### Features
