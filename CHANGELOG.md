@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.9.4 (2026-04-12)
+
+### Bug Fixes
+
+- **dpd**: Store sender name as PRE_TRANSIT event so 'from' line displays correctly
+  ([`3ecb9fd`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/3ecb9fd850f8fb9daf342280594d76b16c842570))
+
+
 ## v1.9.3 (2026-04-12)
 
 ### Bug Fixes
