@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.14.4 (2026-04-12)
+
+### Bug Fixes
+
+- **dwmp**: Resize icon to 256x256 for HA brands compatibility
+  ([`169ed9b`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/169ed9b1fce22eb0947753492199748bcb03ae77))
+
+
 ## v1.14.3 (2026-04-12)
 
 ### Bug Fixes
