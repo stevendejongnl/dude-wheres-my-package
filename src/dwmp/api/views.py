@@ -46,11 +46,20 @@ def _enrich_package(pkg: dict) -> dict:
     """Add computed fields for display."""
     events = pkg.get("events", [])
 
-    # Sender: first pre_transit event description
+    # Sender: first pre_transit event that looks like a name, not a date or status text
     sender = None
+    _skip_phrases = ("exchanging data", "data received", "aangekondigd", "aangemeld")
     for e in events:
         if e.get("status") == "pre_transit" and e.get("description"):
-            sender = e["description"]
+            desc = e["description"].strip()
+            # Skip date-like descriptions (e.g., Amazon's "12 april 2026")
+            if desc and desc[0].isdigit():
+                continue
+            # Skip tracking status descriptions (e.g., DPD's "Exchanging data internally")
+            lower = desc.lower()
+            if any(kw in lower for kw in _skip_phrases):
+                continue
+            sender = desc
             break
 
     # Last update time
