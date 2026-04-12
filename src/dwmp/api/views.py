@@ -184,6 +184,10 @@ async def notifications_page(
         n["new_status_display"] = _format_status(n["new_status"])
     unread_count = await service.get_unread_notification_count()
 
+    # Auto-mark all as read on page visit
+    if unread_count > 0:
+        await service.mark_all_notifications_read()
+
     return templates.TemplateResponse(
         request, "notifications.html",
         {"active_nav": "notifications", "notifications": notifications, "unread_count": unread_count, "version": VERSION},
