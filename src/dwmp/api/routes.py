@@ -229,3 +229,41 @@ async def refresh_package(
     if pkg is None:
         raise HTTPException(status_code=404, detail="Package not found")
     return pkg
+
+
+# --- Notification endpoints ---
+
+@router.get("/notifications")
+async def list_notifications(
+    limit: int = 50,
+    offset: int = 0,
+    service: TrackingService = Depends(get_tracking_service),
+) -> list[dict]:
+    return await service.list_notifications(limit, offset)
+
+
+@router.get("/notifications/unread-count")
+async def unread_count(
+    service: TrackingService = Depends(get_tracking_service),
+) -> dict:
+    count = await service.get_unread_notification_count()
+    return {"count": count}
+
+
+@router.post("/notifications/{notification_id}/read")
+async def mark_notification_read(
+    notification_id: int,
+    service: TrackingService = Depends(get_tracking_service),
+) -> dict:
+    marked = await service.mark_notification_read(notification_id)
+    if not marked:
+        raise HTTPException(status_code=404, detail="Notification not found or already read")
+    return {"status": "ok"}
+
+
+@router.post("/notifications/read-all")
+async def mark_all_read(
+    service: TrackingService = Depends(get_tracking_service),
+) -> dict:
+    count = await service.mark_all_notifications_read()
+    return {"marked": count}

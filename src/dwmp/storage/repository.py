@@ -2,7 +2,7 @@ import json
 import os
 
 import aiosqlite
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DB_PATH = Path(os.environ.get("DB_PATH", "dwmp.db"))
@@ -47,6 +47,18 @@ CREATE TABLE IF NOT EXISTS tracking_events (
     location TEXT,
     UNIQUE(package_id, timestamp, status)
 );
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    package_id INTEGER NOT NULL REFERENCES packages(id) ON DELETE CASCADE,
+    old_status TEXT NOT NULL,
+    new_status TEXT NOT NULL,
+    tracking_number TEXT NOT NULL,
+    carrier TEXT NOT NULL,
+    label TEXT,
+    is_read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -58,6 +70,7 @@ class PackageRepository:
     async def init(self) -> None:
         self._db = await aiosqlite.connect(self._db_path)
         self._db.row_factory = aiosqlite.Row
+        await self._db.execute("PRAGMA foreign_keys = ON")
         await self._db.executescript(SCHEMA)
 
     async def close(self) -> None:
@@ -239,3 +252,64 @@ class PackageRepository:
             (package_id,),
         )
         return [dict(row) for row in await cursor.fetchall()]
+
+    # --- Notification methods ---
+
+    async def add_notification(
+        self,
+        package_id: int,
+        old_status: str,
+        new_status: str,
+        tracking_number: str,
+        carrier: str,
+        label: str | None = None,
+    ) -> int:
+        now = datetime.now(timezone.utc).isoformat()
+        cursor = await self.db.execute(
+            """INSERT INTO notifications
+               (package_id, old_status, new_status, tracking_number, carrier, label, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (package_id, old_status, new_status, tracking_number, carrier, label, now),
+        )
+        await self.db.commit()
+        assert cursor.lastrowid is not None
+        return cursor.lastrowid
+
+    async def get_unread_count(self) -> int:
+        cursor = await self.db.execute(
+            "SELECT COUNT(*) FROM notifications WHERE is_read = 0"
+        )
+        row = await cursor.fetchone()
+        return row[0] if row else 0
+
+    async def list_notifications(
+        self, limit: int = 50, offset: int = 0
+    ) -> list[dict]:
+        cursor = await self.db.execute(
+            "SELECT * FROM notifications ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (limit, offset),
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+    async def mark_notification_read(self, notification_id: int) -> bool:
+        cursor = await self.db.execute(
+            "UPDATE notifications SET is_read = 1 WHERE id = ? AND is_read = 0",
+            (notification_id,),
+        )
+        await self.db.commit()
+        return cursor.rowcount > 0
+
+    async def mark_all_read(self) -> int:
+        cursor = await self.db.execute(
+            "UPDATE notifications SET is_read = 1 WHERE is_read = 0"
+        )
+        await self.db.commit()
+        return cursor.rowcount
+
+    async def delete_old_notifications(self, days: int = 30) -> int:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        cursor = await self.db.execute(
+            "DELETE FROM notifications WHERE created_at < ?", (cutoff,)
+        )
+        await self.db.commit()
+        return cursor.rowcount

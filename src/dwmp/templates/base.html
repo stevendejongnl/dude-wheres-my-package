@@ -171,6 +171,40 @@
     .empty { text-align: center; padding: 48px 20px; color: var(--text-dim); }
     .empty p { margin-top: 8px; font-size: 0.9rem; }
 
+    /* Notification bell & badge */
+    .nav-bell { position: relative; display: inline-flex; align-items: center; }
+    .nav-bell svg { width: 18px; height: 18px; fill: currentColor; }
+    .notif-badge-dot {
+      position: absolute; top: -4px; right: -8px;
+      background: var(--red); color: white;
+      font-size: 0.6rem; font-weight: 700;
+      min-width: 16px; height: 16px; line-height: 16px;
+      border-radius: 8px; text-align: center;
+      padding: 0 4px; pointer-events: none;
+    }
+
+    /* Notification center page */
+    .notification-card { transition: background 0.2s; }
+    .notification-card.unread { background: var(--surface2); border-left: 3px solid var(--accent); }
+    .notification-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px; gap: 12px;
+    }
+    .notification-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+    .notification-info { display: flex; flex-direction: column; min-width: 0; }
+    .notification-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .notification-transition { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+    .status-arrow { color: var(--text-dim); font-size: 0.8rem; }
+    .notif-unread-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent); flex-shrink: 0;
+    }
+    .notif-page-count {
+      font-size: 0.8rem; font-weight: 500; color: var(--accent);
+      background: #6c5ce715; padding: 2px 10px; border-radius: 20px;
+      margin-left: 8px;
+    }
+
     /* Section header */
     .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
     .section-header h2 { font-size: 1.1rem; font-weight: 600; }
@@ -195,6 +229,9 @@
       .card-body { padding: 0 14px 12px; }
       .account { flex-direction: column; gap: 10px; align-items: flex-start; }
       .account-actions { align-self: flex-end; }
+      .notification-row { flex-direction: column; align-items: flex-start; }
+      .notification-right { align-items: flex-start; width: 100%; }
+      .notification-transition { justify-content: flex-start; }
     }
     @media (min-width: 641px) {
       .app-title-short { display: none; }
@@ -214,6 +251,10 @@
       <nav>
         <a href="/" class="{% if active_nav == 'packages' %}active{% endif %}">Packages</a>
         <a href="/accounts" class="{% if active_nav == 'accounts' %}active{% endif %}">Accounts</a>
+        <a href="/notifications" class="{% if active_nav == 'notifications' %}active{% endif %} nav-bell">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C10.9 2 10 2.9 10 4C10 4.1 10 4.19 10.02 4.28C7.58 5.07 6 7.36 6 10V16L4 18V19H20V18L18 16V10C18 7.36 16.42 5.07 13.98 4.28C14 4.19 14 4.1 14 4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z"/></svg>
+          <span id="notif-badge" hx-get="/notifications/badge" hx-trigger="load, every 30s" hx-swap="innerHTML"></span>
+        </a>
         <a href="/docs" target="_blank">API</a>
       </nav>
       {% endif %}
@@ -224,5 +265,37 @@
       {% block content %}{% endblock %}
     </div>
   </main>
+  {% if active_nav %}
+  <script>
+  (function() {
+    if (!('Notification' in window)) return;
+
+    // Request permission after a short delay (less aggressive)
+    if (Notification.permission === 'default') {
+      setTimeout(function() { Notification.requestPermission(); }, 3000);
+    }
+
+    // Track last known unread count to detect new notifications
+    var lastCount = 0;
+
+    document.addEventListener('htmx:afterSwap', function(evt) {
+      if (evt.detail.target.id !== 'notif-badge') return;
+
+      var el = evt.detail.target.querySelector('[data-count]');
+      var count = el ? parseInt(el.dataset.count, 10) : 0;
+
+      if (count > lastCount && lastCount >= 0 && Notification.permission === 'granted') {
+        var diff = count - lastCount;
+        new Notification('Dude, Where\'s My Package?', {
+          body: diff === 1 ? 'A package status has changed' : diff + ' package updates',
+          icon: '/static/icon-64.png',
+          tag: 'dwmp-update'
+        });
+      }
+      lastCount = count;
+    });
+  })();
+  </script>
+  {% endif %}
 </body>
 </html>

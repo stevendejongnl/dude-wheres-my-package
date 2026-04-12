@@ -79,3 +79,8 @@ class PackageScheduler:
                 await self._service.refresh_package(pkg["id"])
             except Exception:
                 logger.exception("Failed to refresh package %s", pkg["id"])
+
+        # 3. Clean up old notifications
+        deleted = await self._service.delete_old_notifications(days=30)
+        if deleted:
+            logger.info("Cleaned up %d old notifications", deleted)

@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from importlib.metadata import version as pkg_version
@@ -141,3 +141,60 @@ async def accounts_page(
         request, "accounts.html",
         {"active_nav": "accounts", "active": "accounts", "accounts": accounts, "carriers": carriers, "version": VERSION},
     )
+
+
+# --- Notification views ---
+
+
+def _format_status(status: str) -> str:
+    """Format status value for display."""
+    return status.replace("_", " ").title()
+
+
+@router.get("/notifications", response_class=HTMLResponse)
+async def notifications_page(
+    request: Request,
+    service: TrackingService = Depends(get_tracking_service),
+):
+    notifications = await service.list_notifications(limit=100)
+    for n in notifications:
+        n["formatted_time"] = _format_time(n.get("created_at", ""))
+        n["old_status_display"] = _format_status(n["old_status"])
+        n["new_status_display"] = _format_status(n["new_status"])
+    unread_count = await service.get_unread_notification_count()
+
+    return templates.TemplateResponse(
+        request, "notifications.html",
+        {"active_nav": "notifications", "notifications": notifications, "unread_count": unread_count, "version": VERSION},
+    )
+
+
+@router.get("/notifications/badge", response_class=HTMLResponse)
+async def notification_badge(
+    service: TrackingService = Depends(get_tracking_service),
+):
+    count = await service.get_unread_notification_count()
+    if count > 0:
+        display = "99+" if count > 99 else str(count)
+        return HTMLResponse(
+            f'<span class="notif-badge-dot" data-count="{count}">{display}</span>'
+        )
+    return HTMLResponse('<span data-count="0"></span>')
+
+
+@router.post("/notifications/{notification_id}/read", response_class=HTMLResponse)
+async def mark_notification_read_view(
+    request: Request,
+    notification_id: int,
+    service: TrackingService = Depends(get_tracking_service),
+):
+    await service.mark_notification_read(notification_id)
+    return HTMLResponse("", headers={"HX-Refresh": "true"})
+
+
+@router.post("/notifications/read-all", response_class=HTMLResponse)
+async def mark_all_read_view(
+    service: TrackingService = Depends(get_tracking_service),
+):
+    await service.mark_all_notifications_read()
+    return HTMLResponse("", headers={"HX-Refresh": "true"})

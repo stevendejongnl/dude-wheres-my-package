@@ -28,6 +28,30 @@ class TrackingService:
     def get_carrier(self, name: str) -> CarrierBase | None:
         return self._carriers.get(name)
 
+    # --- Status change detection ---
+
+    async def _update_package_status(
+        self,
+        pkg_id: int,
+        new_status: str,
+        tracking_number: str,
+        carrier: str,
+        label: str | None,
+    ) -> None:
+        """Update package status and create a notification if it changed."""
+        existing = await self._repository.get_package(pkg_id)
+        old_status = existing["current_status"] if existing else "unknown"
+        await self._repository.update_status(pkg_id, new_status)
+        if old_status != new_status:
+            await self._repository.add_notification(
+                package_id=pkg_id,
+                old_status=old_status,
+                new_status=new_status,
+                tracking_number=tracking_number,
+                carrier=carrier,
+                label=label,
+            )
+
     # --- Account management ---
 
     async def connect_account_oauth(
@@ -192,7 +216,10 @@ class TrackingService:
                     source="account",
                 )
 
-            await self._repository.update_status(pkg_id, result.status.value)
+            await self._update_package_status(
+                pkg_id, result.status.value, result.tracking_number,
+                result.carrier, existing.get("label") if existing else None,
+            )
             for event in result.events:
                 await self._repository.add_event(
                     package_id=pkg_id,
@@ -256,7 +283,10 @@ class TrackingService:
             postal_code=pkg.get("postal_code", ""),
         )
 
-        await self._repository.update_status(package_id, result.status.value)
+        await self._update_package_status(
+            package_id, result.status.value,
+            pkg["tracking_number"], pkg["carrier"], pkg.get("label"),
+        )
         for event in result.events:
             await self._repository.add_event(
                 package_id=package_id,
@@ -267,3 +297,22 @@ class TrackingService:
             )
 
         return await self.get_package(package_id)
+
+    # --- Notification management ---
+
+    async def get_unread_notification_count(self) -> int:
+        return await self._repository.get_unread_count()
+
+    async def list_notifications(
+        self, limit: int = 50, offset: int = 0
+    ) -> list[dict]:
+        return await self._repository.list_notifications(limit, offset)
+
+    async def mark_notification_read(self, notification_id: int) -> bool:
+        return await self._repository.mark_notification_read(notification_id)
+
+    async def mark_all_notifications_read(self) -> int:
+        return await self._repository.mark_all_read()
+
+    async def delete_old_notifications(self, days: int = 30) -> int:
+        return await self._repository.delete_old_notifications(days)

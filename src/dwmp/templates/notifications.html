@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Notifications - DWMP{% endblock %}
+{% block content %}
+<div class="section-header">
+  <h2>Notifications{% if unread_count %} <span class="notif-page-count">{{ unread_count }} unread</span>{% endif %}</h2>
+  {% if notifications %}
+  <form>
+    <button class="btn btn-ghost btn-sm"
+            hx-post="/notifications/read-all"
+            hx-swap="none">
+      Mark all read
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+{% if notifications %}
+{% for n in notifications %}
+<div class="card notification-card{% if not n.is_read %} unread{% endif %}" id="notif-{{ n.id }}">
+  <div class="notification-row">
+    <div class="notification-left">
+      {% if not n.is_read %}<span class="notif-unread-dot"></span>{% endif %}
+      <span class="pkg-carrier {{ n.carrier }}">{{ n.carrier }}</span>
+      <div class="notification-info">
+        <span class="pkg-tracking">{{ n.tracking_number }}</span>
+        {% if n.label %}<span class="pkg-label">{{ n.label }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="notification-right">
+      <div class="notification-transition">
+        <span class="status status-{{ n.old_status }}">{{ n.old_status_display }}</span>
+        <span class="status-arrow">&rarr;</span>
+        <span class="status status-{{ n.new_status }}">{{ n.new_status_display }}</span>
+      </div>
+      <span class="pkg-date">{{ n.formatted_time }}</span>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty">
+  <p>No notifications yet</p>
+  <p>Status changes will appear here when your packages update.</p>
+</div>
+{% endif %}
+{% endblock %}

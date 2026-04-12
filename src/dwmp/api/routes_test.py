@@ -256,3 +256,66 @@ async def test_sync_account(client: AsyncClient):
     assert len(packages) == 1
     assert packages[0]["tracking_number"] == "SYNCED-1"
     assert packages[0]["source"] == "account"
+
+
+# --- Notification endpoint tests ---
+
+
+async def test_list_notifications_empty(client: AsyncClient):
+    response = await client.get("/api/v1/notifications")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+async def test_unread_count_zero(client: AsyncClient):
+    response = await client.get("/api/v1/notifications/unread-count")
+    assert response.status_code == 200
+    assert response.json() == {"count": 0}
+
+
+async def test_notifications_after_sync(client: AsyncClient):
+    # Create account and sync to trigger status change (unknown -> in_transit)
+    create_resp = await client.post(
+        "/api/v1/accounts/token",
+        json={"carrier": "postnl", "access_token": "tok"},
+    )
+    account_id = create_resp.json()["id"]
+    await client.post(f"/api/v1/accounts/{account_id}/sync")
+
+    # Check unread count
+    count_resp = await client.get("/api/v1/notifications/unread-count")
+    assert count_resp.json()["count"] == 1
+
+    # Check notification list
+    list_resp = await client.get("/api/v1/notifications")
+    notifications = list_resp.json()
+    assert len(notifications) == 1
+    assert notifications[0]["tracking_number"] == "SYNCED-1"
+    assert notifications[0]["new_status"] == "in_transit"
+
+
+async def test_mark_notification_read(client: AsyncClient):
+    # Create a notification via sync
+    create_resp = await client.post(
+        "/api/v1/accounts/token",
+        json={"carrier": "postnl", "access_token": "tok"},
+    )
+    account_id = create_resp.json()["id"]
+    await client.post(f"/api/v1/accounts/{account_id}/sync")
+
+    list_resp = await client.get("/api/v1/notifications")
+    notifications = list_resp.json()
+    assert len(notifications) == 1
+
+    notif_id = notifications[0]["id"]
+    response = await client.post(f"/api/v1/notifications/{notif_id}/read")
+    assert response.status_code == 200
+
+    count_resp = await client.get("/api/v1/notifications/unread-count")
+    assert count_resp.json()["count"] == 0
+
+
+async def test_mark_all_read(client: AsyncClient):
+    response = await client.post("/api/v1/notifications/read-all")
+    assert response.status_code == 200
+    assert response.json() == {"marked": 0}
