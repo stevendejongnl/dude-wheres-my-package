@@ -70,32 +70,35 @@ curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
 
 ### DPD
 
-**Auth type:** `credentials` (email + password)
+**Auth type:** `manual_token` (browser-captured HTML)
 
-DPD uses Keycloak SSO at `login.dpdgroup.com`. Server-side rendered — no JSON API, parcels are scraped from the HTML.
+DPD uses Keycloak SSO at `login.dpdgroup.com` with Cloudflare bot protection on the parcels page. No JSON API — the service parses the server-rendered HTML. Because Cloudflare blocks headless HTTP clients, the parcels page HTML must be captured from a real browser session.
 
 **Steps:**
 
-1. Create a myDPD account at https://www.dpdgroup.com/nl/mydpd/login (click "New user? Register!")
-2. Connect:
+1. Log in at https://www.dpdgroup.com/nl/mydpd/login
+2. Navigate to **My parcels** > **Incoming**
+3. Open DevTools (F12) > **Console** and run:
+   ```js
+   copy(document.documentElement.outerHTML)
+   ```
+4. Save the clipboard content to a file (e.g. `dpd.html`)
+5. Strip the JSON string wrapper if present (the copied text may be wrapped in quotes)
+6. Connect — send the HTML as the `access_token`:
 
 ```bash
-curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/credentials \
+curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/token \
   -H "Content-Type: application/json" \
-  -d '{
-    "carrier": "dpd",
-    "username": "<your email>",
-    "password": "<your password>"
-  }'
+  -d "{\"carrier\":\"dpd\",\"access_token\":\"$(cat dpd.html)\"}"
 ```
 
-3. Sync your packages:
+7. Sync your packages:
 
 ```bash
 curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
 ```
 
-**Note:** DPD has no JSON API — the service logs into myDPD via Keycloak and scrapes the parcels page HTML.
+**Note:** DPD parcels are scraped from the HTML. The "token" is a snapshot of the parcels page — re-capture it when you need fresh data.
 
 ### Manual Tracking (any carrier)
 
@@ -131,10 +134,8 @@ GET    /api/v1/carriers               # List carriers with auth_type and setup h
 ### Accounts (connect carrier accounts)
 
 ```
-POST   /api/v1/accounts/token         # Connect with manual token {carrier, access_token, refresh_token?}
-POST   /api/v1/accounts/credentials   # Connect with login {carrier, username, password}
-POST   /api/v1/accounts/oauth/start   # Start OAuth flow {carrier, callback_url}
-POST   /api/v1/accounts/oauth/callback # Complete OAuth {carrier, code, callback_url}
+POST   /api/v1/accounts/token         # Connect with manual token (PostNL, DPD)
+POST   /api/v1/accounts/credentials   # Connect with email/password (DHL)
 GET    /api/v1/accounts               # List connected accounts (tokens stripped)
 GET    /api/v1/accounts/{id}          # Account details
 DELETE /api/v1/accounts/{id}          # Disconnect account
