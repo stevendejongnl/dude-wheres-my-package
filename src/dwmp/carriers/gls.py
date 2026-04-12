@@ -11,41 +11,37 @@ from dwmp.carriers.base import (
     TrackingStatus,
 )
 
-# GLS Group (NL) public tracking endpoint
-GLS_TRACKING_URL = "https://gls-group.eu/app/service/open/rest/NL/nl/rstt001"
-GLS_REFERER = "https://gls-group.eu/NL/nl/opvolging-van-pakketten"
+# GLS Netherlands tracking API (apm.gls.nl)
+GLS_TRACKING_URL = "https://apm.gls.nl/api/tracktrace/v1"
+GLS_REFERER = "https://www.gls-info.nl/"
 
 STATUS_MAP: list[tuple[str, TrackingStatus]] = [
-    # Failed attempt — must precede "delivered" (substring match)
-    ("the parcel could not be delivered", TrackingStatus.FAILED_ATTEMPT),
-    ("not delivered", TrackingStatus.FAILED_ATTEMPT),
+    # Failed attempt — must precede "afgeleverd" (substring match)
+    ("niet afgeleverd", TrackingStatus.FAILED_ATTEMPT),
     ("niet bezorgd", TrackingStatus.FAILED_ATTEMPT),
-    # Returned — must precede "delivered" (substring match)
-    ("the parcel has been returned", TrackingStatus.RETURNED),
+    ("could not be delivered", TrackingStatus.FAILED_ATTEMPT),
+    # Returned — must precede "afgeleverd"
     ("retour", TrackingStatus.RETURNED),
     ("returned", TrackingStatus.RETURNED),
     # Delivered
-    ("the parcel has been delivered", TrackingStatus.DELIVERED),
-    ("het pakket is bezorgd", TrackingStatus.DELIVERED),
     ("afgeleverd", TrackingStatus.DELIVERED),
     ("bezorgd", TrackingStatus.DELIVERED),
     ("delivered", TrackingStatus.DELIVERED),
     # Out for delivery
-    ("the parcel is out for delivery", TrackingStatus.OUT_FOR_DELIVERY),
+    ("geladen voor aflevering", TrackingStatus.OUT_FOR_DELIVERY),
     ("out for delivery", TrackingStatus.OUT_FOR_DELIVERY),
     ("in delivery", TrackingStatus.OUT_FOR_DELIVERY),
-    ("wordt vandaag bezorgd", TrackingStatus.OUT_FOR_DELIVERY),
     # In transit
-    ("the parcel has left the parcel center", TrackingStatus.IN_TRANSIT),
-    ("the parcel has reached the parcel center", TrackingStatus.IN_TRANSIT),
-    ("the parcel is on its way", TrackingStatus.IN_TRANSIT),
+    ("doorgestuurd naar gls depot", TrackingStatus.IN_TRANSIT),
+    ("aangekomen op gls depot", TrackingStatus.IN_TRANSIT),
+    ("ontvangen door gls", TrackingStatus.IN_TRANSIT),
     ("in transit", TrackingStatus.IN_TRANSIT),
     ("parcel center", TrackingStatus.IN_TRANSIT),
     ("sorteercentrum", TrackingStatus.IN_TRANSIT),
-    ("onderweg", TrackingStatus.IN_TRANSIT),
     ("depot", TrackingStatus.IN_TRANSIT),
     # Pre-transit
-    ("the parcel was handed over to gls", TrackingStatus.PRE_TRANSIT),
+    ("aangekondigd bij gls", TrackingStatus.PRE_TRANSIT),
+    ("gereed voor overdracht", TrackingStatus.PRE_TRANSIT),
     ("the parcel data was entered", TrackingStatus.PRE_TRANSIT),
     ("preadvice", TrackingStatus.PRE_TRANSIT),
     ("aangemeld", TrackingStatus.PRE_TRANSIT),
@@ -75,10 +71,22 @@ class GLS(CarrierBase):
         self._client = http_client
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        postal_code = kwargs.get("postal_code", "")
+        if not postal_code:
+            return TrackingResult(
+                tracking_number=tracking_number,
+                carrier=self.name,
+                status=TrackingStatus.UNKNOWN,
+            )
+
+        url = (
+            f"{GLS_TRACKING_URL}/{tracking_number}"
+            f"/postalcode/{postal_code}/details/nl-NL"
+        )
+
         async with self._get_client() as client:
-            response = await client.post(
-                GLS_TRACKING_URL,
-                data={"match": tracking_number, "type": "MYFGLS"},
+            response = await client.get(
+                url,
                 headers={
                     "User-Agent": "Mozilla/5.0",
                     "Accept": "application/json",
@@ -112,40 +120,21 @@ class GLS(CarrierBase):
     def _parse_tracking_response(
         self, tracking_number: str, data: dict
     ) -> TrackingResult:
-        tu_status = data.get("tuStatus", [])
-        if not tu_status:
-            return TrackingResult(
-                tracking_number=tracking_number,
-                carrier=self.name,
-                status=TrackingStatus.UNKNOWN,
-            )
-
-        parcel = tu_status[0]
+        scans = data.get("scans", [])
         events: list[TrackingEvent] = []
 
-        for entry in parcel.get("history", []):
-            date_str = entry.get("date", "")
-            time_str = entry.get("time", "00:00")
-            description = entry.get("evtDscr", "")
+        for scan in scans:
+            description = scan.get("eventReasonDescr", "")
+            date_str = scan.get("dateTime", "")
+            depot_name = scan.get("depotName") or ""
+            country = scan.get("countryName") or ""
 
             try:
-                ts = _ensure_utc(
-                    datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
-                )
+                ts = _ensure_utc(datetime.fromisoformat(date_str))
             except ValueError:
-                try:
-                    ts = _ensure_utc(
-                        datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
-                    )
-                except ValueError:
-                    ts = datetime.now(UTC)
+                ts = datetime.now(UTC)
 
-            address = entry.get("address", {})
-            location_parts = []
-            if address.get("city"):
-                location_parts.append(address["city"])
-            if address.get("countryName"):
-                location_parts.append(address["countryName"])
+            location_parts = [p for p in [depot_name, country] if p and p != "-"]
 
             events.append(
                 TrackingEvent(
@@ -158,12 +147,17 @@ class GLS(CarrierBase):
 
         sorted_events = sorted(events, key=lambda e: e.timestamp)
 
-        # Overall status from progressBar or last event
-        progress = parcel.get("progressBar", {})
-        status_info = progress.get("statusInfo", "")
-        status = _parse_status(status_info) if status_info else TrackingStatus.UNKNOWN
-        if status == TrackingStatus.UNKNOWN and sorted_events:
+        # Determine overall status from delivery info or last event
+        delivery_info = data.get("deliveryScanInfo", {})
+        if delivery_info.get("isDelivered"):
+            status = TrackingStatus.DELIVERED
+        elif sorted_events:
             status = sorted_events[-1].status
+        else:
+            status = TrackingStatus.UNKNOWN
+
+        # Sender name as label context
+        sender = data.get("addressInfo", {}).get("from", {}).get("name")
 
         return TrackingResult(
             tracking_number=tracking_number,

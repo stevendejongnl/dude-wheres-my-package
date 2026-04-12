@@ -145,6 +145,38 @@ curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
 
 **Note:** DPD parcels are scraped from the HTML. The "token" is a snapshot of the parcels page — re-capture it when you need fresh data.
 
+### GLS
+
+**Auth type:** `manual_token` (no account needed — public tracking)
+
+GLS Netherlands (`gls-info.nl`) provides public parcel tracking. No login required — just the tracking number and postal code.
+
+**Steps:**
+
+Add a GLS parcel directly:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/packages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tracking_number": "<your GLS tracking number>",
+    "carrier": "gls",
+    "postal_code": "<delivery postal code>"
+  }'
+```
+
+**Important:** The `postal_code` field is **required** for GLS — the API won't return tracking data without it.
+
+Refresh to fetch the latest tracking status:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/packages/<id>/refresh
+```
+
+**API:** REST at `apm.gls.nl/api/tracktrace/v1` — returns detailed scan events with depot names, timestamps, and delivery confirmation.
+
+**Note:** GLS account sync is not supported. Parcels are tracked individually using the public API.
+
 ### Manual Tracking (any carrier)
 
 You can also track individual packages without an account:
