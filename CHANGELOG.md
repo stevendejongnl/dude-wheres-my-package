@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.10.1 (2026-04-12)
+
+### Bug Fixes
+
+- **amazon**: Treat future-tense 'wordt bezorgd' as in-transit, sort packages by last event
+  ([`a1b576f`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/a1b576f74a7bacc81aaac9c626367f4b1cf5d7f8))
+
+
 ## v1.10.0 (2026-04-12)
 
 ### Features
