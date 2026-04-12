@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.3.0 (2026-04-12)
+
+### Documentation
+
+- Fix DPD auth type to manual_token, update API reference
+  ([`5b058c5`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/5b058c567e379c388941c9074abb857e5a29847a))
+
+### Features
+
+- **ui**: Add Jinja2 + htmx dashboard with package timeline and accounts page
+  ([`143e3fc`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/143e3fcc68f832895a6a31baeb026f8e5b271447))
+
+
 ## v1.2.0 (2026-04-12)
 
 ### Features
