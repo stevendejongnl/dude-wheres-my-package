@@ -62,7 +62,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health() -> dict[str, str]:
-        return {"status": "ok"}
+        return {"status": "ok", "version": app.version}
 
     @app.exception_handler(_LoginRequired)
     async def login_redirect(request: Request, exc: _LoginRequired):

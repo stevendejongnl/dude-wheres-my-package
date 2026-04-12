@@ -10,7 +10,9 @@ async def test_health_check():
         response = await client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "version" in data
 
 
 async def test_list_carriers():
