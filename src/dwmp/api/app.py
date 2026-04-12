@@ -1,7 +1,7 @@
 import os
-from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
-
+from contextlib import asynccontextmanager
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -10,12 +10,10 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from dwmp.api.auth import is_authenticated
-
-from importlib.metadata import version as pkg_version
-
-from dwmp.api.routes import router
-from dwmp.api.views import router as views_router, _LoginRequired
 from dwmp.api.dependencies import get_repository, get_tracking_service
+from dwmp.api.routes import router
+from dwmp.api.views import _LoginRequired
+from dwmp.api.views import router as views_router
 from dwmp.services.scheduler import PackageScheduler
 
 

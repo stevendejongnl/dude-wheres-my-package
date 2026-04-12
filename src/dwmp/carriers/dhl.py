@@ -1,5 +1,6 @@
+from datetime import UTC, datetime, timedelta
+
 import httpx
-from datetime import datetime, timedelta, timezone
 
 from dwmp.carriers.base import (
     AuthTokens,
@@ -38,7 +39,7 @@ STATUS_MAP: list[tuple[str, TrackingStatus]] = [
 
 def _ensure_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 
@@ -109,7 +110,7 @@ class DHL(CarrierBase):
         data = await self._login_and_fetch_parcels(tokens)
 
         results: list[TrackingResult] = []
-        cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+        cutoff = datetime.now(UTC) - timedelta(days=lookback_days)
 
         for parcel in data.get("parcels", []):
             result = self._parse_parcel(parcel)
@@ -227,9 +228,9 @@ class DHL(CarrierBase):
                 location_parts.append(loc)
 
             try:
-                ts = _ensure_utc(datetime.fromisoformat(ts_str)) if ts_str else datetime.now(timezone.utc)
+                ts = _ensure_utc(datetime.fromisoformat(ts_str)) if ts_str else datetime.now(UTC)
             except ValueError:
-                ts = datetime.now(timezone.utc)
+                ts = datetime.now(UTC)
 
             events.append(
                 TrackingEvent(

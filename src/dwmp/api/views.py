@@ -1,11 +1,10 @@
 from datetime import datetime
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-
-from importlib.metadata import version as pkg_version
 
 from dwmp.api.auth import login_response, logout_response, verify_password
 from dwmp.api.dependencies import get_tracking_service
@@ -132,10 +131,11 @@ async def packages_page(
 
     accounts = await service.list_accounts()
 
-    return templates.TemplateResponse(
-        request, "packages.html",
-        {"active_nav": "packages", "active": active, "delivered": delivered, "accounts": len(accounts), "version": VERSION},
-    )
+    ctx = {
+        "active_nav": "packages", "active": active, "delivered": delivered,
+        "accounts": len(accounts), "version": VERSION,
+    }
+    return templates.TemplateResponse(request, "packages.html", ctx)
 
 
 @router.get("/accounts", response_class=HTMLResponse)
@@ -158,10 +158,11 @@ async def accounts_page(
             )
         carriers.append(entry)
 
-    return templates.TemplateResponse(
-        request, "accounts.html",
-        {"active_nav": "accounts", "active": "accounts", "accounts": accounts, "carriers": carriers, "version": VERSION},
-    )
+    ctx = {
+        "active_nav": "accounts", "active": "accounts",
+        "accounts": accounts, "carriers": carriers, "version": VERSION,
+    }
+    return templates.TemplateResponse(request, "accounts.html", ctx)
 
 
 # --- Notification views ---
@@ -188,9 +189,12 @@ async def notifications_page(
     if unread_count > 0:
         await service.mark_all_notifications_read()
 
+    ctx = {
+        "active_nav": "notifications", "notifications": notifications,
+        "unread_count": unread_count, "version": VERSION,
+    }
     return templates.TemplateResponse(
-        request, "notifications.html",
-        {"active_nav": "notifications", "notifications": notifications, "unread_count": unread_count, "version": VERSION},
+        request, "notifications.html", ctx,
     )
 
 

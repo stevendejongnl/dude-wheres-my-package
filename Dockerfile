@@ -1,3 +1,11 @@
+FROM node:22-slim AS frontend
+WORKDIR /build
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.json ./
+COPY src/dwmp/static/ts/ src/dwmp/static/ts/
+RUN npm run build
+
 FROM python:3.13-slim
 
 LABEL org.opencontainers.image.source="https://github.com/stevendejongnl/dude-wheres-my-package"
@@ -13,6 +21,7 @@ RUN uv sync --no-dev --frozen
 RUN uv run playwright install --with-deps chromium
 
 COPY src/ src/
+COPY --from=frontend /build/src/dwmp/static/js/ src/dwmp/static/js/
 
 ENV PYTHONIOENCODING=utf-8
 ENV LANG=C.UTF-8

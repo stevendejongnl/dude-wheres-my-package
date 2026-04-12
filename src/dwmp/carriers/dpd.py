@@ -1,7 +1,8 @@
 import re
+from datetime import UTC, datetime
+
 import httpx
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta, timezone
 
 from dwmp.carriers.base import (
     AuthTokens,
@@ -43,7 +44,7 @@ STATUS_MAP: list[tuple[str, TrackingStatus]] = [
 
 def _ensure_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 
@@ -102,11 +103,9 @@ class DPD(CarrierBase):
     ) -> list[TrackingResult]:
         soup = BeautifulSoup(html, "lxml")
         results: list[TrackingResult] = []
-        cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
-
         # Find parcel links — handle both normal and escaped class attributes
         parcel_links = soup.select("a[href*='parcelNumber']")
-        parcel_links = [l for l in parcel_links if "mailto" not in l.get("href", "")]
+        parcel_links = [link for link in parcel_links if "mailto" not in link.get("href", "")]
 
         for link in parcel_links:
             href = link.get("href", "")
@@ -126,7 +125,7 @@ class DPD(CarrierBase):
             events: list[TrackingEvent] = []
             if sender:
                 events.append(TrackingEvent(
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     status=TrackingStatus.PRE_TRANSIT,
                     description=sender,
                 ))
@@ -253,7 +252,7 @@ class DPD(CarrierBase):
             try:
                 ts = datetime.strptime(
                     f"{date_str} {time_str}", "%d.%m.%Y %H:%M"
-                ).replace(tzinfo=timezone.utc)
+                ).replace(tzinfo=UTC)
             except ValueError:
                 continue
 
@@ -279,11 +278,11 @@ class DPD(CarrierBase):
         try:
             ts = datetime.strptime(
                 f"{date_str} {time_str}", "%d.%m.%Y %H:%M"
-            ).replace(tzinfo=timezone.utc)
+            ).replace(tzinfo=UTC)
         except ValueError:
             return None
 
-        lines = [l.strip() for l in rest.strip().split("\n") if l.strip()]
+        lines = [line.strip() for line in rest.strip().split("\n") if line.strip()]
         location = lines[0] if lines else None
         description = lines[1] if len(lines) > 1 else lines[0] if lines else ""
 
@@ -315,9 +314,9 @@ class DPD(CarrierBase):
             date_text = date_el.get_text(strip=True) if date_el else ""
 
             try:
-                ts = datetime.fromisoformat(date_text) if date_text else datetime.now(timezone.utc)
+                ts = datetime.fromisoformat(date_text) if date_text else datetime.now(UTC)
             except ValueError:
-                ts = datetime.now(timezone.utc)
+                ts = datetime.now(UTC)
 
             if description:
                 events.append(TrackingEvent(

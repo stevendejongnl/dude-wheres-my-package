@@ -1,4 +1,5 @@
 import pytest
+
 from dwmp.carriers.base import AuthType, TrackingStatus
 from dwmp.carriers.dpd import DPD, _parse_status
 

@@ -1,10 +1,10 @@
 import json
 import logging
 import re
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta, timezone
 
 from dwmp.carriers.base import (
     AuthTokens,
@@ -105,10 +105,10 @@ def _parse_dutch_date(text: str) -> datetime | None:
     month = DUTCH_MONTHS.get(month_str)
     if not month:
         return None
-    year = int(year_str) if year_str else datetime.now(timezone.utc).year
+    year = int(year_str) if year_str else datetime.now(UTC).year
 
     try:
-        return datetime(year, month, day, tzinfo=timezone.utc)
+        return datetime(year, month, day, tzinfo=UTC)
     except ValueError:
         return None
 
@@ -246,7 +246,7 @@ class Amazon(CarrierBase):
     ) -> list[TrackingResult]:
         soup = BeautifulSoup(html, "lxml")
         results: list[TrackingResult] = []
-        cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+        cutoff = datetime.now(UTC) - timedelta(days=lookback_days)
 
         order_cards = soup.select(
             ".order-card, .js-order-card, .a-box-group.order"
@@ -357,7 +357,7 @@ class Amazon(CarrierBase):
 
         if not events and status != TrackingStatus.UNKNOWN:
             events.append(TrackingEvent(
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 status=status,
                 description=status_text or status.value,
             ))
@@ -385,7 +385,8 @@ async def _playwright_login_and_capture(
     Returns ``(orders_html, cookies_json)``.
     """
     from playwright.async_api import async_playwright
-    from dwmp.carriers.browser import _browser_lock, _normalize_cookies
+
+    from dwmp.carriers.browser import _browser_lock
 
     async with _browser_lock:
         async with async_playwright() as pw:

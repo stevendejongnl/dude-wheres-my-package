@@ -285,36 +285,7 @@
     </div>
   </footer>
   {% if active_nav %}
-  <script>
-  (function() {
-    if (!('Notification' in window)) return;
-
-    // Request permission after a short delay (less aggressive)
-    if (Notification.permission === 'default') {
-      setTimeout(function() { Notification.requestPermission(); }, 3000);
-    }
-
-    // Track last known unread count to detect new notifications
-    var lastCount = 0;
-
-    document.addEventListener('htmx:afterSwap', function(evt) {
-      if (evt.detail.target.id !== 'notif-badge') return;
-
-      var el = evt.detail.target.querySelector('[data-count]');
-      var count = el ? parseInt(el.dataset.count, 10) : 0;
-
-      if (count > lastCount && lastCount >= 0 && Notification.permission === 'granted') {
-        var diff = count - lastCount;
-        new Notification('Dude, Where\'s My Package?', {
-          body: diff === 1 ? 'A package status has changed' : diff + ' package updates',
-          icon: '/static/icon-64.png',
-          tag: 'dwmp-update'
-        });
-      }
-      lastCount = count;
-    });
-  })();
-  </script>
+  <script src="/static/js/notifications.js"></script>
   {% endif %}
 </body>
 </html>

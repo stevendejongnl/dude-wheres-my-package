@@ -1,16 +1,15 @@
 import pytest
 
-from dwmp.services.scheduler import PackageScheduler
-from dwmp.services.tracking import TrackingService
-from dwmp.storage.repository import PackageRepository
 from dwmp.carriers.base import (
     AuthTokens,
     AuthType,
-    CarrierAuthError,
     CarrierBase,
     TrackingResult,
     TrackingStatus,
 )
+from dwmp.services.scheduler import PackageScheduler
+from dwmp.services.tracking import TrackingService
+from dwmp.storage.repository import PackageRepository
 
 
 class StubCarrier(CarrierBase):
@@ -75,7 +74,7 @@ async def test_poll_syncs_accounts_and_manual_packages(repo):
     scheduler = PackageScheduler(tracking_service=service)
 
     # Add a connected account
-    account = await service.connect_account_credentials(
+    await service.connect_account_credentials(
         "stub", "user", "pass", lookback_days=30
     )
 

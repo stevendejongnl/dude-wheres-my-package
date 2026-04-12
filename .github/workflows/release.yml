@@ -13,9 +13,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Python
       - uses: astral-sh/setup-uv@v4
       - run: uv sync --all-extras
+      - run: uv run ruff check src/
       - run: uv run pytest
+
+      # TypeScript
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
 
   release:
     needs: test

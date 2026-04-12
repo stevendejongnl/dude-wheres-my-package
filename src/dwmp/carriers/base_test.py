@@ -1,4 +1,7 @@
+from datetime import datetime
+
 import pytest
+
 from dwmp.carriers.base import (
     AuthTokens,
     AuthType,
@@ -7,7 +10,6 @@ from dwmp.carriers.base import (
     TrackingResult,
     TrackingStatus,
 )
-from datetime import datetime
 
 
 class FakeOAuthCarrier(CarrierBase):

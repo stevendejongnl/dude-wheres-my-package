@@ -1,11 +1,11 @@
 import os
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from fastapi import Cookie, Request
+from fastapi import Request
 from fastapi.responses import RedirectResponse
 
 ph = PasswordHasher()
@@ -35,7 +35,7 @@ def verify_password(password: str) -> bool:
 
 def create_token() -> str:
     return jwt.encode(
-        {"exp": datetime.now(timezone.utc) + timedelta(days=JWT_EXPIRY_DAYS)},
+        {"exp": datetime.now(UTC) + timedelta(days=JWT_EXPIRY_DAYS)},
         JWT_SECRET,
         algorithm=JWT_ALGORITHM,
     )

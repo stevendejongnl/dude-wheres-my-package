@@ -1,5 +1,6 @@
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timezone
 
 from dwmp.carriers.base import (
     AuthTokens,
@@ -24,7 +25,7 @@ class StubCarrier(CarrierBase):
             status=TrackingStatus.IN_TRANSIT,
             events=[
                 TrackingEvent(
-                    timestamp=datetime(2026, 4, 11, 10, 0, tzinfo=timezone.utc),
+                    timestamp=datetime(2026, 4, 11, 10, 0, tzinfo=UTC),
                     status=TrackingStatus.IN_TRANSIT,
                     description="On its way",
                     location="Amsterdam",

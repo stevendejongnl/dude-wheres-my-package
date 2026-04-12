@@ -1,5 +1,6 @@
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timedelta, timezone
 
 from dwmp.storage.repository import PackageRepository
 
@@ -66,14 +67,14 @@ async def test_add_and_get_events(repo: PackageRepository):
 
     await repo.add_event(
         package_id=pkg_id,
-        timestamp=datetime(2026, 4, 11, 10, 0, tzinfo=timezone.utc),
+        timestamp=datetime(2026, 4, 11, 10, 0, tzinfo=UTC),
         status="in_transit",
         description="Package is on its way",
         location="Amsterdam",
     )
     await repo.add_event(
         package_id=pkg_id,
-        timestamp=datetime(2026, 4, 11, 14, 0, tzinfo=timezone.utc),
+        timestamp=datetime(2026, 4, 11, 14, 0, tzinfo=UTC),
         status="out_for_delivery",
         description="Out for delivery",
         location="Utrecht",
@@ -87,7 +88,7 @@ async def test_add_and_get_events(repo: PackageRepository):
 
 async def test_duplicate_event_is_ignored(repo: PackageRepository):
     pkg_id = await repo.add_package(tracking_number="DUP1", carrier="postnl")
-    ts = datetime(2026, 4, 11, 10, 0, tzinfo=timezone.utc)
+    ts = datetime(2026, 4, 11, 10, 0, tzinfo=UTC)
 
     await repo.add_event(pkg_id, ts, "in_transit", "On its way")
     await repo.add_event(pkg_id, ts, "in_transit", "On its way")
@@ -293,7 +294,7 @@ async def test_delete_package_cascades_notifications(repo: PackageRepository):
 
 async def test_auth_failure_notification_without_package(repo: PackageRepository):
     """Auth failure notifications have no package_id."""
-    notif_id = await repo.add_notification(
+    await repo.add_notification(
         package_id=None,
         old_status="connected",
         new_status="auth_failed",

@@ -10,8 +10,8 @@ from dwmp.carriers.base import (
     TrackingResult,
     TrackingStatus,
 )
-from dwmp.storage.repository import PackageRepository
 from dwmp.services.tracking import TrackingService
+from dwmp.storage.repository import PackageRepository
 
 
 class StubPostNLCarrier(CarrierBase):

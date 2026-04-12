@@ -1,13 +1,15 @@
 import json
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timezone
-from dwmp.carriers.base import AuthTokens, AuthType, CarrierAuthError, TrackingStatus
+
 from dwmp.carriers.amazon import (
     Amazon,
     _parse_cookies,
     _parse_dutch_date,
     _parse_status,
 )
+from dwmp.carriers.base import AuthTokens, AuthType, CarrierAuthError, TrackingStatus
 
 
 def test_amazon_is_credentials():
@@ -80,7 +82,7 @@ def test_parse_dutch_date_short_month():
 
 def test_parse_dutch_date_full_month():
     dt = _parse_dutch_date("5 april 2026")
-    assert dt == datetime(2026, 4, 5, tzinfo=timezone.utc)
+    assert dt == datetime(2026, 4, 5, tzinfo=UTC)
 
 
 def test_parse_dutch_date_in_sentence():

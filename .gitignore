@@ -8,3 +8,5 @@ build/
 *.db
 .idea/
 .playwright-mcp/
+node_modules/
+src/dwmp/static/js/

@@ -1,9 +1,9 @@
 import json
 import os
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import aiosqlite
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 DB_PATH = Path(os.environ.get("DB_PATH", "dwmp.db"))
 
@@ -117,7 +117,7 @@ class PackageRepository:
         username: str | None = None,
         lookback_days: int = 30,
     ) -> int:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         tokens_json = json.dumps(tokens) if tokens else None
         try:
             cursor = await self.db.execute(
@@ -161,7 +161,7 @@ class PackageRepository:
     async def update_account_tokens(
         self, account_id: int, tokens: dict
     ) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         await self.db.execute(
             "UPDATE accounts SET tokens = ?, updated_at = ? WHERE id = ?",
             (json.dumps(tokens), now, account_id),
@@ -171,7 +171,7 @@ class PackageRepository:
     async def update_account_status(
         self, account_id: int, status: str, message: str | None = None
     ) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         await self.db.execute(
             "UPDATE accounts SET status = ?, status_message = ?, updated_at = ? WHERE id = ?",
             (status, message, now, account_id),
@@ -179,7 +179,7 @@ class PackageRepository:
         await self.db.commit()
 
     async def update_account_last_synced(self, account_id: int) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         await self.db.execute(
             "UPDATE accounts SET last_synced = ?, updated_at = ? WHERE id = ?",
             (now, now, account_id),
@@ -197,7 +197,7 @@ class PackageRepository:
         account_id: int | None = None,
         source: str = "manual",
     ) -> int:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         try:
             cursor = await self.db.execute(
                 """INSERT INTO packages
@@ -247,7 +247,7 @@ class PackageRepository:
         return cursor.rowcount > 0
 
     async def update_status(self, package_id: int, status: str) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         await self.db.execute(
             "UPDATE packages SET current_status = ?, updated_at = ? WHERE id = ?",
             (status, now, package_id),
@@ -289,7 +289,7 @@ class PackageRepository:
         carrier: str,
         label: str | None = None,
     ) -> int:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         cursor = await self.db.execute(
             """INSERT INTO notifications
                (package_id, old_status, new_status, tracking_number, carrier, label, created_at)
@@ -332,7 +332,7 @@ class PackageRepository:
         return cursor.rowcount
 
     async def delete_old_notifications(self, days: int = 30) -> int:
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
         cursor = await self.db.execute(
             "DELETE FROM notifications WHERE created_at < ?", (cutoff,)
         )
