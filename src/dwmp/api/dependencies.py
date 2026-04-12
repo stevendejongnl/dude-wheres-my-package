@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from dwmp.carriers.amazon import Amazon
 from dwmp.carriers.postnl import PostNL
 from dwmp.carriers.dhl import DHL
 from dwmp.carriers.dpd import DPD
@@ -17,6 +18,7 @@ def get_tracking_service() -> TrackingService:
     return TrackingService(
         repository=get_repository(),
         carriers={
+            "amazon": Amazon(),
             "postnl": PostNL(),
             "dhl": DHL(),
             "dpd": DPD(),

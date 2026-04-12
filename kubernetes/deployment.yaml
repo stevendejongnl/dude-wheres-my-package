@@ -5,6 +5,11 @@ metadata:
   namespace: package-tracking
   labels:
     app: dwmp
+  annotations:
+    keel.sh/policy: major
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+    keel.sh/match-tag: "true"
 spec:
   replicas: 1
   selector:
@@ -21,7 +26,7 @@ spec:
         kubernetes.io/hostname: worker-02
       containers:
         - name: dwmp
-          image: ghcr.io/stevendejongnl/dude-wheres-my-package:latest
+          image: ghcr.io/stevendejongnl/dude-wheres-my-package:1.6.1
           ports:
             - containerPort: 8000
           envFrom:
