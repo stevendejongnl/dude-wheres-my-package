@@ -32,10 +32,6 @@ jobs:
   release:
     needs: test
     runs-on: ubuntu-latest
-    outputs:
-      released: ${{ steps.release.outputs.released }}
-      version: ${{ steps.release.outputs.version }}
-      tag: ${{ steps.release.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,7 +55,6 @@ jobs:
             VERSION=$(semantic-release version --print)
             echo "released=true" >> "$GITHUB_OUTPUT"
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
             git push
             git push --tags
             semantic-release publish
@@ -67,27 +62,21 @@ jobs:
             echo "released=false" >> "$GITHUB_OUTPUT"
           fi
 
-  docker:
-    needs: release
-    if: needs.release.outputs.released == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.release.outputs.tag }}
-
-      - uses: docker/login-action@v3
+      # Build and push Docker image in the same job — no checkout race
+      - name: Docker login
+        if: steps.release.outputs.released == 'true'
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      - name: Build and push Docker image
+        if: steps.release.outputs.released == 'true'
+        uses: docker/build-push-action@v6
         with:
+          context: .
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ needs.release.outputs.version }}
+            ghcr.io/${{ github.repository }}:${{ steps.release.outputs.version }}
