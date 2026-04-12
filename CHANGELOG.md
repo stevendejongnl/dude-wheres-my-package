@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.4.0 (2026-04-12)
+
+### Features
+
+- **ui**: Add argon2 password auth, active/delivered split, datetime formatting, version label
+  ([`a6f2384`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/a6f2384448d384c2b37455fa5c1518f0d7af583c))
+
+
 ## v1.3.0 (2026-04-12)
 
 ### Documentation
