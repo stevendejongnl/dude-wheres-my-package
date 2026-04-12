@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.10.2 (2026-04-12)
+
+### Bug Fixes
+
+- **ui**: Skip dates and status text in sender extraction, bold From: label
+  ([`546c4ab`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/546c4aba407afbcf115e6d2a979b0d1ac9693562))
+
+
 ## v1.10.1 (2026-04-12)
 
 ### Bug Fixes
