@@ -14,14 +14,17 @@ WORKDIR /app
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
+# Install dependencies first (cached layer)
 COPY pyproject.toml uv.lock ./
-RUN uv sync --no-dev --frozen
+RUN uv sync --no-dev --frozen --no-install-project
 
 # Install Chromium for Playwright (Amazon browser automation)
 RUN uv run playwright install --with-deps chromium
 
+# Copy source and install the project itself (records version metadata)
 COPY src/ src/
 COPY --from=frontend /build/src/dwmp/static/js/ src/dwmp/static/js/
+RUN uv sync --no-dev --frozen
 
 ENV PYTHONIOENCODING=utf-8
 ENV LANG=C.UTF-8
