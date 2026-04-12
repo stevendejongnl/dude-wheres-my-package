@@ -86,9 +86,13 @@ class CarrierBase(ABC):
         """Exchange OAuth code for tokens. Only for AuthType.OAUTH carriers."""
         raise NotImplementedError(f"{self.name} does not use OAuth")
 
-    async def login(self, username: str, password: str) -> AuthTokens:
+    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
         """Authenticate with credentials. Only for AuthType.CREDENTIALS carriers."""
         raise NotImplementedError(f"{self.name} does not use credentials")
+
+    def get_updated_tokens(self) -> AuthTokens | None:
+        """Return updated tokens if the last sync refreshed them (e.g. browser cookies)."""
+        return None
 
     async def refresh_tokens(self, tokens: AuthTokens) -> AuthTokens:
         """Refresh expired tokens. Returns new tokens."""

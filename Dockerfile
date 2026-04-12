@@ -9,6 +9,9 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev --frozen
 
+# Install Chromium for Playwright (Amazon browser automation)
+RUN uv run playwright install --with-deps chromium
+
 COPY src/ src/
 
 ENV PYTHONIOENCODING=utf-8

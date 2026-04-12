@@ -41,7 +41,7 @@ class StubCredCarrier(CarrierBase):
     async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
         return []
 
-    async def login(self, username: str, password: str) -> AuthTokens:
+    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
         return AuthTokens(access_token="dpd-token")
 
 

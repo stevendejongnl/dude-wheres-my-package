@@ -52,7 +52,7 @@ class StubCarrier(CarrierBase):
             )
         ]
 
-    async def login(self, username: str, password: str) -> AuthTokens:
+    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
         return AuthTokens(access_token="stub-token")
 
 

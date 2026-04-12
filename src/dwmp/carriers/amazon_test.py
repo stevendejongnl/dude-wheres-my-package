@@ -1,3 +1,4 @@
+import json
 import pytest
 from datetime import datetime, timezone
 from dwmp.carriers.base import AuthTokens, AuthType, CarrierAuthError, TrackingStatus
@@ -9,8 +10,8 @@ from dwmp.carriers.amazon import (
 )
 
 
-def test_amazon_is_manual_token():
-    assert Amazon().auth_type == AuthType.MANUAL_TOKEN
+def test_amazon_is_credentials():
+    assert Amazon().auth_type == AuthType.CREDENTIALS
 
 
 # --- status parsing ---
@@ -165,11 +166,144 @@ def test_parse_orders_page_in_transit():
     assert results[0].estimated_delivery.day == 16
 
 
-async def test_sync_rejects_non_html():
+async def test_sync_rejects_unconfigured():
+    """No cookies, no HTML, no credentials → clear error."""
     carrier = Amazon()
     tokens = AuthTokens(access_token="session-id=abc; session-token=xyz")
-    with pytest.raises(CarrierAuthError, match="browser-captured HTML"):
+    with pytest.raises(CarrierAuthError, match="not configured"):
         await carrier.sync_packages(tokens)
+
+
+async def test_sync_detects_cookies_json(monkeypatch):
+    """When access_token is a JSON array, sync uses browser automation."""
+    captured_args: dict = {}
+
+    async def fake_capture(url, cookies_json, carrier_name, **kw):
+        captured_args["url"] = url
+        captured_args["cookies_json"] = cookies_json
+        html = """
+        <html><body>
+        <div class="order-card">
+            <span>305-0000000-0000000</span>
+            <span class="a-color-success">Bezorgd</span>
+        </div>
+        </body></html>
+        """
+        return html, '[{"name":"refreshed","value":"1"}]'
+
+    monkeypatch.setattr(
+        "dwmp.carriers.browser.capture_page_html", fake_capture
+    )
+
+    carrier = Amazon()
+    cookies = '[{"name":"session-id","value":"abc","domain":".amazon.nl"}]'
+    tokens = AuthTokens(access_token=cookies, refresh_token='{"email":"x","password":"y"}')
+    results = await carrier.sync_packages(tokens)
+
+    assert len(results) == 1
+    assert results[0].tracking_number == "305-0000000-0000000"
+    assert captured_args["url"] == "https://www.amazon.nl/your-orders/orders"
+
+    # Updated tokens should preserve credentials in refresh_token
+    updated = carrier.get_updated_tokens()
+    assert updated is not None
+    assert "refreshed" in updated.access_token
+    assert "email" in updated.refresh_token
+
+
+async def test_sync_auto_relogins_on_expired_cookies(monkeypatch):
+    """When cookies expire (CarrierAuthError), auto-re-login with stored credentials."""
+    login_called = []
+
+    async def fake_capture_expired(**kw):
+        raise CarrierAuthError("amazon", "Session expired")
+
+    async def fake_login(email, password, totp_secret, orders_url):
+        login_called.append(email)
+        html = """
+        <html><body>
+        <div class="order-card">
+            <span>305-1111111-1111111</span>
+            <span class="a-color-success">Bezorgd</span>
+        </div>
+        </body></html>
+        """
+        return html, '[{"name":"fresh","value":"1"}]'
+
+    monkeypatch.setattr(
+        "dwmp.carriers.browser.capture_page_html", fake_capture_expired
+    )
+    monkeypatch.setattr(
+        "dwmp.carriers.amazon._playwright_login_and_capture", fake_login
+    )
+
+    carrier = Amazon()
+    creds = json.dumps({"email": "test@example.com", "password": "secret"})
+    tokens = AuthTokens(access_token='[{"name":"old"}]', refresh_token=creds)
+    results = await carrier.sync_packages(tokens)
+
+    assert len(results) == 1
+    assert login_called == ["test@example.com"]
+    updated = carrier.get_updated_tokens()
+    assert updated is not None
+    assert "fresh" in updated.access_token
+
+
+async def test_sync_relogin_fails_without_credentials(monkeypatch):
+    """If cookies expire and no credentials stored, raise clear error."""
+    async def fake_capture_expired(**kw):
+        raise CarrierAuthError("amazon", "Session expired")
+
+    monkeypatch.setattr(
+        "dwmp.carriers.browser.capture_page_html", fake_capture_expired
+    )
+
+    carrier = Amazon()
+    tokens = AuthTokens(access_token='[{"name":"old"}]', refresh_token=None)
+    with pytest.raises(CarrierAuthError, match="no stored credentials"):
+        await carrier.sync_packages(tokens)
+
+
+async def test_login_stores_credentials(monkeypatch):
+    """login() should return cookies in access_token and credentials in refresh_token."""
+    async def fake_login(email, password, totp_secret, orders_url):
+        return "<html></html>", '[{"name":"session","value":"abc"}]'
+
+    monkeypatch.setattr(
+        "dwmp.carriers.amazon._playwright_login_and_capture", fake_login
+    )
+
+    carrier = Amazon()
+    tokens = await carrier.login("user@example.com", "pass123", totp_secret="JBSWY3DP")
+
+    assert tokens.access_token.startswith("[")
+    creds = json.loads(tokens.refresh_token)
+    assert creds["email"] == "user@example.com"
+    assert creds["password"] == "pass123"
+    assert creds["totp_secret"] == "JBSWY3DP"
+
+
+def test_get_updated_tokens_returns_none_by_default():
+    carrier = Amazon()
+    assert carrier.get_updated_tokens() is None
+
+
+async def test_legacy_html_mode_still_works():
+    """Raw HTML in access_token should still parse (backwards compatible)."""
+    carrier = Amazon()
+    html = """
+    <html><body>
+    <div class="order-card">
+        <span>305-9999999-9999999</span>
+        <span class="a-color-success">Bezorgd</span>
+    </div>
+    </body></html>
+    """
+    tokens = AuthTokens(access_token=html)
+    results = await carrier.sync_packages(tokens)
+    assert len(results) == 1
+    assert results[0].tracking_number == "305-9999999-9999999"
+    assert carrier.get_updated_tokens() is None
 
 
 def test_parse_orders_page_empty():

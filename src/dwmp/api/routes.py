@@ -34,6 +34,7 @@ class CredentialsRequest(BaseModel):
     carrier: str
     username: str
     password: str
+    totp_secret: str | None = None
     lookback_days: int = 30
 
 
@@ -105,7 +106,8 @@ async def connect_credentials(
 ) -> dict:
     try:
         return await service.connect_account_credentials(
-            body.carrier, body.username, body.password, body.lookback_days
+            body.carrier, body.username, body.password, body.lookback_days,
+            totp_secret=body.totp_secret,
         )
     except CarrierAuthError as exc:
         raise HTTPException(status_code=502, detail=exc.message)

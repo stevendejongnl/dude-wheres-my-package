@@ -16,6 +16,8 @@ dependencies = [
     "argon2-cffi>=25.1.0",
     "pyjwt>=2.12.1",
     "python-multipart>=0.0.26",
+    "playwright>=1.49",
+    "pyotp>=2.9",
 ]
 
 [project.optional-dependencies]

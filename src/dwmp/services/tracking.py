@@ -113,6 +113,7 @@ class TrackingService:
         username: str,
         password: str,
         lookback_days: int = 30,
+        totp_secret: str | None = None,
     ) -> dict:
         carrier = self._carriers.get(carrier_name)
         if carrier is None:
@@ -121,7 +122,9 @@ class TrackingService:
             raise ValueError(f"{carrier_name} does not use credentials")
 
         try:
-            tokens = await carrier.login(username, password)
+            tokens = await carrier.login(
+                username, password, totp_secret=totp_secret or ""
+            )
         except Exception as exc:
             raise CarrierAuthError(
                 carrier_name,
@@ -211,6 +214,13 @@ class TrackingService:
             account_id, AccountStatus.CONNECTED
         )
         await self._repository.update_account_last_synced(account_id)
+
+        # Persist refreshed tokens (e.g. updated browser cookies)
+        updated_tokens = carrier.get_updated_tokens()
+        if updated_tokens:
+            await self._repository.update_account_tokens(
+                account_id, asdict(updated_tokens)
+            )
 
         synced: list[dict] = []
         for result in results:
