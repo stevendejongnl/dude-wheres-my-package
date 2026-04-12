@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.14.3 (2026-04-12)
+
+### Bug Fixes
+
+- **ci**: Use build_command to sync uv.lock during release
+  ([`62b93ed`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/62b93ed7b6be43c518fac46f7f9b6bb6e9db9a5f))
+
+
 ## v1.14.2 (2026-04-12)
 
 ### Bug Fixes
