@@ -52,6 +52,6 @@ select = ["E", "F", "I", "UP"]
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
 branch = "main"
-build_command = "uv lock"
+build_command = "uv lock && git add uv.lock"
 commit_message = "chore(release): {version}"
 tag_format = "v{version}"
