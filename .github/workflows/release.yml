@@ -46,6 +46,8 @@ jobs:
         with:
           python-version: "3.13"
 
+      - uses: astral-sh/setup-uv@v4
+
       - run: pip install python-semantic-release
 
       - name: Semantic Release
@@ -58,6 +60,10 @@ jobs:
             echo "released=true" >> "$GITHUB_OUTPUT"
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
             echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+            # Update uv.lock so the installed package version matches
+            uv lock
+            git add uv.lock
+            git commit --amend --no-edit
             git push
             git push --tags
             semantic-release publish
