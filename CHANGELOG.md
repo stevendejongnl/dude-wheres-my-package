@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.10.0 (2026-04-12)
+
+### Features
+
+- **amazon**: Automate login and sync with Playwright browser automation
+  ([`35d7bda`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/35d7bdaae6c03351a390104c4cd10e6496c58b5d))
+
+
 ## v1.9.4 (2026-04-12)
 
 ### Bug Fixes
