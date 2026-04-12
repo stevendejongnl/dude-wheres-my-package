@@ -46,8 +46,13 @@
       position: sticky; top: 0; z-index: 10;
     }
     header .container { display: flex; align-items: center; justify-content: space-between; }
-    header h1 { font-size: 1.2rem; font-weight: 600; }
-    header h1 span { color: var(--accent); }
+    header h1 { font-size: 1.2rem; font-weight: 600; display: flex; align-items: center; }
+    .version-badge {
+      font-size: 0.6rem; font-weight: 500; color: var(--accent);
+      background: #6c5ce715; border: 1px solid #6c5ce730;
+      padding: 2px 8px; border-radius: 20px; margin-left: 12px;
+      letter-spacing: 0.3px;
+    }
     nav { display: flex; gap: 8px; }
     nav a {
       color: var(--text-dim); text-decoration: none; padding: 6px 12px;
@@ -175,9 +180,9 @@
   <header>
     <div class="container">
       <h1>
-        <img src="/static/icon-64.png" alt="" style="width:28px;height:28px;vertical-align:middle;margin-right:8px;border-radius:6px;">
-        <span>DWMP</span> Dude, Where's My Package?
-        <span style="font-size:0.6rem;color:var(--text-dim);font-weight:400;vertical-align:middle;">v{{ version }}</span>
+        <img src="/static/icon-64.png" alt="" style="width:36px;height:36px;vertical-align:middle;margin-right:10px;border-radius:8px;">
+        Dude, Where's My Package?
+        <span class="version-badge">v{{ version }}</span>
       </h1>
       <nav>
         <a href="/" class="{% if active_nav == 'packages' %}active{% endif %}">Packages</a>
