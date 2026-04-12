@@ -4,6 +4,51 @@ Package tracking service for Dutch carriers. Runs as a container with a REST API
 
 ## Carrier Setup
 
+### Amazon
+
+**Auth type:** `credentials` (email + password + optional TOTP)
+
+Amazon.nl uses client-side JavaScript rendering — Playwright automates a headless Chromium to log in and capture the orders page. Cookies are cached between syncs; re-login happens automatically when they expire.
+
+**Steps:**
+
+1. Connect with your Amazon credentials:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/credentials \
+  -H "Content-Type: application/json" \
+  -d '{
+    "carrier": "amazon",
+    "username": "<your Amazon email>",
+    "password": "<your Amazon password>"
+  }'
+```
+
+2. **If you have TOTP MFA enabled** (authenticator app), add your TOTP secret:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/credentials \
+  -H "Content-Type: application/json" \
+  -d '{
+    "carrier": "amazon",
+    "username": "<your Amazon email>",
+    "password": "<your Amazon password>",
+    "totp_secret": "<your TOTP setup key>"
+  }'
+```
+
+The TOTP secret is the base32 key you received when setting up your authenticator app (e.g. `JBSWY3DPEHPK3PXP`).
+
+3. Sync your packages:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
+```
+
+**How it works:** Playwright launches headless Chromium, logs in with your credentials, navigates to the orders page, waits for JavaScript to render, and captures the HTML. The HTML is parsed for order status, dates, and tracking info. Cookies are saved so subsequent syncs skip the login step.
+
+**MFA:** TOTP (authenticator app) is supported. Push notification MFA is not — switch to TOTP in your Amazon security settings if you use push-based approval.
+
 ### PostNL
 
 **Auth type:** `manual_token` (browser login required)
@@ -135,7 +180,7 @@ GET    /api/v1/carriers               # List carriers with auth_type and setup h
 
 ```
 POST   /api/v1/accounts/token         # Connect with manual token (PostNL, DPD)
-POST   /api/v1/accounts/credentials   # Connect with email/password (DHL)
+POST   /api/v1/accounts/credentials   # Connect with email/password (Amazon, DHL)
 GET    /api/v1/accounts               # List connected accounts (tokens stripped)
 GET    /api/v1/accounts/{id}          # Account details
 DELETE /api/v1/accounts/{id}          # Disconnect account

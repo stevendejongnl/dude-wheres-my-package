@@ -1,7 +1,7 @@
 [project]
 name = "dude-wheres-my-package"
 version = "1.10.2"
-description = "Package tracking service for PostNL, DHL, and DPD"
+description = "Package tracking service for Amazon, PostNL, DHL, and DPD"
 authors = [{ name = "Steven de Jong", email = "steven@steven-dejong.nl" }]
 requires-python = ">=3.13"
 dependencies = [
