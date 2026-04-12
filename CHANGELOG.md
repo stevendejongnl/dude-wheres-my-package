@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.9.0 (2026-04-12)
+
+### Features
+
+- **notifications**: Notify user when carrier auth expires
+  ([`11f5f5e`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/11f5f5e81b05f6959d26dbe367329957c5159f78))
+
+
 ## v1.8.0 (2026-04-12)
 
 ### Features
