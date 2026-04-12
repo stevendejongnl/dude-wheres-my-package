@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.6.1 (2026-04-12)
+
+### Bug Fixes
+
+- Read API version from package metadata instead of hardcoded
+  ([`0650367`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/0650367ac086109bd6a12237b178701885f80812))
+
+
 ## v1.6.0 (2026-04-12)
 
 ### Features
