@@ -174,6 +174,31 @@
     /* Section header */
     .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
     .section-header h2 { font-size: 1.1rem; font-weight: 600; }
+
+    /* Mobile */
+    @media (max-width: 640px) {
+      header .container { flex-direction: column; gap: 10px; }
+      header h1 { font-size: 1rem; }
+      header h1 .app-title { display: none; }
+      header h1 .app-title-short { display: inline; }
+      .version-badge { margin-left: 8px; }
+      nav { width: 100%; justify-content: center; }
+      .stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .stat { padding: 12px; }
+      .stat-value { font-size: 1.5rem; }
+      .pkg-main { gap: 10px; }
+      .pkg-tracking { font-size: 0.75rem; word-break: break-all; }
+      .pkg-sender { display: block; margin-left: 0; margin-top: 2px; }
+      .pkg-meta { align-items: flex-end; min-width: 90px; }
+      .pkg-date { font-size: 0.7rem; }
+      .card-header { padding: 12px 14px; }
+      .card-body { padding: 0 14px 12px; }
+      .account { flex-direction: column; gap: 10px; align-items: flex-start; }
+      .account-actions { align-self: flex-end; }
+    }
+    @media (min-width: 641px) {
+      .app-title-short { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -181,14 +206,17 @@
     <div class="container">
       <h1>
         <img src="/static/icon-64.png" alt="" style="width:48px;height:48px;vertical-align:middle;margin-right:12px;border-radius:10px;">
-        Dude, Where's My Package?
+        <span class="app-title">Dude, Where's My Package?</span>
+        <span class="app-title-short">DWMP</span>
         <span class="version-badge">v{{ version }}</span>
       </h1>
+      {% if active_nav %}
       <nav>
         <a href="/" class="{% if active_nav == 'packages' %}active{% endif %}">Packages</a>
         <a href="/accounts" class="{% if active_nav == 'accounts' %}active{% endif %}">Accounts</a>
         <a href="/docs" target="_blank">API</a>
       </nav>
+      {% endif %}
     </div>
   </header>
   <main>

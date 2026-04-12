@@ -5,8 +5,11 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from dwmp.api.auth import is_authenticated
 
 from dwmp.api.routes import router
 from dwmp.api.views import router as views_router, _LoginRequired
@@ -32,12 +35,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await repo.close()
 
 
+OPEN_PATHS = {"/health", "/login", "/static", "/docs", "/openapi.json", "/redoc"}
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if any(path == p or path.startswith(p + "/") for p in OPEN_PATHS):
+            return await call_next(request)
+        if is_authenticated(request):
+            return await call_next(request)
+        # API requests get 401, browser requests get redirect
+        if path.startswith("/api/"):
+            return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+        return RedirectResponse("/login", status_code=303)
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Dude, Where's My Package?",
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    app.add_middleware(AuthMiddleware)
 
     @app.get("/health")
     async def health() -> dict[str, str]:

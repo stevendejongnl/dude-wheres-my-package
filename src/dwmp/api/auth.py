@@ -52,8 +52,15 @@ def verify_token(token: str) -> bool:
 def is_authenticated(request: Request) -> bool:
     if not PASSWORD_HASH:
         return True  # No password configured — open access
+    # Check cookie (browser sessions)
     token = request.cookies.get(COOKIE_NAME, "")
-    return verify_token(token)
+    if verify_token(token):
+        return True
+    # Check Authorization header (API clients)
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        return verify_token(auth_header[7:])
+    return False
 
 
 def login_response(redirect_to: str = "/") -> RedirectResponse:

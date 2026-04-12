@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 
 from importlib.metadata import version as pkg_version
 
-from dwmp.api.auth import is_authenticated, login_response, logout_response, verify_password
+from dwmp.api.auth import login_response, logout_response, verify_password
 from dwmp.api.dependencies import get_tracking_service
 from dwmp.services.tracking import TrackingService
 
@@ -17,11 +17,6 @@ TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 router = APIRouter()
-
-
-def _require_auth(request: Request):
-    if not is_authenticated(request):
-        raise _LoginRequired()
 
 
 class _LoginRequired(Exception):
@@ -103,7 +98,6 @@ async def packages_page(
     request: Request,
     service: TrackingService = Depends(get_tracking_service),
 ):
-    _require_auth(request)
 
     packages = await service.list_packages()
     for pkg in packages:
@@ -128,7 +122,6 @@ async def accounts_page(
     request: Request,
     service: TrackingService = Depends(get_tracking_service),
 ):
-    _require_auth(request)
 
     accounts = await service.list_accounts()
     for account in accounts:
