@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.11.0 (2026-04-12)
+
+### Features
+
+- **ui**: Add footer with GitHub repo and MadeBySteven links
+  ([`a9fae11`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/a9fae11decce9d2228d84918d1cd83d8d9fb8da1))
+
+
 ## v1.10.3 (2026-04-12)
 
 ### Bug Fixes
