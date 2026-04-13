@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.16.0 (2026-04-13)
+
+### Features
+
+- Support HA ingress path prefix via X-Ingress-Path header
+  ([`cde13c3`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/cde13c3dfae5916b163538e282c7e25c9873e9fd))
+
+
 ## v1.15.2 (2026-04-12)
 
 ### Bug Fixes
