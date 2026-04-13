@@ -41,24 +41,37 @@ spec:
             - name: DB_PATH
               value: /app/data/dwmp.db
           resources:
+            # Headless Chrome (Playwright) for Amazon + DPD sync needs
+            # real memory and CPU during browser launch. The old
+            # 256Mi / 250m limits caused the pod to be OOM-killed and
+            # liveness-failed mid-Amazon-login, surfacing as 504s at
+            # the ingress. 1Gi / 1 core leaves headroom for the
+            # normal idle footprint (~120Mi) with spikes during sync.
             requests:
-              memory: "128Mi"
-              cpu: "100m"
-            limits:
               memory: "256Mi"
-              cpu: "250m"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
             initialDelaySeconds: 5
             periodSeconds: 30
+            # A browser launch can stall the event loop for a few
+            # seconds on a cold start — don't let one slow /health
+            # reply kill the pod mid-sync.
+            timeoutSeconds: 5
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
             initialDelaySeconds: 3
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
       volumes:
         - name: data
           persistentVolumeClaim:

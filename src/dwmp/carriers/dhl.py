@@ -58,7 +58,9 @@ class DHL(CarrierBase):
     def __init__(self, http_client: httpx.AsyncClient | None = None) -> None:
         self._client = http_client
 
-    async def login(self, username: str, password: str) -> AuthTokens:
+    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+        # kwargs is accepted for base-class compatibility — the service always
+        # passes totp_secret="" since DHL eCommerce NL has no MFA flow. Ignored.
         async with httpx.AsyncClient(follow_redirects=True) as client:
             await client.get(f"{DHL_BASE}/account/sign-in")
             xsrf = client.cookies.get("XSRF-TOKEN", "")
