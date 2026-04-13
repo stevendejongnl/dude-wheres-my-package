@@ -26,7 +26,10 @@ spec:
         kubernetes.io/hostname: worker-02
       containers:
         - name: dwmp
-          image: ghcr.io/stevendejongnl/dude-wheres-my-package:1.9.1
+          # Kept in sync by semantic-release (see pyproject.toml build_command).
+          # Do NOT edit by hand — keel.sh rolls the live image forward on new
+          # tags, and a manual downgrade here would be undone on the next apply.
+          image: ghcr.io/stevendejongnl/dude-wheres-my-package:1.20.0
           ports:
             - containerPort: 8000
           envFrom:
