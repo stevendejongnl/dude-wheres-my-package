@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.17.0 (2026-04-13)
+
+### Documentation
+
+- Cross-reference HA addon and integration
+  ([`a5403f7`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/a5403f70c25482c795bdce4b0ee87fc519b50f08))
+
+### Features
+
+- **ui**: Easy-add account form on accounts page
+  ([`17bb717`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/17bb717b5c34dad9d8f3554922dd27d9eea50df7))
+
+
 ## v1.16.0 (2026-04-13)
 
 ### Features
