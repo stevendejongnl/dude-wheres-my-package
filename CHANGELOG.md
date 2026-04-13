@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.19.0 (2026-04-13)
+
+### Features
+
+- **accounts**: Add edit-account flow with pre-filled form
+  ([`f178f72`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/f178f72972cfe56602ce5dfa72bb79c368e73190))
+
+
 ## v1.18.0 (2026-04-13)
 
 ### Features
