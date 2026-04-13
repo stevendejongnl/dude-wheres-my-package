@@ -100,9 +100,9 @@ async def test_accounts_page_lists_carriers_with_add_buttons(client: AsyncClient
     assert 'hx-get="/accounts/add/amazon"' in body
     assert 'hx-get="/accounts/add/postnl"' in body
     assert 'hx-get="/accounts/add/dpd"' in body
-    # GLS is shown as no-account-needed, no Add button
+    # GLS has no account and is intentionally hidden from this page
     assert 'hx-get="/accounts/add/gls"' not in body
-    assert "No account needed" in body
+    assert "No account needed" not in body
 
 
 async def test_add_form_amazon_includes_totp_field(client: AsyncClient):
@@ -214,3 +214,80 @@ async def test_sync_account_view_returns_refreshed_row(client: AsyncClient, repo
 async def test_sync_account_view_missing_account_returns_404(client: AsyncClient):
     response = await client.post("/accounts/9999/sync")
     assert response.status_code == 404
+
+
+# --- Track-package modal ---
+
+
+async def test_track_package_form_lists_all_carriers_including_gls(client: AsyncClient):
+    response = await client.get("/packages/add")
+    assert response.status_code == 200
+    body = response.text
+    assert 'id="track-package-form"' in body
+    assert 'value="amazon"' in body
+    assert 'value="postnl"' in body
+    assert 'value="dpd"' in body
+    # GLS is intentionally offered here even though it has no account
+    assert 'value="gls"' in body
+
+
+async def test_track_package_cancel_returns_empty(client: AsyncClient):
+    response = await client.get("/packages/add/cancel")
+    assert response.status_code == 200
+    assert response.text == ""
+
+
+async def test_track_package_save_creates_package(client: AsyncClient, repo):
+    response = await client.post(
+        "/packages/add/save",
+        data={
+            "tracking_number": "3STEST9876543210",
+            "carrier": "postnl",
+            "label": "Headphones",
+            "postal_code": "",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers.get("HX-Refresh") == "true"
+
+    packages = await repo.list_packages()
+    assert len(packages) == 1
+    assert packages[0]["tracking_number"] == "3STEST9876543210"
+    assert packages[0]["carrier"] == "postnl"
+    assert packages[0]["label"] == "Headphones"
+    assert packages[0]["source"] == "manual"
+
+
+async def test_track_package_save_gls_requires_postal_code(client: AsyncClient, repo):
+    response = await client.post(
+        "/packages/add/save",
+        data={"tracking_number": "GLS123", "carrier": "gls", "postal_code": ""},
+    )
+    assert response.status_code == 200
+    assert "test-result error" in response.text
+    assert "postal code" in response.text.lower()
+    assert await repo.list_packages() == []
+
+
+async def test_track_package_save_rejects_missing_carrier(client: AsyncClient, repo):
+    response = await client.post(
+        "/packages/add/save",
+        data={"tracking_number": "X", "carrier": ""},
+    )
+    assert response.status_code == 200
+    assert "test-result error" in response.text
+    assert await repo.list_packages() == []
+
+
+async def test_track_package_save_rejects_duplicate(client: AsyncClient, repo):
+    await client.post(
+        "/packages/add/save",
+        data={"tracking_number": "DUP1", "carrier": "postnl"},
+    )
+    response = await client.post(
+        "/packages/add/save",
+        data={"tracking_number": "DUP1", "carrier": "postnl"},
+    )
+    assert response.status_code == 200
+    assert "test-result error" in response.text
+    assert "already being tracked" in response.text

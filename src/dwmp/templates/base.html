@@ -282,6 +282,41 @@
     }
     .test-icon { font-weight: 700; flex-shrink: 0; }
 
+    /* Modal */
+    .modal-slot:empty { display: none; }
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      animation: fade-in 0.15s ease-out;
+    }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); width: 100%; max-width: 480px;
+      max-height: calc(100vh - 40px); overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      animation: slide-up 0.2s ease-out;
+    }
+    .modal .add-form {
+      border-top: none; background: var(--surface);
+      padding: 24px;
+    }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slide-up {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .form-group select {
+      width: 100%; padding: 8px 12px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 0.875rem;
+      font-family: inherit;
+    }
+    .form-group select:focus {
+      outline: none; border-color: var(--accent);
+    }
+
     /* Indicators */
     .htmx-indicator { display: none; }
     .htmx-request .htmx-indicator { display: inline; }

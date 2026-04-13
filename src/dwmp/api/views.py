@@ -396,6 +396,59 @@ async def add_account_save(
     return HTMLResponse("", headers={"HX-Refresh": "true"})
 
 
+# --- Track-package modal lifecycle (HTMX partials) ---
+
+
+@router.get("/packages/add", response_class=HTMLResponse)
+async def track_package_form(
+    request: Request,
+    service: TrackingService = Depends(get_tracking_service),
+):
+    """Render the 'Track a package' modal."""
+    ctx = {
+        "carriers": service.list_carriers(),
+        "base_path": _base_path(request),
+    }
+    return templates.TemplateResponse(request, "track_package_form.html", ctx)
+
+
+@router.get("/packages/add/cancel", response_class=HTMLResponse)
+async def track_package_form_cancel():
+    """Empty response — closes the modal via HTMX swap."""
+    return HTMLResponse("")
+
+
+@router.post("/packages/add/save", response_class=HTMLResponse)
+async def track_package_save(
+    service: TrackingService = Depends(get_tracking_service),
+    tracking_number: str = Form(default=""),
+    carrier: str = Form(default=""),
+    label: str = Form(default=""),
+    postal_code: str = Form(default=""),
+):
+    tracking_number = tracking_number.strip()
+    carrier = carrier.strip()
+    if not tracking_number:
+        return _result_html(False, "Tracking number is required.")
+    if not carrier:
+        return _result_html(False, "Please select a carrier.")
+    if service.get_carrier(carrier) is None:
+        return _result_html(False, f"Unknown carrier: {carrier}")
+    if carrier == "gls" and not postal_code.strip():
+        return _result_html(False, "GLS requires a postal code to fetch tracking details.")
+
+    try:
+        await service.add_package(
+            tracking_number=tracking_number,
+            carrier=carrier,
+            label=label.strip() or None,
+            postal_code=postal_code.strip() or None,
+        )
+    except ValueError:
+        return _result_html(False, "That tracking number is already being tracked.")
+    return HTMLResponse("", headers={"HX-Refresh": "true"})
+
+
 # --- Notification views ---
 
 

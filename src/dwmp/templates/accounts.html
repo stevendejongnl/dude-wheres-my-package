@@ -47,21 +47,6 @@
     </div>
     <div id="add-form-{{ carrier.name }}" class="add-form-slot"></div>
   </div>
-  {% else %}
-  <div class="card">
-    <div class="account">
-      <div class="account-info">
-        <span class="pkg-carrier gls">gls</span>
-        <div>
-          <div style="font-size:0.85rem;color:var(--text-dim);">No account needed</div>
-          <div style="font-size:0.75rem;color:var(--text-dim);max-width:500px;">
-            GLS uses public tracking — add individual GLS parcels from the
-            <a href="{{ base_path }}/" style="color:var(--accent);">Packages</a> page using a tracking number and postal code.
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
   {% endif %}
   {% endfor %}
 </div>

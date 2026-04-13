@@ -1,0 +1,76 @@
+{#
+  Track-package modal — rendered into #track-modal on the packages page.
+
+  Context:
+    carriers  — list of carrier name strings
+    base_path — reverse-proxy prefix
+#}
+<div class="modal-overlay"
+  hx-get="{{ base_path }}/packages/add/cancel"
+  hx-target="#track-modal"
+  hx-trigger="click"
+  hx-swap="innerHTML">
+  <div class="modal" onclick="event.stopPropagation()">
+    <form class="add-form" id="track-package-form">
+      <div class="form-header">
+        <h3>Track a package</h3>
+        <button type="button" class="btn btn-ghost btn-sm"
+          hx-get="{{ base_path }}/packages/add/cancel"
+          hx-target="#track-modal"
+          hx-swap="innerHTML">Cancel</button>
+      </div>
+
+      <p class="form-hint">
+        Add a standalone tracking number — useful for parcels that don't come
+        from a connected account (e.g. a friend shipped you something, or a
+        one-off GLS delivery).
+      </p>
+
+      <div class="form-group">
+        <label for="track-carrier">Carrier</label>
+        <select id="track-carrier" name="carrier" required
+          onchange="document.getElementById('track-postal-hint').style.display = this.value === 'gls' ? 'block' : 'none';">
+          <option value="">Select a carrier…</option>
+          {% for name in carriers %}
+          <option value="{{ name }}">{{ name|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="track-number">Tracking number</label>
+        <input type="text" id="track-number" name="tracking_number" required
+          autocomplete="off" spellcheck="false"
+          placeholder="e.g. 3STEST1234567890">
+      </div>
+
+      <div class="form-group">
+        <label for="track-label">Label <span class="form-optional">(optional)</span></label>
+        <input type="text" id="track-label" name="label"
+          placeholder="e.g. Headphones from Dave">
+      </div>
+
+      <div class="form-group">
+        <label for="track-postal">Postal code <span class="form-optional">(required for GLS)</span></label>
+        <input type="text" id="track-postal" name="postal_code"
+          autocomplete="postal-code" placeholder="1234AB">
+        <small class="form-help" id="track-postal-hint" style="display:none;">
+          GLS requires the delivery postal code to fetch tracking details.
+        </small>
+      </div>
+
+      <div id="track-result"></div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-primary"
+          hx-post="{{ base_path }}/packages/add/save"
+          hx-include="closest form"
+          hx-target="#track-result"
+          hx-indicator="#track-spinner">
+          Add
+          <span class="htmx-indicator" id="track-spinner"><span class="spinner"></span></span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
