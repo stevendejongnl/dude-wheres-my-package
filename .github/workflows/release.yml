@@ -32,6 +32,9 @@ jobs:
   release:
     needs: test
     runs-on: ubuntu-latest
+    outputs:
+      released: ${{ steps.release.outputs.released }}
+      version: ${{ steps.release.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -87,3 +90,100 @@ jobs:
               --tag "$IMAGE_TAG_LATEST" \
               --tag "$IMAGE_TAG_VERSION" \
               .
+
+  # Open a PR in the HA addon repo to bump its Dockerfile to the new dwmp image tag.
+  # Runs only when semantic-release actually published a new version.
+  # Requires repo secret ADDON_REPO_TOKEN (PAT or GitHub App token) with
+  # contents:write + pull-requests:write on stevendejongnl/madebysteven-ha-addons.
+  bump-addon:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout addon repo
+        uses: actions/checkout@v4
+        with:
+          repository: stevendejongnl/madebysteven-ha-addons
+          token: ${{ secrets.ADDON_REPO_TOKEN }}
+          fetch-depth: 0
+
+      - name: Open bump PR
+        env:
+          GH_TOKEN: ${{ secrets.ADDON_REPO_TOKEN }}
+          NEW_VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # Extract the pinned version from the addon's Dockerfile.
+          OLD_VERSION=$(sed -nE 's|^FROM ghcr\.io/stevendejongnl/dude-wheres-my-package:(.+)$|\1|p' dwmp/Dockerfile)
+          if [[ -z "$OLD_VERSION" ]]; then
+            echo "Could not parse current dwmp version from dwmp/Dockerfile" >&2
+            exit 1
+          fi
+          if [[ "$OLD_VERSION" == "$NEW_VERSION" ]]; then
+            echo "Addon already pinned to v$NEW_VERSION — nothing to do."
+            exit 0
+          fi
+
+          BRANCH="bump-dwmp-v${NEW_VERSION}"
+          # Idempotency: skip if a bump branch for this version already exists upstream.
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
+            echo "Branch $BRANCH already exists upstream — assuming PR is in flight."
+            exit 0
+          fi
+
+          # Determine bump type from semver delta so the addon's own
+          # semantic-release picks the matching bump.
+          OLD_MAJOR="${OLD_VERSION%%.*}"
+          NEW_MAJOR="${NEW_VERSION%%.*}"
+          OLD_MINOR=$(echo "$OLD_VERSION" | cut -d. -f2)
+          NEW_MINOR=$(echo "$NEW_VERSION" | cut -d. -f2)
+
+          if [[ "$NEW_MAJOR" != "$OLD_MAJOR" ]]; then
+            COMMIT_TYPE="feat"
+            BREAKING_FOOTER="BREAKING CHANGE: dwmp upstream major bump (${OLD_VERSION} → ${NEW_VERSION})"
+          elif [[ "$NEW_MINOR" != "$OLD_MINOR" ]]; then
+            COMMIT_TYPE="feat"
+            BREAKING_FOOTER=""
+          else
+            COMMIT_TYPE="fix"
+            BREAKING_FOOTER=""
+          fi
+
+          # Update the FROM line.
+          sed -i -E "s|(dude-wheres-my-package:)${OLD_VERSION}|\1${NEW_VERSION}|" dwmp/Dockerfile
+
+          # Confirm the change actually landed.
+          if ! grep -q "dude-wheres-my-package:${NEW_VERSION}" dwmp/Dockerfile; then
+            echo "Failed to update dwmp/Dockerfile" >&2
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add dwmp/Dockerfile
+
+          COMMIT_SUBJECT="${COMMIT_TYPE}(dwmp): bump upstream image to v${NEW_VERSION}"
+          if [[ -n "$BREAKING_FOOTER" ]]; then
+            git commit -m "$COMMIT_SUBJECT" -m "$BREAKING_FOOTER"
+          else
+            git commit -m "$COMMIT_SUBJECT"
+          fi
+          git push -u origin "$BRANCH"
+
+          PR_BODY="Automated bump of dwmp from \`v${OLD_VERSION}\` to \`v${NEW_VERSION}\`.
+
+          Release notes: https://github.com/stevendejongnl/dude-wheres-my-package/releases/tag/v${NEW_VERSION}"
+
+          gh pr create \
+            --repo stevendejongnl/madebysteven-ha-addons \
+            --base main \
+            --head "$BRANCH" \
+            --title "$COMMIT_SUBJECT" \
+            --body "$PR_BODY"
+
+          gh pr merge "$BRANCH" \
+            --repo stevendejongnl/madebysteven-ha-addons \
+            --auto \
+            --squash
