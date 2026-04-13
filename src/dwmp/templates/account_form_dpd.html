@@ -45,7 +45,7 @@
       hx-include="closest form"
       hx-target="#test-result-{{ carrier }}"
       hx-indicator="#test-spinner-{{ carrier }}"
-      hx-on::after-swap="this.closest('form').querySelector('.save-btn').disabled = !document.querySelector('#test-result-{{ carrier }} .test-result.ok')">
+      hx-on::after-request="this.closest('form').querySelector('.save-btn').disabled = !document.querySelector('#test-result-{{ carrier }} .test-result.ok')">
       Test connection
       <span class="htmx-indicator" id="test-spinner-{{ carrier }}"><span class="spinner"></span></span>
     </button>
