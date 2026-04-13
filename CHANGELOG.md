@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.21.0 (2026-04-13)
+
+### Bug Fixes
+
+- **amazon**: Handle password-only, MFA-entry, and consent-banner cases in login
+  ([`119ccf5`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/119ccf5ce0098b344ff1da87fc184da117ee102f))
+
+### Features
+
+- **ui**: Blur-and-spinner loader overlay for long-running form actions
+  ([`3b58ab7`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/3b58ab7da3749f0ecb02291a24a3f4cede8d59f4))
+
+
 ## v1.20.1 (2026-04-13)
 
 ### Bug Fixes
