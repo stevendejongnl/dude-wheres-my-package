@@ -114,6 +114,39 @@ async def oauth_callback(
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@router.post("/accounts/test/credentials")
+async def test_credentials(
+    body: CredentialsRequest,
+    service: TrackingService = Depends(get_tracking_service),
+) -> dict:
+    try:
+        await service.validate_account_credentials(
+            body.carrier, body.username, body.password,
+            totp_secret=body.totp_secret,
+        )
+    except CarrierAuthError as exc:
+        raise HTTPException(status_code=502, detail=exc.message)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"ok": True}
+
+
+@router.post("/accounts/test/token")
+async def test_token(
+    body: ManualTokenRequest,
+    service: TrackingService = Depends(get_tracking_service),
+) -> dict:
+    try:
+        await service.validate_account_manual_token(
+            body.carrier, body.access_token, body.refresh_token,
+        )
+    except CarrierAuthError as exc:
+        raise HTTPException(status_code=502, detail=exc.message)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"ok": True}
+
+
 @router.post("/accounts/credentials", status_code=201)
 async def connect_credentials(
     body: CredentialsRequest,

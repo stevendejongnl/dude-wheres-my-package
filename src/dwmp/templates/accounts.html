@@ -9,7 +9,7 @@
 {% if not accounts %}
 <div class="empty">
   <p>No carrier accounts connected.</p>
-  <p>Use the API to connect PostNL, DHL, or DPD.</p>
+  <p>Choose a carrier below to connect.</p>
 </div>
 {% else %}
 <div class="card">
@@ -54,10 +54,11 @@
 
 <div style="margin-top:24px;">
   <div class="section-header">
-    <h2>Available Carriers</h2>
+    <h2>Add a Carrier</h2>
   </div>
+  {% for carrier in carriers %}
+  {% if carrier.name != "gls" %}
   <div class="card">
-    {% for carrier in carriers %}
     <div class="account">
       <div class="account-info">
         <span class="pkg-carrier {{ carrier.name }}">{{ carrier.name }}</span>
@@ -68,9 +69,34 @@
           {% endif %}
         </div>
       </div>
+      <div class="account-actions">
+        <button class="btn btn-primary btn-sm"
+          hx-get="{{ base_path }}/accounts/add/{{ carrier.name }}"
+          hx-target="#add-form-{{ carrier.name }}"
+          hx-swap="innerHTML">
+          Add
+        </button>
+      </div>
     </div>
-    {% endfor %}
+    <div id="add-form-{{ carrier.name }}" class="add-form-slot"></div>
   </div>
+  {% else %}
+  <div class="card">
+    <div class="account">
+      <div class="account-info">
+        <span class="pkg-carrier gls">gls</span>
+        <div>
+          <div style="font-size:0.85rem;color:var(--text-dim);">No account needed</div>
+          <div style="font-size:0.75rem;color:var(--text-dim);max-width:500px;">
+            GLS uses public tracking — add individual GLS parcels from the
+            <a href="{{ base_path }}/" style="color:var(--accent);">Packages</a> page using a tracking number and postal code.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
 </div>
 
 {% endblock %}

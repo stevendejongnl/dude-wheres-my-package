@@ -5,6 +5,7 @@ import pytest
 from dwmp.carriers.base import (
     AuthTokens,
     AuthType,
+    CarrierAuthError,
     CarrierBase,
     TrackingEvent,
     TrackingResult,
@@ -175,3 +176,103 @@ async def test_mark_all_notifications_read(service: TrackingService):
     count = await service.mark_all_notifications_read()
     assert count == 1
     assert await service.get_unread_notification_count() == 0
+
+
+# --- validate_account_* tests ---
+
+
+class FailingCredCarrier(CarrierBase):
+    name = "fail-cred"
+    auth_type = AuthType.CREDENTIALS
+
+    async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        return TrackingResult(tracking_number=tracking_number, carrier=self.name, status=TrackingStatus.UNKNOWN)
+
+    async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
+        return []
+
+    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+        raise RuntimeError("invalid password")
+
+
+class FailingTokenCarrier(CarrierBase):
+    name = "fail-token"
+    auth_type = AuthType.MANUAL_TOKEN
+
+    async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        return TrackingResult(tracking_number=tracking_number, carrier=self.name, status=TrackingStatus.UNKNOWN)
+
+    async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
+        raise RuntimeError("token expired")
+
+
+async def test_validate_credentials_success_returns_tokens_without_persisting(service: TrackingService, repo):
+    tokens = await service.validate_account_credentials("stub", "user@test.com", "pw")
+
+    assert tokens.access_token == "stub-token"
+    accounts = await repo.list_accounts()
+    assert accounts == []
+
+
+async def test_validate_credentials_failure_raises_carrier_auth_error(repo):
+    service = TrackingService(repository=repo, carriers={"fail-cred": FailingCredCarrier()})
+
+    with pytest.raises(CarrierAuthError) as exc_info:
+        await service.validate_account_credentials("fail-cred", "u", "p")
+
+    assert exc_info.value.carrier == "fail-cred"
+    assert "invalid password" in exc_info.value.message
+
+
+async def test_validate_credentials_unknown_carrier(service: TrackingService):
+    with pytest.raises(ValueError, match="Unknown carrier"):
+        await service.validate_account_credentials("nope", "u", "p")
+
+
+async def test_validate_credentials_wrong_auth_type(repo):
+    service = TrackingService(
+        repository=repo, carriers={"fail-token": FailingTokenCarrier()},
+    )
+    with pytest.raises(ValueError, match="does not use credentials"):
+        await service.validate_account_credentials("fail-token", "u", "p")
+
+
+async def test_validate_manual_token_success_does_not_persist(service: TrackingService, repo):
+    tokens = await service.validate_account_manual_token("stub", "tok-1", "refresh-1")
+
+    assert tokens.access_token == "tok-1"
+    assert tokens.refresh_token == "refresh-1"
+    assert await repo.list_accounts() == []
+
+
+async def test_validate_manual_token_failure_raises_carrier_auth_error(repo):
+    service = TrackingService(repository=repo, carriers={"fail-token": FailingTokenCarrier()})
+
+    with pytest.raises(CarrierAuthError) as exc_info:
+        await service.validate_account_manual_token("fail-token", "bad-token")
+
+    assert exc_info.value.carrier == "fail-token"
+    assert "token expired" in exc_info.value.message
+
+
+async def test_validate_manual_token_unknown_carrier(service: TrackingService):
+    with pytest.raises(ValueError, match="Unknown carrier"):
+        await service.validate_account_manual_token("nope", "tok")
+
+
+async def test_connect_credentials_persists_after_validation(service: TrackingService, repo):
+    account = await service.connect_account_credentials("stub", "u@t.com", "pw")
+
+    assert account["carrier"] == "stub"
+    accounts = await repo.list_accounts()
+    assert len(accounts) == 1
+
+
+async def test_connect_manual_token_fails_when_token_invalid(repo):
+    service = TrackingService(repository=repo, carriers={"fail-token": FailingTokenCarrier()})
+
+    with pytest.raises(CarrierAuthError):
+        await service.connect_account_manual_token("fail-token", "bad")
+
+    # Failed connect must not persist a broken account
+    assert await repo.list_accounts() == []

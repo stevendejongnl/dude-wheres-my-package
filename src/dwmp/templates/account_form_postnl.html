@@ -1,0 +1,65 @@
+<form class="add-form" id="add-form-{{ carrier }}-form">
+  <div class="form-header">
+    <h3>Connect PostNL</h3>
+    <button type="button" class="btn btn-ghost btn-sm"
+      hx-get="{{ base_path }}/accounts/add/{{ carrier }}/cancel"
+      hx-target="#add-form-{{ carrier }}"
+      hx-swap="innerHTML">Cancel</button>
+  </div>
+
+  <p class="form-hint">
+    PostNL has no public API. You'll capture an OAuth token from your browser
+    after logging in. Tokens are short-lived (~5 min) — the refresh token below
+    keeps the session alive.
+  </p>
+
+  <ol class="wizard-steps">
+    <li>Open <a href="https://jouw.postnl.nl/account/mijn-pakketten" target="_blank" rel="noopener">jouw.postnl.nl/account/mijn-pakketten</a> and log in.</li>
+    <li>Open DevTools (<kbd>F12</kbd>) → <strong>Application</strong> tab → <strong>Session Storage</strong> → <code>jouw.postnl.nl</code>.</li>
+    <li>Find the key:
+      <pre class="wizard-code">akamai:1e450c3d-5bbb-4f34-9264-dd51fa9fd066:oidc-tokens</pre>
+    </li>
+    <li>Copy the <code>access_token</code> and <code>refresh_token</code> values from the JSON value.</li>
+    <li>Paste them into the fields below and click <strong>Test connection</strong>.</li>
+  </ol>
+
+  <div class="form-group">
+    <label for="access-token-{{ carrier }}">Access token</label>
+    <textarea id="access-token-{{ carrier }}" name="access_token" rows="4"
+      required spellcheck="false" autocomplete="off"></textarea>
+  </div>
+
+  <div class="form-group">
+    <label for="refresh-token-{{ carrier }}">Refresh token <span class="form-optional">(recommended)</span></label>
+    <textarea id="refresh-token-{{ carrier }}" name="refresh_token" rows="4"
+      spellcheck="false" autocomplete="off"></textarea>
+    <small class="form-help">Without this, you'll need to re-paste tokens every ~5 minutes.</small>
+  </div>
+
+  <div class="form-group">
+    <label for="lookback-{{ carrier }}">Look back (days)</label>
+    <input type="number" id="lookback-{{ carrier }}" name="lookback_days" value="30" min="1" max="365">
+  </div>
+
+  <div id="test-result-{{ carrier }}"></div>
+
+  <div class="form-actions">
+    <button type="button" class="btn btn-ghost"
+      hx-post="{{ base_path }}/accounts/add/{{ carrier }}/test"
+      hx-include="closest form"
+      hx-target="#test-result-{{ carrier }}"
+      hx-indicator="#test-spinner-{{ carrier }}"
+      hx-on::after-swap="this.closest('form').querySelector('.save-btn').disabled = !document.querySelector('#test-result-{{ carrier }} .test-result.ok')">
+      Test connection
+      <span class="htmx-indicator" id="test-spinner-{{ carrier }}"><span class="spinner"></span></span>
+    </button>
+    <button type="button" class="btn btn-primary save-btn" disabled
+      hx-post="{{ base_path }}/accounts/add/{{ carrier }}/save"
+      hx-include="closest form"
+      hx-target="#test-result-{{ carrier }}"
+      hx-indicator="#save-spinner-{{ carrier }}">
+      Save
+      <span class="htmx-indicator" id="save-spinner-{{ carrier }}"><span class="spinner"></span></span>
+    </button>
+  </div>
+</form>

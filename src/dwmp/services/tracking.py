@@ -107,14 +107,14 @@ class TrackingService:
         assert account is not None
         return account
 
-    async def connect_account_credentials(
+    async def validate_account_credentials(
         self,
         carrier_name: str,
         username: str,
         password: str,
-        lookback_days: int = 30,
         totp_secret: str | None = None,
-    ) -> dict:
+    ) -> AuthTokens:
+        """Attempt a credentials login without persisting. Raises CarrierAuthError on failure."""
         carrier = self._carriers.get(carrier_name)
         if carrier is None:
             raise ValueError(f"Unknown carrier: {carrier_name}")
@@ -122,7 +122,7 @@ class TrackingService:
             raise ValueError(f"{carrier_name} does not use credentials")
 
         try:
-            tokens = await carrier.login(
+            return await carrier.login(
                 username, password, totp_secret=totp_secret or ""
             )
         except Exception as exc:
@@ -131,6 +131,18 @@ class TrackingService:
                 f"Login failed. Check your credentials or the carrier's login "
                 f"flow may have changed. ({exc})",
             ) from exc
+
+    async def connect_account_credentials(
+        self,
+        carrier_name: str,
+        username: str,
+        password: str,
+        lookback_days: int = 30,
+        totp_secret: str | None = None,
+    ) -> dict:
+        tokens = await self.validate_account_credentials(
+            carrier_name, username, password, totp_secret=totp_secret
+        )
 
         account_id = await self._repository.add_account(
             carrier=carrier_name,
@@ -143,6 +155,33 @@ class TrackingService:
         assert account is not None
         return account
 
+    async def validate_account_manual_token(
+        self,
+        carrier_name: str,
+        access_token: str,
+        refresh_token: str | None = None,
+    ) -> AuthTokens:
+        """Validate a manual token by attempting a minimal sync. Raises CarrierAuthError on failure."""
+        carrier = self._carriers.get(carrier_name)
+        if carrier is None:
+            raise ValueError(f"Unknown carrier: {carrier_name}")
+
+        tokens = AuthTokens(
+            access_token=access_token,
+            refresh_token=refresh_token,
+        )
+
+        try:
+            await carrier.sync_packages(tokens, lookback_days=1)
+        except Exception as exc:
+            raise CarrierAuthError(
+                carrier_name,
+                f"Token validation failed. The token may be expired, malformed, "
+                f"or the carrier's API may have changed. ({exc})",
+            ) from exc
+
+        return tokens
+
     async def connect_account_manual_token(
         self,
         carrier_name: str,
@@ -150,12 +189,8 @@ class TrackingService:
         refresh_token: str | None = None,
         lookback_days: int = 30,
     ) -> dict:
-        if carrier_name not in self._carriers:
-            raise ValueError(f"Unknown carrier: {carrier_name}")
-
-        tokens = AuthTokens(
-            access_token=access_token,
-            refresh_token=refresh_token,
+        tokens = await self.validate_account_manual_token(
+            carrier_name, access_token, refresh_token
         )
 
         account_id = await self._repository.add_account(

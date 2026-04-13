@@ -319,3 +319,109 @@ async def test_mark_all_read(client: AsyncClient):
     response = await client.post("/api/v1/notifications/read-all")
     assert response.status_code == 200
     assert response.json() == {"marked": 0}
+
+
+# --- Test-only "validate" endpoints ---
+
+
+class FailingCredCarrier(CarrierBase):
+    name = "amazon"
+    auth_type = AuthType.CREDENTIALS
+
+    async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        return TrackingResult(tracking_number=tracking_number, carrier=self.name, status=TrackingStatus.UNKNOWN)
+
+    async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
+        return []
+
+    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+        raise RuntimeError("invalid credentials")
+
+
+class FailingTokenCarrier(CarrierBase):
+    name = "postnl"
+    auth_type = AuthType.MANUAL_TOKEN
+
+    async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        return TrackingResult(tracking_number=tracking_number, carrier=self.name, status=TrackingStatus.UNKNOWN)
+
+    async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
+        raise RuntimeError("token expired")
+
+
+@pytest.fixture
+def failing_app(repo):
+    application = create_app()
+    service = TrackingService(
+        repository=repo,
+        carriers={"amazon": FailingCredCarrier(), "postnl": FailingTokenCarrier()},
+    )
+    application.dependency_overrides[get_repository] = lambda: repo
+    application.dependency_overrides[get_tracking_service] = lambda: service
+    return application
+
+
+@pytest.fixture
+async def failing_client(failing_app):
+    transport = ASGITransport(app=failing_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+
+
+async def test_test_credentials_success_does_not_persist(client: AsyncClient):
+    response = await client.post(
+        "/api/v1/accounts/test/credentials",
+        json={"carrier": "dpd", "username": "u", "password": "p"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+
+    # No account was persisted
+    list_resp = await client.get("/api/v1/accounts")
+    assert list_resp.json() == []
+
+
+async def test_test_credentials_auth_failure_returns_502(failing_client: AsyncClient):
+    response = await failing_client.post(
+        "/api/v1/accounts/test/credentials",
+        json={"carrier": "amazon", "username": "u", "password": "p"},
+    )
+    assert response.status_code == 502
+    assert "invalid credentials" in response.json()["detail"]
+
+
+async def test_test_credentials_unknown_carrier_returns_400(client: AsyncClient):
+    response = await client.post(
+        "/api/v1/accounts/test/credentials",
+        json={"carrier": "nope", "username": "u", "password": "p"},
+    )
+    assert response.status_code == 400
+
+
+async def test_test_token_success_does_not_persist(client: AsyncClient):
+    response = await client.post(
+        "/api/v1/accounts/test/token",
+        json={"carrier": "postnl", "access_token": "tok"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+
+    list_resp = await client.get("/api/v1/accounts")
+    assert list_resp.json() == []
+
+
+async def test_test_token_failure_returns_502(failing_client: AsyncClient):
+    response = await failing_client.post(
+        "/api/v1/accounts/test/token",
+        json={"carrier": "postnl", "access_token": "bad"},
+    )
+    assert response.status_code == 502
+    assert "token expired" in response.json()["detail"]
+
+
+async def test_test_token_unknown_carrier_returns_400(client: AsyncClient):
+    response = await client.post(
+        "/api/v1/accounts/test/token",
+        json={"carrier": "nope", "access_token": "tok"},
+    )
+    assert response.status_code == 400

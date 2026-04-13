@@ -4,12 +4,13 @@ from importlib.metadata import version as pkg_version
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from dwmp.api.auth import login_response, logout_response, verify_password
 from dwmp.api.dependencies import get_tracking_service
+from dwmp.carriers.base import CarrierAuthError
 from dwmp.services.tracking import TrackingService
 
 VERSION = pkg_version("dude-wheres-my-package")
@@ -195,6 +196,108 @@ async def accounts_page(
         "base_path": _base_path(request),
     }
     return templates.TemplateResponse(request, "accounts.html", ctx)
+
+
+# --- Add-account form lifecycle (HTMX partials) ---
+
+# carrier name → form template
+_FORM_TEMPLATES = {
+    "amazon": "account_form_credentials.html",
+    "dhl": "account_form_credentials.html",
+    "postnl": "account_form_postnl.html",
+    "dpd": "account_form_dpd.html",
+}
+
+
+def _form_template(carrier: str) -> str:
+    template = _FORM_TEMPLATES.get(carrier)
+    if template is None:
+        raise HTTPException(status_code=404, detail=f"No add form for {carrier}")
+    return template
+
+
+@router.get("/accounts/add/{carrier}", response_class=HTMLResponse)
+async def add_account_form(
+    request: Request,
+    carrier: str,
+    service: TrackingService = Depends(get_tracking_service),
+):
+    template = _form_template(carrier)
+    if service.get_carrier(carrier) is None:
+        raise HTTPException(status_code=404, detail=f"Unknown carrier: {carrier}")
+    ctx = {"carrier": carrier, "base_path": _base_path(request)}
+    return templates.TemplateResponse(request, template, ctx)
+
+
+@router.get("/accounts/add/{carrier}/cancel", response_class=HTMLResponse)
+async def add_account_form_cancel(carrier: str):
+    """Empty response — used to clear the inline form via HTMX swap."""
+    return HTMLResponse("")
+
+
+def _result_html(ok: bool, message: str) -> HTMLResponse:
+    cls = "ok" if ok else "error"
+    icon = "✓" if ok else "✕"
+    return HTMLResponse(
+        f'<div class="test-result {cls}"><span class="test-icon">{icon}</span> {message}</div>',
+    )
+
+
+@router.post("/accounts/add/{carrier}/test", response_class=HTMLResponse)
+async def add_account_test(
+    carrier: str,
+    service: TrackingService = Depends(get_tracking_service),
+    username: str = Form(default=""),
+    password: str = Form(default=""),
+    totp_secret: str = Form(default=""),
+    access_token: str = Form(default=""),
+    refresh_token: str = Form(default=""),
+):
+    template = _form_template(carrier)
+    try:
+        if template == "account_form_credentials.html":
+            await service.validate_account_credentials(
+                carrier, username, password, totp_secret=totp_secret or None,
+            )
+        else:
+            await service.validate_account_manual_token(
+                carrier, access_token, refresh_token or None,
+            )
+    except CarrierAuthError as exc:
+        return _result_html(False, exc.message)
+    except ValueError as exc:
+        return _result_html(False, str(exc))
+    return _result_html(True, "Connection works — click Save to add this account.")
+
+
+@router.post("/accounts/add/{carrier}/save", response_class=HTMLResponse)
+async def add_account_save(
+    request: Request,
+    carrier: str,
+    service: TrackingService = Depends(get_tracking_service),
+    username: str = Form(default=""),
+    password: str = Form(default=""),
+    totp_secret: str = Form(default=""),
+    access_token: str = Form(default=""),
+    refresh_token: str = Form(default=""),
+    lookback_days: int = Form(default=30),
+):
+    template = _form_template(carrier)
+    try:
+        if template == "account_form_credentials.html":
+            await service.connect_account_credentials(
+                carrier, username, password, lookback_days,
+                totp_secret=totp_secret or None,
+            )
+        else:
+            await service.connect_account_manual_token(
+                carrier, access_token, refresh_token or None, lookback_days,
+            )
+    except CarrierAuthError as exc:
+        return _result_html(False, exc.message)
+    except ValueError as exc:
+        return _result_html(False, str(exc))
+    return HTMLResponse("", headers={"HX-Refresh": "true"})
 
 
 # --- Notification views ---

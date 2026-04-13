@@ -1,0 +1,61 @@
+<form class="add-form" id="add-form-{{ carrier }}-form">
+  <div class="form-header">
+    <h3>Connect DPD</h3>
+    <button type="button" class="btn btn-ghost btn-sm"
+      hx-get="{{ base_path }}/accounts/add/{{ carrier }}/cancel"
+      hx-target="#add-form-{{ carrier }}"
+      hx-swap="innerHTML">Cancel</button>
+  </div>
+
+  <p class="form-hint">
+    DPD's parcels page is behind Cloudflare bot protection — there's no JSON API to call.
+    You'll capture the rendered HTML from your logged-in browser session and paste it below.
+    Re-capture whenever you need fresh data.
+  </p>
+
+  <ol class="wizard-steps">
+    <li>Log in at <a href="https://www.dpdgroup.com/nl/mydpd/login" target="_blank" rel="noopener">dpdgroup.com/nl/mydpd/login</a>.</li>
+    <li>Navigate to <strong>My parcels</strong> → <strong>Incoming</strong>.</li>
+    <li>Open DevTools (<kbd>F12</kbd>) → <strong>Console</strong> tab.</li>
+    <li>Run this command:
+      <pre class="wizard-code">copy(document.documentElement.outerHTML)</pre>
+      Your clipboard now contains the page HTML.
+    </li>
+    <li>Paste it into the field below and click <strong>Test connection</strong>.</li>
+  </ol>
+
+  <div class="form-group">
+    <label for="access-token-{{ carrier }}">Page HTML</label>
+    <textarea id="access-token-{{ carrier }}" name="access_token" rows="8"
+      required spellcheck="false" autocomplete="off"
+      placeholder="<!DOCTYPE html>..."></textarea>
+    <small class="form-help">Strip surrounding quotes if your clipboard wrapped the HTML in a string literal.</small>
+  </div>
+
+  <div class="form-group">
+    <label for="lookback-{{ carrier }}">Look back (days)</label>
+    <input type="number" id="lookback-{{ carrier }}" name="lookback_days" value="30" min="1" max="365">
+  </div>
+
+  <div id="test-result-{{ carrier }}"></div>
+
+  <div class="form-actions">
+    <button type="button" class="btn btn-ghost"
+      hx-post="{{ base_path }}/accounts/add/{{ carrier }}/test"
+      hx-include="closest form"
+      hx-target="#test-result-{{ carrier }}"
+      hx-indicator="#test-spinner-{{ carrier }}"
+      hx-on::after-swap="this.closest('form').querySelector('.save-btn').disabled = !document.querySelector('#test-result-{{ carrier }} .test-result.ok')">
+      Test connection
+      <span class="htmx-indicator" id="test-spinner-{{ carrier }}"><span class="spinner"></span></span>
+    </button>
+    <button type="button" class="btn btn-primary save-btn" disabled
+      hx-post="{{ base_path }}/accounts/add/{{ carrier }}/save"
+      hx-include="closest form"
+      hx-target="#test-result-{{ carrier }}"
+      hx-indicator="#save-spinner-{{ carrier }}">
+      Save
+      <span class="htmx-indicator" id="save-spinner-{{ carrier }}"><span class="spinner"></span></span>
+    </button>
+  </div>
+</form>

@@ -167,6 +167,111 @@
     .btn-danger:hover { background: #d6303120; }
     .btn-sm { padding: 4px 10px; font-size: 0.75rem; }
 
+    /* Add-account form */
+    .add-form-slot:empty { display: none; }
+    .add-form {
+      padding: 18px 20px; border-top: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .form-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .form-header h3 { font-size: 1rem; font-weight: 600; }
+    .form-hint {
+      font-size: 0.85rem; color: var(--text-dim); margin-bottom: 14px;
+      line-height: 1.5;
+    }
+    .form-hint a { color: var(--accent); text-decoration: none; }
+    .form-hint a:hover { text-decoration: underline; }
+    .form-hint code {
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem;
+      background: var(--surface); padding: 1px 6px; border-radius: 4px;
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+      display: block; font-size: 0.8rem; font-weight: 500;
+      margin-bottom: 6px; color: var(--text);
+    }
+    .form-optional {
+      font-weight: 400; color: var(--text-dim); font-size: 0.75rem;
+    }
+    .form-group input, .form-group textarea {
+      width: 100%; padding: 8px 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 0.875rem;
+      font-family: inherit;
+    }
+    .form-group textarea {
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.75rem;
+      resize: vertical; min-height: 60px;
+    }
+    .form-group input:focus, .form-group textarea:focus {
+      outline: none; border-color: var(--accent);
+    }
+    .form-help {
+      display: block; font-size: 0.72rem; color: var(--text-dim);
+      margin-top: 4px;
+    }
+    .form-actions {
+      display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;
+    }
+    .save-btn:disabled {
+      opacity: 0.5; cursor: not-allowed;
+    }
+    .save-btn:disabled:hover { background: var(--accent); }
+
+    /* Wizard steps */
+    .wizard-steps {
+      list-style: none; counter-reset: step; padding: 0;
+      margin: 0 0 16px;
+    }
+    .wizard-steps li {
+      counter-increment: step; position: relative;
+      padding: 6px 0 6px 32px; font-size: 0.85rem; line-height: 1.6;
+    }
+    .wizard-steps li::before {
+      content: counter(step); position: absolute; left: 0; top: 6px;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--accent); color: white;
+      font-size: 0.7rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .wizard-steps a { color: var(--accent); text-decoration: none; }
+    .wizard-steps a:hover { text-decoration: underline; }
+    .wizard-steps code {
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem;
+      background: var(--surface); padding: 1px 6px; border-radius: 4px;
+    }
+    .wizard-steps kbd {
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.72rem;
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 1px 6px; border-radius: 4px; box-shadow: 0 1px 0 var(--border);
+    }
+    .wizard-code {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; padding: 8px 10px; margin: 6px 0;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.75rem; color: var(--text);
+      overflow-x: auto; white-space: pre; user-select: all;
+    }
+
+    /* Test result */
+    .test-result {
+      margin: 14px 0 0; padding: 10px 14px; border-radius: 8px;
+      font-size: 0.85rem; display: flex; align-items: flex-start; gap: 8px;
+      line-height: 1.4;
+    }
+    .test-result.ok {
+      background: #00b89415; color: var(--green);
+      border: 1px solid #00b89440;
+    }
+    .test-result.error {
+      background: #d6303115; color: var(--red);
+      border: 1px solid #d6303140;
+    }
+    .test-icon { font-weight: 700; flex-shrink: 0; }
+
     /* Indicators */
     .htmx-indicator { display: none; }
     .htmx-request .htmx-indicator { display: inline; }
