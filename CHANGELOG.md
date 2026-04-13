@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.17.1 (2026-04-13)
+
+### Bug Fixes
+
+- Don't break StaticFiles mount when ingress prefix is set
+  ([`c71f69d`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/c71f69de686cdcfe0127ccb3292d9f8605bf028a))
+
+
 ## v1.17.0 (2026-04-13)
 
 ### Documentation
