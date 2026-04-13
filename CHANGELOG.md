@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.21.1 (2026-04-13)
+
+### Bug Fixes
+
+- **browser**: Include page url, title, and body snippet on selector-miss
+  ([`175d673`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/175d673f987c55ce78f3d98c25e09fe119441ee8))
+
+
 ## v1.21.0 (2026-04-13)
 
 ### Bug Fixes
