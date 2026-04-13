@@ -185,11 +185,29 @@ async def capture_page_html(
                             wait_selector, timeout=wait_timeout_ms
                         )
                     except Exception:
+                        # Log enough context to diagnose selector misses
+                        # without leaking account data — URL + title only,
+                        # plus a sanitized snippet of the first body text.
+                        try:
+                            title = await page.title()
+                        except Exception:
+                            title = "<unavailable>"
+                        try:
+                            body_text = await page.evaluate(
+                                "() => (document.body?.innerText || '').slice(0, 400)"
+                            )
+                        except Exception:
+                            body_text = ""
                         logger.warning(
-                            "Selector %r not found within %dms — "
-                            "capturing page as-is",
+                            "Selector %r not found within %dms on %s "
+                            "(title=%r, url=%s) — capturing page as-is. "
+                            "First body text: %s",
                             wait_selector,
                             wait_timeout_ms,
+                            carrier_name,
+                            title,
+                            page.url,
+                            body_text.replace("\n", " ")[:400],
                         )
 
                 html = await page.content()
