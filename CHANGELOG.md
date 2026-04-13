@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.17.3 (2026-04-13)
+
+### Bug Fixes
+
+- **ci**: Drop --auto from addon bump PR merge
+  ([`125619d`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/125619dfb4eecfff4ab8475b5e29747ddb17ad19))
+
+
 ## v1.17.2 (2026-04-13)
 
 ### Bug Fixes
