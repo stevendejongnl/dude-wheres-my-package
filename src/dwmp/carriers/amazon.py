@@ -547,8 +547,15 @@ async def _playwright_login_and_capture(
                 # Navigate to orders — Amazon redirects to sign-in if needed
                 await page.goto(orders_url, wait_until="networkidle", timeout=20_000)
 
-                # Detect login page and authenticate
-                if "ap/signin" in page.url or await page.query_selector("#ap_email"):
+                # Detect login page and authenticate. Use URL check OR either
+                # of the two first-step fields Amazon may present (recognized
+                # users skip straight to #ap_password).
+                on_login = (
+                    "ap/signin" in page.url.lower()
+                    or await page.query_selector("#ap_email")
+                    or await page.query_selector("#ap_password")
+                )
+                if on_login:
                     await _do_login(page, email, password, totp_secret)
 
                 # Wait for orders to render
@@ -578,25 +585,80 @@ async def _do_login(
     password: str,
     totp_secret: str | None,
 ) -> None:
-    """Fill in Amazon's sign-in form (email → password → optional TOTP)."""
-    # Email field
-    email_input = await page.wait_for_selector(  # type: ignore[union-attr]
-        "#ap_email", timeout=10_000
-    )
-    await email_input.fill(email)  # type: ignore[union-attr]
+    """Fill in Amazon's sign-in form (email → password → optional TOTP).
 
-    # Some pages show email+password together, others split them
-    password_input = await page.query_selector("#ap_password")  # type: ignore[union-attr]
-    if password_input:
-        await password_input.fill(password)
-        await page.click("#signInSubmit")  # type: ignore[union-attr]
-    else:
-        await page.click("#continue")  # type: ignore[union-attr]
-        await page.wait_for_selector("#ap_password", timeout=10_000)  # type: ignore[union-attr]
-        await page.fill("#ap_password", password)  # type: ignore[union-attr]
-        await page.click("#signInSubmit")  # type: ignore[union-attr]
+    Handles the three entry points Amazon actually serves in practice:
 
-    await page.wait_for_load_state("networkidle")  # type: ignore[union-attr]
+    1. Fresh sign-in — ``#ap_email`` first, then ``#ap_password`` on the same
+       page or on a follow-up page reached via ``#continue``.
+    2. Recognized user — Amazon remembered the email, so we land directly on
+       a password-only page with only ``#ap_password`` visible.
+    3. Interrupted session — we re-enter on the MFA page (``#auth-mfa-otpcode``)
+       because a previous login already passed the password step.
+
+    Also dismisses the EU cookie-consent banner, which otherwise overlays the
+    form and makes every input "present but not visible" — which breaks
+    ``wait_for_selector(state="visible")``.
+    """
+    # EU cookie banner covers the login form in headless contexts — dismiss
+    # if present. Short timeout; most login pages don't show one.
+    try:
+        await page.wait_for_selector(  # type: ignore[union-attr]
+            "#sp-cc-accept", timeout=2_000, state="visible",
+        )
+        await page.click("#sp-cc-accept")  # type: ignore[union-attr]
+        await page.wait_for_load_state("networkidle")  # type: ignore[union-attr]
+    except Exception:
+        pass  # No banner — continue.
+
+    # Race the fields Amazon might have served us, plus the CAPTCHA input
+    # as an early-exit. ``wait_for_selector`` returns whichever matches first.
+    try:
+        entry = await page.wait_for_selector(  # type: ignore[union-attr]
+            "#ap_email, #ap_password, #auth-mfa-otpcode, #auth-captcha-guess",
+            timeout=10_000,
+            state="visible",
+        )
+    except Exception as exc:
+        raise CarrierAuthError(
+            "amazon",
+            "Amazon login form did not appear "
+            f"(url={getattr(page, 'url', '<unknown>')!r}). Amazon may be "
+            "presenting a bot-challenge or approval interstitial, or the "
+            "login flow may have changed. Log in via a real browser once "
+            "to clear any pending challenge, then retry.",
+        ) from exc
+
+    entry_id: str = await entry.evaluate("el => el.id")  # type: ignore[union-attr]
+
+    if entry_id == "auth-captcha-guess":
+        raise CarrierAuthError(
+            "amazon",
+            "Amazon is showing a CAPTCHA challenge. Log in via a real "
+            "browser once to clear it, then retry.",
+        )
+
+    if entry_id == "ap_email":
+        await entry.fill(email)  # type: ignore[union-attr]
+        # Same-page (email + password together) vs split (continue → password).
+        password_input = await page.query_selector("#ap_password")  # type: ignore[union-attr]
+        if password_input and await password_input.is_visible():  # type: ignore[union-attr]
+            await password_input.fill(password)  # type: ignore[union-attr]
+            await page.click("#signInSubmit")  # type: ignore[union-attr]
+        else:
+            await page.click("#continue")  # type: ignore[union-attr]
+            await page.wait_for_selector(  # type: ignore[union-attr]
+                "#ap_password", timeout=10_000, state="visible",
+            )
+            await page.fill("#ap_password", password)  # type: ignore[union-attr]
+            await page.click("#signInSubmit")  # type: ignore[union-attr]
+        await page.wait_for_load_state("networkidle")  # type: ignore[union-attr]
+    elif entry_id == "ap_password":
+        # Recognized user — Amazon skipped the email step.
+        await entry.fill(password)  # type: ignore[union-attr]
+        await page.click("#signInSubmit")  # type: ignore[union-attr]
+        await page.wait_for_load_state("networkidle")  # type: ignore[union-attr]
+    # entry_id == "auth-mfa-otpcode" falls through to the MFA block below.
 
     # Handle TOTP MFA
     mfa_input = await page.query_selector("#auth-mfa-otpcode")  # type: ignore[union-attr]

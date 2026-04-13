@@ -5,6 +5,7 @@ import pytest
 
 from dwmp.carriers.amazon import (
     Amazon,
+    _do_login,
     _parse_cookies,
     _parse_dutch_date,
     _parse_status,
@@ -353,3 +354,149 @@ async def test_amazon_rejects_oauth():
     carrier = Amazon()
     with pytest.raises(NotImplementedError):
         await carrier.get_auth_url("http://callback")
+
+
+# --- _do_login branch coverage ---
+#
+# Playwright's real ``Page`` is far too heavy to stub; these tests exercise the
+# branching logic with a minimal fake that records actions so we can assert
+# the right path is taken for each of Amazon's three entry points.
+
+
+class _FakeElement:
+    def __init__(self, element_id: str, visible: bool = True):
+        self.id = element_id
+        self._visible = visible
+        self.filled: str | None = None
+
+    async def fill(self, value: str) -> None:
+        self.filled = value
+
+    async def is_visible(self) -> bool:
+        return self._visible
+
+    async def evaluate(self, _script: str) -> str:
+        # Only used for ``el => el.id`` in production code.
+        return self.id
+
+
+class _FakePage:
+    """Minimal stand-in for playwright.async_api.Page covering the selectors
+    ``_do_login`` actually queries. Selector handling is *string-based* — it
+    splits a comma-separated CSS selector and returns the first configured
+    element it finds. Good enough for branching assertions, nowhere near a
+    full CSS engine."""
+
+    def __init__(
+        self,
+        elements: dict[str, _FakeElement],
+        url: str = "https://www.amazon.nl/ap/signin",
+    ):
+        self._elements = elements
+        self.url = url
+        self.actions: list[str] = []
+
+    def _lookup(self, selector: str) -> _FakeElement | None:
+        for sel in (s.strip() for s in selector.split(",")):
+            if not sel.startswith("#"):
+                continue
+            el = self._elements.get(sel[1:])
+            if el is not None:
+                return el
+        return None
+
+    async def wait_for_selector(
+        self, selector: str, timeout: int = 0, state: str = "visible",
+    ) -> _FakeElement:
+        el = self._lookup(selector)
+        if el is None or (state == "visible" and not el._visible):
+            from playwright.async_api import TimeoutError as PWTimeout
+            raise PWTimeout(f"no element matched {selector!r}")
+        return el
+
+    async def query_selector(self, selector: str) -> _FakeElement | None:
+        return self._lookup(selector)
+
+    async def click(self, selector: str) -> None:
+        self.actions.append(f"click:{selector}")
+        # Submitting navigates away from the sign-in URL — the real-page
+        # equivalent that the "still on /ap/signin" tail-check relies on.
+        if selector in ("#signInSubmit", "#auth-signin-button"):
+            self.url = "https://www.amazon.nl/your-orders/orders"
+
+    async def fill(self, selector: str, value: str) -> None:
+        el = self._lookup(selector)
+        if el is not None:
+            el.filled = value
+        self.actions.append(f"fill:{selector}={value}")
+
+    async def wait_for_load_state(self, _state: str) -> None:
+        pass
+
+
+async def test_do_login_recognized_user_password_only_flow():
+    """Amazon skips the email step for recognized users — only #ap_password shows."""
+    password_el = _FakeElement("ap_password")
+    page = _FakePage({"ap_password": password_el})
+
+    await _do_login(page, "user@example.com", "hunter2", totp_secret=None)
+
+    assert password_el.filled == "hunter2"
+    assert "click:#signInSubmit" in page.actions
+
+
+async def test_do_login_fresh_sign_in_same_page():
+    """Email + password visible on the same page (legacy flow)."""
+    email_el = _FakeElement("ap_email")
+    password_el = _FakeElement("ap_password")
+    page = _FakePage({"ap_email": email_el, "ap_password": password_el})
+
+    await _do_login(page, "user@example.com", "hunter2", totp_secret=None)
+
+    assert email_el.filled == "user@example.com"
+    assert password_el.filled == "hunter2"
+    assert "click:#signInSubmit" in page.actions
+    assert "click:#continue" not in page.actions  # no split step needed
+
+
+async def test_do_login_fresh_sign_in_split_flow():
+    """Email appears first; #ap_password only shows after clicking Continue."""
+    email_el = _FakeElement("ap_email")
+    # Password field exists but hidden initially — appears after the #continue click.
+    password_el = _FakeElement("ap_password", visible=False)
+    page = _FakePage({"ap_email": email_el, "ap_password": password_el})
+
+    # Simulate the password field becoming visible mid-flow, which is what
+    # Amazon does after #continue is clicked.
+    original_click = page.click
+
+    async def click_with_reveal(selector: str) -> None:
+        await original_click(selector)
+        if selector == "#continue":
+            password_el._visible = True
+
+    page.click = click_with_reveal  # type: ignore[method-assign]
+
+    await _do_login(page, "user@example.com", "hunter2", totp_secret=None)
+
+    assert email_el.filled == "user@example.com"
+    assert page.actions.count("click:#continue") == 1
+    # fill() via page.fill (not element.fill) records an action, so check both.
+    assert any(a.startswith("fill:#ap_password=") for a in page.actions)
+    assert page.actions[-1] == "click:#signInSubmit"
+
+
+async def test_do_login_no_form_raises_clear_error():
+    """No known form fields → descriptive CarrierAuthError, not a raw timeout."""
+    page = _FakePage({}, url="https://www.amazon.nl/ap/bot-challenge")
+
+    with pytest.raises(CarrierAuthError, match="login form did not appear"):
+        await _do_login(page, "user@example.com", "hunter2", totp_secret=None)
+
+
+async def test_do_login_captcha_raises_specific_error():
+    """CAPTCHA presence → actionable error, not a generic timeout."""
+    page = _FakePage({"auth-captcha-guess": _FakeElement("auth-captcha-guess")})
+
+    with pytest.raises(CarrierAuthError, match="CAPTCHA"):
+        await _do_login(page, "user@example.com", "hunter2", totp_secret=None)
