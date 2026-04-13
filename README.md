@@ -200,7 +200,52 @@ uv run pytest
 uv run uvicorn dwmp.api.app:app --reload
 ```
 
+Then visit <http://localhost:8000/> for the web UI (package list, account setup,
+notifications), or hit the JSON API directly — see below.
+
+## Web UI
+
+Dwmp ships a server-rendered HTML UI at `/`:
+
+- `/` — package list with the "Track a package" modal
+- `/accounts` — connected accounts, inline add/edit/test/sync flows
+- `/notifications` — status-change history with unread badge
+- `/login` / `/logout` — password gate (only enabled when `PASSWORD_HASH` is set)
+
+All UI routes sit behind the same auth middleware as the API.
+
+## Authentication
+
+If the `PASSWORD_HASH` environment variable is set, every route except
+`/health`, `/login`, `/api/v1/auth/token`, `/static`, `/docs`, `/openapi.json`
+and `/redoc` requires auth. If it's unset, the app is open — fine for a
+trusted LAN, not fine for the public internet.
+
+Browsers get a cookie session via `/login`. API clients exchange the password
+for a long-lived JWT:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"password": "<your password>"}'
+# → {"token": "eyJhbGciOi..."}
+```
+
+Then send `Authorization: Bearer <token>` on subsequent calls.
+
+Generate a `PASSWORD_HASH` with:
+
+```bash
+python -c "from argon2 import PasswordHasher; print(PasswordHasher().hash('your-password'))"
+```
+
 ## API
+
+### Auth
+
+```
+POST   /api/v1/auth/token             # Exchange password for a JWT Bearer token
+```
 
 ### Carriers
 
@@ -211,12 +256,14 @@ GET    /api/v1/carriers               # List carriers with auth_type and setup h
 ### Accounts (connect carrier accounts)
 
 ```
-POST   /api/v1/accounts/token         # Connect with manual token (PostNL, DPD)
-POST   /api/v1/accounts/credentials   # Connect with email/password (Amazon, DHL)
-GET    /api/v1/accounts               # List connected accounts (tokens stripped)
-GET    /api/v1/accounts/{id}          # Account details
-DELETE /api/v1/accounts/{id}          # Disconnect account
-POST   /api/v1/accounts/{id}/sync     # Force sync packages from account
+POST   /api/v1/accounts/test/credentials  # Dry-run credentials without saving
+POST   /api/v1/accounts/test/token        # Dry-run manual token without saving
+POST   /api/v1/accounts/token             # Connect with manual token (PostNL, DPD)
+POST   /api/v1/accounts/credentials       # Connect with email/password (Amazon, DHL)
+GET    /api/v1/accounts                   # List connected accounts (tokens stripped)
+GET    /api/v1/accounts/{id}              # Account details
+DELETE /api/v1/accounts/{id}              # Disconnect account
+POST   /api/v1/accounts/{id}/sync         # Force sync packages from account
 ```
 
 ### Packages
@@ -229,10 +276,19 @@ DELETE /api/v1/packages/{id}          # Stop tracking
 POST   /api/v1/packages/{id}/refresh  # Force refresh single package
 ```
 
+### Notifications
+
+```
+GET    /api/v1/notifications              # List notifications (query: limit, offset)
+GET    /api/v1/notifications/unread-count # {"count": N}
+POST   /api/v1/notifications/{id}/read    # Mark single notification read
+POST   /api/v1/notifications/read-all     # Mark everything read
+```
+
 ### Health
 
 ```
-GET    /health                        # Health check
+GET    /health                        # Health check + version
 ```
 
 ## Docker
@@ -248,12 +304,21 @@ docker run -p 8000:8000 -v dwmp-data:/app/data dwmp
 |----------|---------|-------------|
 | `DB_PATH` | `dwmp.db` | SQLite database file path |
 | `POLL_INTERVAL_MINUTES` | `30` | Background polling interval |
+| `PASSWORD_HASH` | *(unset)* | Argon2 hash of the login password. Unset → open access. See *Authentication* above for how to generate it. |
+| `JWT_SECRET` | *(random)* | HS256 signing secret for session JWTs. Defaults to a per-process random value, so sessions invalidate on every restart unless you pin it. |
+| `TZ` | `Europe/Amsterdam` | Display timezone for rendered dates/times in the web UI. |
+| `PLAYWRIGHT_BROWSER_CHANNEL` | `chrome` | Playwright browser channel used by carriers that scrape via headless browser (Amazon, DPD). Set empty to use bundled Chromium. |
 
 ## Kubernetes
 
 ```bash
 kubectl apply -f kubernetes/
 ```
+
+The app honors an `X-Ingress-Path` header for reverse proxies that strip a URL
+prefix (used by the Home Assistant addon's ingress). Without the header the app
+behaves as a plain root-mounted service, so direct-port and Kubernetes
+deployments need no extra configuration.
 
 ## Home Assistant
 
