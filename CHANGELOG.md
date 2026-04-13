@@ -2,6 +2,34 @@
 
 <!-- version list -->
 
+## v1.20.1 (2026-04-13)
+
+### Bug Fixes
+
+- **dhl,k8s**: Accept totp_secret kwarg on DHL.login and raise resource limits for playwright
+  ([`9696b63`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/9696b6395fd06ab924d333d1e8444c63b2f5d1fc))
+
+### Build System
+
+- **release**: Keep kubernetes/deployment.yaml image tag in sync via semantic-release
+  ([`49156bd`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/49156bd024e4ce6efc215f05866b8b8be3e0295c))
+
+### Code Style
+
+- **repo**: Wrap long INSERT INTO packages line under 120 cols
+  ([`90fa678`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/90fa678d172e480b42f321c503741e891bec1e8d))
+
+### Documentation
+
+- **readme**: Document web UI, auth flow, notifications API, and missing env vars
+  ([`5818561`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/5818561a6549d5cfcf78fc61241293603f4f9ea4))
+
+### Refactoring
+
+- **tracking**: Unify refresh loop so packages survive dropping off account lists
+  ([`a8e79f0`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/a8e79f0409aa51e5a0c42b81d162f7caebd550fa))
+
+
 ## v1.20.0 (2026-04-13)
 
 ### Features
