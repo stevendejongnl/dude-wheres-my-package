@@ -24,6 +24,15 @@ class _LoginRequired(Exception):
     pass
 
 
+def _base_path(request: Request) -> str:
+    """Return the reverse-proxy prefix (root_path) for use in templates and links.
+
+    Set by IngressPathMiddleware when the X-Ingress-Path header is present;
+    otherwise an empty string so URLs stay absolute (k8s/direct-port deployments).
+    """
+    return request.scope.get("root_path", "")
+
+
 _DISPLAY_TZ = ZoneInfo(os.environ.get("TZ", "Europe/Amsterdam"))
 
 
@@ -96,24 +105,30 @@ def _enrich_package(pkg: dict) -> dict:
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse(
-        request, "login.html", {"active_nav": "", "error": None, "version": VERSION},
+        request, "login.html",
+        {"active_nav": "", "error": None, "version": VERSION, "base_path": _base_path(request)},
     )
 
 
 @router.post("/login")
 async def login_submit(request: Request, password: str = Form()):
     if verify_password(password):
-        return login_response("/")
+        return login_response(f"{_base_path(request)}/")
     return templates.TemplateResponse(
         request, "login.html",
-        {"active_nav": "", "error": "Wrong password", "version": VERSION},
+        {
+            "active_nav": "",
+            "error": "Wrong password",
+            "version": VERSION,
+            "base_path": _base_path(request),
+        },
         status_code=401,
     )
 
 
 @router.get("/logout")
-async def logout():
-    return logout_response()
+async def logout(request: Request):
+    return logout_response(_base_path(request))
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -149,6 +164,7 @@ async def packages_page(
     ctx = {
         "active_nav": "packages", "active": active, "delivered": delivered,
         "accounts": len(accounts), "version": VERSION,
+        "base_path": _base_path(request),
     }
     return templates.TemplateResponse(request, "packages.html", ctx)
 
@@ -176,6 +192,7 @@ async def accounts_page(
     ctx = {
         "active_nav": "accounts", "active": "accounts",
         "accounts": accounts, "carriers": carriers, "version": VERSION,
+        "base_path": _base_path(request),
     }
     return templates.TemplateResponse(request, "accounts.html", ctx)
 
@@ -207,6 +224,7 @@ async def notifications_page(
     ctx = {
         "active_nav": "notifications", "notifications": notifications,
         "unread_count": unread_count, "version": VERSION,
+        "base_path": _base_path(request),
     }
     return templates.TemplateResponse(
         request, "notifications.html", ctx,

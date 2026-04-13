@@ -64,6 +64,8 @@ def is_authenticated(request: Request) -> bool:
 
 
 def login_response(redirect_to: str = "/") -> RedirectResponse:
+    # Caller passes the already-prefixed path (e.g. f"{root_path}/") so this
+    # helper stays agnostic of whether a reverse proxy is in front of us.
     response = RedirectResponse(redirect_to, status_code=303)
     response.set_cookie(
         COOKIE_NAME,
@@ -75,7 +77,7 @@ def login_response(redirect_to: str = "/") -> RedirectResponse:
     return response
 
 
-def logout_response() -> RedirectResponse:
-    response = RedirectResponse("/login", status_code=303)
+def logout_response(prefix: str = "") -> RedirectResponse:
+    response = RedirectResponse(f"{prefix}/login", status_code=303)
     response.delete_cookie(COOKIE_NAME)
     return response

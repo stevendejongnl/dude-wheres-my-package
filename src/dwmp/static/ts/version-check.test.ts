@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { getPageVersion, isNewVersion } from "./version-check";
+import { getBasePath, getPageVersion, isNewVersion } from "./version-check";
 
 describe("getPageVersion", () => {
   afterEach(() => {
@@ -17,6 +17,34 @@ describe("getPageVersion", () => {
 
   it("returns null when badge is missing", () => {
     expect(getPageVersion()).toBeNull();
+  });
+});
+
+describe("getBasePath", () => {
+  afterEach(() => {
+    document.head.querySelectorAll('meta[name="dwmp-base"]').forEach((m) => m.remove());
+  });
+
+  it("reads prefix from <meta name=\"dwmp-base\">", () => {
+    const meta = document.createElement("meta");
+    meta.name = "dwmp-base";
+    meta.content = "/api/hassio_ingress/abc";
+    document.head.appendChild(meta);
+
+    expect(getBasePath()).toBe("/api/hassio_ingress/abc");
+  });
+
+  it("returns empty string when meta is missing (k8s/direct-port deployment)", () => {
+    expect(getBasePath()).toBe("");
+  });
+
+  it("returns empty string when meta content is empty", () => {
+    const meta = document.createElement("meta");
+    meta.name = "dwmp-base";
+    meta.content = "";
+    document.head.appendChild(meta);
+
+    expect(getBasePath()).toBe("");
   });
 });
 
