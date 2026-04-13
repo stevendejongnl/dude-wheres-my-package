@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.20.0 (2026-04-13)
+
+### Features
+
+- **packages**: Add track-a-package modal and hide GLS from accounts page
+  ([`c21f51a`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/c21f51a63094647bc678605227470ad7ce79f63e))
+
+
 ## v1.19.0 (2026-04-13)
 
 ### Features
