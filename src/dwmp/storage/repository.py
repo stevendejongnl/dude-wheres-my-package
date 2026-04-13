@@ -257,9 +257,11 @@ class PackageRepository:
         try:
             cursor = await self.db.execute(
                 """INSERT INTO packages
-                   (tracking_number, carrier, label, postal_code, account_id, source, tracking_url, created_at, updated_at)
+                   (tracking_number, carrier, label, postal_code,
+                    account_id, source, tracking_url, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (tracking_number, carrier, label, postal_code, account_id, source, tracking_url, now, now),
+                (tracking_number, carrier, label, postal_code,
+                 account_id, source, tracking_url, now, now),
             )
             await self.db.commit()
             assert cursor.lastrowid is not None
