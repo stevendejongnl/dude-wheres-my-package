@@ -255,6 +255,29 @@ docker run -p 8000:8000 -v dwmp-data:/app/data dwmp
 kubectl apply -f kubernetes/
 ```
 
+## Home Assistant
+
+Two pieces, designed to be installed together:
+
+1. **Run dwmp as an HA addon** — wraps this image, exposes the web UI through
+   HA ingress (sidebar tile), persists the database to the addon's `/data`
+   volume. Install from
+   [`madebysteven-ha-addons`](https://github.com/stevendejongnl/madebysteven-ha-addons):
+   add the repo under *Settings → Add-ons → Add-on Store → ⋮ → Repositories*,
+   then install **Dude, Where's My Package?** Set a password in the addon
+   config and start it.
+
+2. **Add the HA integration** — exposes parcels as `sensor.dwmp_packages`
+   plus a Lovelace card and `dwmp_package_status_changed` events for
+   automations. Install via HACS:
+   add [`stevens-home-assistant-integrations`](https://github.com/stevendejongnl/stevens-home-assistant-integrations)
+   as a custom repository (Integration), download, restart HA, then configure
+   it against the addon's URL (e.g. `http://local-dwmp:8000`) and the password
+   set in step 1.
+
+The addon talks to dwmp over HTTP on its hassio-DNS hostname; the integration
+talks to dwmp via the same REST API used by the curl examples above.
+
 ## License
 
 MIT
