@@ -11,7 +11,7 @@
       {{ error }}
     </div>
     {% endif %}
-    <form method="post" action="/login">
+    <form method="post" action="{{ base_path }}/login">
       <div style="margin-bottom:16px;">
         <input type="password" name="password" placeholder="Password" autofocus
           style="width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.95rem;outline:none;">

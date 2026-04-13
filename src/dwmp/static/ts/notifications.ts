@@ -14,6 +14,16 @@ export interface NotificationPayload {
 }
 
 /**
+ * Read the reverse-proxy prefix from the <meta name="dwmp-base"> tag.
+ * Mirrors getBasePath() in version-check.ts — kept local so this module
+ * stays standalone-importable.
+ */
+function getBasePath(): string {
+  const meta = document.querySelector('meta[name="dwmp-base"]');
+  return meta?.getAttribute("content")?.trim() ?? "";
+}
+
+/**
  * Build the notification payload from a count delta.
  * Returns `null` when no notification should be shown.
  */
@@ -30,7 +40,7 @@ export function buildPayload(
       diff === 1
         ? "A package status has changed"
         : `${diff} package updates`,
-    icon: "/static/icon-64.png",
+    icon: `${getBasePath()}/static/icon-64.png`,
     tag: "dwmp-update",
   };
 }

@@ -23,8 +23,24 @@ describe("buildPayload", () => {
     expect(payload).not.toBeNull();
     expect(payload!.body).toBe("A package status has changed");
     expect(payload!.title).toBe("Dude, Where's My Package?");
+    // Without <meta name="dwmp-base"> the icon URL stays absolute-from-root
+    // (k8s/direct-port deployment behavior).
     expect(payload!.icon).toBe("/static/icon-64.png");
     expect(payload!.tag).toBe("dwmp-update");
+  });
+
+  it("prefixes icon URL when <meta name=\"dwmp-base\"> is set (HA ingress)", () => {
+    const meta = document.createElement("meta");
+    meta.name = "dwmp-base";
+    meta.content = "/api/hassio_ingress/xyz";
+    document.head.appendChild(meta);
+
+    try {
+      const payload = buildPayload(1, 0);
+      expect(payload!.icon).toBe("/api/hassio_ingress/xyz/static/icon-64.png");
+    } finally {
+      meta.remove();
+    }
   });
 
   it("returns plural message for +2 or more", () => {

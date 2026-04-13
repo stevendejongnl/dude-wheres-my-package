@@ -9,6 +9,15 @@
 const CHECK_INTERVAL_MS = 60_000; // 1 minute
 
 /**
+ * Read the reverse-proxy prefix from the <meta name="dwmp-base"> tag injected by base.html.
+ * Empty string when no proxy (k8s/direct port) — calls then resolve to absolute paths as before.
+ */
+export function getBasePath(): string {
+  const meta = document.querySelector('meta[name="dwmp-base"]');
+  return meta?.getAttribute("content")?.trim() ?? "";
+}
+
+/**
  * Read the version string shown in the page's version badge.
  * Returns `null` when the badge element is missing.
  */
@@ -23,7 +32,7 @@ export function getPageVersion(): string | null {
  */
 export async function fetchServerVersion(): Promise<string | null> {
   try {
-    const res = await fetch("/health");
+    const res = await fetch(`${getBasePath()}/health`);
     if (!res.ok) return null;
     const data = await res.json();
     return data.version ? `v${data.version}` : null;

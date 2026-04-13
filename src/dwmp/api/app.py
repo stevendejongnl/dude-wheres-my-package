@@ -38,6 +38,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 OPEN_PATHS = {"/health", "/login", "/api/v1/auth/token", "/static", "/docs", "/openapi.json", "/redoc"}
 
 
+def _root_path(request: Request) -> str:
+    """Return the request's root_path (set by IngressPathMiddleware), no trailing slash."""
+    return request.scope.get("root_path", "")
+
+
+class IngressPathMiddleware(BaseHTTPMiddleware):
+    """Honor the X-Ingress-Path header from a reverse proxy (e.g. Home Assistant ingress).
+
+    HA ingress forwards the per-session prefix (e.g. /api/hassio_ingress/<token>)
+    via this header. We reflect it into ``request.scope["root_path"]`` so that
+    redirects, ``request.url_for(...)``, and the ``base_path`` value passed to
+    templates all produce URLs the upstream proxy can resolve.
+
+    Without the header, ``root_path`` stays empty and the app behaves exactly
+    as it did before — preserving direct-port and Kubernetes deployments.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        ingress_path = request.headers.get("x-ingress-path", "").rstrip("/")
+        if ingress_path:
+            request.scope["root_path"] = ingress_path
+        return await call_next(request)
+
+
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -48,7 +72,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # API requests get 401, browser requests get redirect
         if path.startswith("/api/"):
             return JSONResponse({"detail": "Not authenticated"}, status_code=401)
-        return RedirectResponse("/login", status_code=303)
+        return RedirectResponse(f"{_root_path(request)}/login", status_code=303)
 
 
 def create_app() -> FastAPI:
@@ -58,7 +82,11 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Order matters: Starlette runs middleware in reverse of add_middleware() calls,
+    # so IngressPathMiddleware (added last) runs first and AuthMiddleware sees the
+    # ingress-aware root_path.
     app.add_middleware(AuthMiddleware)
+    app.add_middleware(IngressPathMiddleware)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
@@ -66,7 +94,7 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(_LoginRequired)
     async def login_redirect(request: Request, exc: _LoginRequired):
-        return RedirectResponse("/login", status_code=303)
+        return RedirectResponse(f"{_root_path(request)}/login", status_code=303)
 
     static_dir = Path(__file__).parent.parent / "static"
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")

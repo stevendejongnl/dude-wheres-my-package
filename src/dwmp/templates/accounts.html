@@ -32,7 +32,7 @@
     </div>
     <div class="account-actions">
       <button class="btn btn-ghost btn-sm"
-        hx-post="/api/v1/accounts/{{ account.id }}/sync"
+        hx-post="{{ base_path }}/api/v1/accounts/{{ account.id }}/sync"
         hx-target="#account-{{ account.id }}"
         hx-swap="outerHTML"
         hx-indicator="#sync-spinner-{{ account.id }}">
@@ -40,7 +40,7 @@
         <span class="htmx-indicator" id="sync-spinner-{{ account.id }}"><span class="spinner"></span></span>
       </button>
       <button class="btn btn-danger btn-sm"
-        hx-delete="/api/v1/accounts/{{ account.id }}"
+        hx-delete="{{ base_path }}/api/v1/accounts/{{ account.id }}"
         hx-target="#account-{{ account.id }}"
         hx-swap="outerHTML"
         hx-confirm="Disconnect {{ account.carrier }} account?">

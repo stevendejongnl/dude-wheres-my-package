@@ -7,8 +7,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="DWMP">
   <meta name="theme-color" content="#0f1117">
-  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+  <link rel="apple-touch-icon" href="{{ base_path }}/static/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ base_path }}/static/favicon-32.png">
+  <meta name="dwmp-base" content="{{ base_path }}">
   <title>{% block title %}DWMP{% endblock %}</title>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <style>
@@ -259,18 +260,18 @@
   <header>
     <div class="container">
       <h1>
-        <img src="/static/icon-64.png" alt="" style="width:48px;height:48px;vertical-align:middle;margin-right:12px;border-radius:10px;">
+        <img src="{{ base_path }}/static/icon-64.png" alt="" style="width:48px;height:48px;vertical-align:middle;margin-right:12px;border-radius:10px;">
         <span class="app-title">Dude, Where's My Package?</span>
         <span class="app-title-short">DWMP</span>
         <span class="version-badge">v{{ version }}</span>
       </h1>
       {% if active_nav %}
       <nav>
-        <a href="/" class="{% if active_nav == 'packages' %}active{% endif %}">Packages</a>
-        <a href="/accounts" class="{% if active_nav == 'accounts' %}active{% endif %}">Accounts</a>
-        <a href="/notifications" class="{% if active_nav == 'notifications' %}active{% endif %} nav-bell">
+        <a href="{{ base_path }}/" class="{% if active_nav == 'packages' %}active{% endif %}">Packages</a>
+        <a href="{{ base_path }}/accounts" class="{% if active_nav == 'accounts' %}active{% endif %}">Accounts</a>
+        <a href="{{ base_path }}/notifications" class="{% if active_nav == 'notifications' %}active{% endif %} nav-bell">
           <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C10.9 2 10 2.9 10 4C10 4.1 10 4.19 10.02 4.28C7.58 5.07 6 7.36 6 10V16L4 18V19H20V18L18 16V10C18 7.36 16.42 5.07 13.98 4.28C14 4.19 14 4.1 14 4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z"/></svg>
-          <span id="notif-badge" hx-get="/notifications/badge" hx-trigger="load, every 30s" hx-swap="innerHTML"></span>
+          <span id="notif-badge" hx-get="{{ base_path }}/notifications/badge" hx-trigger="load, every 30s" hx-swap="innerHTML"></span>
         </a>
       </nav>
       {% endif %}
@@ -287,11 +288,11 @@
       &middot;
       <a href="https://www.madebysteven.nl" target="_blank">MadeBySteven</a>
       &middot;
-      <a href="/docs" target="_blank">API</a>
+      <a href="{{ base_path }}/docs" target="_blank">API</a>
     </div>
   </footer>
   {% if active_nav %}
-  <script src="/static/js/notifications.js"></script>
+  <script src="{{ base_path }}/static/js/notifications.js"></script>
   {% endif %}
 </body>
 </html>
