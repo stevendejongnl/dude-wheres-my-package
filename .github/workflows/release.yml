@@ -183,7 +183,11 @@ jobs:
             --title "$COMMIT_SUBJECT" \
             --body "$PR_BODY"
 
+          # Personal repos can't add the Actions integration as a ruleset bypass
+          # actor, so --auto + branch protection breaks the addon's own
+          # semantic-release direct-push to main. Merge immediately instead;
+          # validate.yml runs on the PR and post-merge as a regression net.
           gh pr merge "$BRANCH" \
             --repo stevendejongnl/madebysteven-ha-addons \
-            --auto \
-            --squash
+            --squash \
+            --delete-branch
