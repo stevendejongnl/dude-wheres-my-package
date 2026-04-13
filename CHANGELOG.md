@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.17.2 (2026-04-13)
+
+### Bug Fixes
+
+- **ui**: Enable Save button after successful test in add-account form
+  ([`05dedc1`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/05dedc1c8dac01044a273a3d5a369599b39bb367))
+
+### Continuous Integration
+
+- Auto-open PR in addon repo on new dwmp release
+  ([`499a73e`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/499a73e90f8a883f893031f6fb334670b2453d7d))
+
+
 ## v1.17.1 (2026-04-13)
 
 ### Bug Fixes
