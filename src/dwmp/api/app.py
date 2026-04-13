@@ -39,26 +39,31 @@ OPEN_PATHS = {"/health", "/login", "/api/v1/auth/token", "/static", "/docs", "/o
 
 
 def _root_path(request: Request) -> str:
-    """Return the request's root_path (set by IngressPathMiddleware), no trailing slash."""
-    return request.scope.get("root_path", "")
+    """Return the X-Ingress-Path prefix captured by IngressPathMiddleware, no trailing slash."""
+    return getattr(request.state, "ingress_path", "")
 
 
 class IngressPathMiddleware(BaseHTTPMiddleware):
     """Honor the X-Ingress-Path header from a reverse proxy (e.g. Home Assistant ingress).
 
     HA ingress forwards the per-session prefix (e.g. /api/hassio_ingress/<token>)
-    via this header. We reflect it into ``request.scope["root_path"]`` so that
-    redirects, ``request.url_for(...)``, and the ``base_path`` value passed to
-    templates all produce URLs the upstream proxy can resolve.
+    via this header. We stash it on ``request.state.ingress_path`` so that
+    redirects (``RedirectResponse(f"{prefix}/login")``) and the ``base_path``
+    value passed to templates all produce URLs the upstream proxy can resolve.
 
-    Without the header, ``root_path`` stays empty and the app behaves exactly
-    as it did before — preserving direct-port and Kubernetes deployments.
+    NOTE: We deliberately do NOT set ``scope["root_path"]`` — Starlette's
+    Mount routing slices the request path by ``len(root_path)`` when resolving
+    sub-apps (``StaticFiles``, sub-routers), which mangles paths that don't
+    start with the prefix. The proxy already sends us unprefixed paths, so
+    routing must stay prefix-unaware; only response URLs need the prefix.
+
+    Without the header, ``ingress_path`` stays empty and the app behaves
+    exactly as it did before — preserving direct-port and Kubernetes deployments.
     """
 
     async def dispatch(self, request: Request, call_next):
         ingress_path = request.headers.get("x-ingress-path", "").rstrip("/")
-        if ingress_path:
-            request.scope["root_path"] = ingress_path
+        request.state.ingress_path = ingress_path
         return await call_next(request)
 
 

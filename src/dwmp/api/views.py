@@ -26,12 +26,14 @@ class _LoginRequired(Exception):
 
 
 def _base_path(request: Request) -> str:
-    """Return the reverse-proxy prefix (root_path) for use in templates and links.
+    """Return the reverse-proxy prefix captured by IngressPathMiddleware.
 
-    Set by IngressPathMiddleware when the X-Ingress-Path header is present;
-    otherwise an empty string so URLs stay absolute (k8s/direct-port deployments).
+    Read from ``request.state`` rather than ``scope["root_path"]`` because
+    setting ``root_path`` breaks Starlette's Mount routing for sub-apps like
+    ``StaticFiles``. See ``IngressPathMiddleware`` in ``app.py`` for the full
+    explanation.
     """
-    return request.scope.get("root_path", "")
+    return getattr(request.state, "ingress_path", "")
 
 
 _DISPLAY_TZ = ZoneInfo(os.environ.get("TZ", "Europe/Amsterdam"))

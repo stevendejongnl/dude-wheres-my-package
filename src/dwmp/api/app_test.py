@@ -75,3 +75,21 @@ async def test_ingress_header_strips_trailing_slash(monkeypatch):
         )
 
     assert response.headers["location"] == "/proxy/abc/login"
+
+
+async def test_static_files_serve_under_ingress_header():
+    """Regression: setting scope['root_path'] breaks Starlette's StaticFiles mount
+    because the mount slices the request path by len(root_path). The middleware
+    must keep static-asset routing intact when the X-Ingress-Path header is present.
+    """
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response_no_header = await client.get("/static/icon-64.png")
+        response_with_header = await client.get(
+            "/static/icon-64.png", headers={"X-Ingress-Path": "/api/hassio_ingress/abc"},
+        )
+
+    assert response_no_header.status_code == 200
+    assert response_with_header.status_code == 200
+    assert response_no_header.content == response_with_header.content
