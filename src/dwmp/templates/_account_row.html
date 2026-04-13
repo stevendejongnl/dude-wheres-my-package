@@ -1,0 +1,57 @@
+{#
+  Account row partial — rendered both in the accounts list and as the HTMX
+  response to POST /accounts/{id}/sync.
+
+  Context:
+    account       — account dict (id, carrier, username/auth_type, status,
+                    status_message, last_synced, ...)
+    base_path     — reverse-proxy prefix (may be empty)
+    sync_result   — optional dict, only present after a sync. Shape:
+                    {"ok": bool, "count": int, "message": str | None}
+                    Use it to render transient feedback next to the row.
+#}
+<div class="account" id="account-{{ account.id }}">
+  <div class="account-info">
+    <span class="pkg-carrier {{ account.carrier }}">{{ account.carrier }}</span>
+    <div>
+      <div style="font-size:0.9rem;">{{ account.username or account.auth_type }}</div>
+      <div class="account-status {{ account.status }}">
+        {{ account.status }}
+        {% if account.status_message %}
+        <span style="color:var(--text-dim);font-size:0.7rem;"> — {{ account.status_message[:60] }}</span>
+        {% endif %}
+      </div>
+      {% if account.last_synced %}
+      <div style="font-size:0.7rem;color:var(--text-dim);">Last synced: {{ account.last_synced[:16] | replace('T', ' ') }}</div>
+      {% endif %}
+
+      {% if sync_result %}
+      <div class="test-result {{ 'ok' if sync_result.ok else 'error' }}" style="margin-top:6px;padding:6px 10px;font-size:0.75rem;" role="status">
+        <span class="test-icon" aria-hidden="true">{{ '✓' if sync_result.ok else '✕' }}</span>
+        {% if sync_result.ok %}
+        Synced — {{ sync_result.count }} package{{ '' if sync_result.count == 1 else 's' }} found
+        {% else %}
+        Sync failed — {{ sync_result.message }}
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="account-actions">
+    <button class="btn btn-ghost btn-sm"
+      hx-post="{{ base_path }}/accounts/{{ account.id }}/sync"
+      hx-target="#account-{{ account.id }}"
+      hx-swap="outerHTML"
+      hx-indicator="#sync-spinner-{{ account.id }}">
+      Sync
+      <span class="htmx-indicator" id="sync-spinner-{{ account.id }}"><span class="spinner"></span></span>
+    </button>
+    <button class="btn btn-danger btn-sm"
+      hx-delete="{{ base_path }}/api/v1/accounts/{{ account.id }}"
+      hx-target="#account-{{ account.id }}"
+      hx-swap="outerHTML"
+      hx-confirm="Disconnect {{ account.carrier }} account?">
+      Disconnect
+    </button>
+  </div>
+</div>

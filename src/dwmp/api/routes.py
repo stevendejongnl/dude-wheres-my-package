@@ -44,6 +44,7 @@ class ManualTokenRequest(BaseModel):
     access_token: str
     refresh_token: str | None = None
     lookback_days: int = 30
+    user_agent: str | None = None
 
 
 class AuthTokenRequest(BaseModel):
@@ -139,6 +140,7 @@ async def test_token(
     try:
         await service.validate_account_manual_token(
             body.carrier, body.access_token, body.refresh_token,
+            user_agent=body.user_agent,
         )
     except CarrierAuthError as exc:
         raise HTTPException(status_code=502, detail=exc.message)
@@ -170,7 +172,8 @@ async def connect_manual_token(
 ) -> dict:
     try:
         return await service.connect_account_manual_token(
-            body.carrier, body.access_token, body.refresh_token, body.lookback_days
+            body.carrier, body.access_token, body.refresh_token, body.lookback_days,
+            user_agent=body.user_agent,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

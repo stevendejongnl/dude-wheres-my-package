@@ -255,6 +255,16 @@
       font-size: 0.75rem; color: var(--text);
       overflow-x: auto; white-space: pre; user-select: all;
     }
+    .wizard-details {
+      margin: 0 0 10px; border: 1px solid var(--border);
+      border-radius: 6px; padding: 8px 12px;
+    }
+    .wizard-details[open] { background: var(--surface); }
+    .wizard-details summary {
+      cursor: pointer; font-size: 0.85rem; padding: 2px 0;
+      list-style: revert;
+    }
+    .wizard-details[open] summary { margin-bottom: 8px; }
 
     /* Test result */
     .test-result {

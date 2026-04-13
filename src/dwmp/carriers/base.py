@@ -62,6 +62,10 @@ class AuthTokens:
     access_token: str
     refresh_token: str | None = None
     expires_at: datetime | None = None
+    # Optional user-agent the cookies/session were issued to. Used by browser
+    # carriers (DPD) so headless replay matches the fingerprint Cloudflare
+    # bound cf_clearance to. Safely ignored by carriers that don't need it.
+    user_agent: str | None = None
 
 
 class CarrierBase(ABC):

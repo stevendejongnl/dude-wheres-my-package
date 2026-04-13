@@ -193,3 +193,24 @@ async def test_save_token_triggers_hx_refresh(client: AsyncClient, repo):
     assert len(accounts) == 1
     assert accounts[0]["carrier"] == "postnl"
     assert accounts[0]["lookback_days"] == 14
+
+
+async def test_sync_account_view_returns_refreshed_row(client: AsyncClient, repo):
+    await client.post(
+        "/accounts/add/amazon/save",
+        data={"username": "u", "password": "p", "lookback_days": "30"},
+    )
+    account_id = (await repo.list_accounts())[0]["id"]
+
+    response = await client.post(f"/accounts/{account_id}/sync")
+    assert response.status_code == 200
+    body = response.text
+    assert f'id="account-{account_id}"' in body
+    assert "Synced" in body
+    # Must not leak the raw tokens dict into rendered HTML.
+    assert "access_token" not in body
+
+
+async def test_sync_account_view_missing_account_returns_404(client: AsyncClient):
+    response = await client.post("/accounts/9999/sync")
+    assert response.status_code == 404

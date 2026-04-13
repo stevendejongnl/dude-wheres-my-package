@@ -9,6 +9,8 @@ to the target page, waits for JS to render, and returns the final HTML.
 import asyncio
 import json
 import logging
+import os
+import re
 
 from dwmp.carriers.base import CarrierAuthError
 
@@ -16,6 +18,67 @@ logger = logging.getLogger(__name__)
 
 # Serialise browser launches so a memory-constrained pod doesn't OOM.
 _browser_lock = asyncio.Lock()
+
+# Default UA matching the Linux container. Overridable per-call so browser
+# carriers can replay with the exact UA their cookies were issued to.
+_USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+)
+
+# Launch real Chrome (installed via `playwright install chrome`) by default so
+# the TLS ClientHello fingerprint matches Chrome-stable — what Cloudflare's
+# cf_clearance is actually bound to. Set PLAYWRIGHT_BROWSER_CHANNEL="" at runtime
+# to force bundled Chromium (e.g. in environments where Chrome isn't installed).
+_BROWSER_CHANNEL = os.environ.get("PLAYWRIGHT_BROWSER_CHANNEL", "chrome") or None
+
+
+def _platform_from_ua(user_agent: str) -> str:
+    """Pick a navigator.platform override that's consistent with the UA string."""
+    lower = user_agent.lower()
+    if "windows" in lower:
+        return "Win32"
+    if "mac os x" in lower or "macintosh" in lower:
+        return "MacIntel"
+    return "Linux x86_64"
+
+
+def _stealth(user_agent: str):
+    """Return a configured Stealth instance for use with ``use_async``.
+
+    Aligns the navigator platform with the effective user-agent so the JS
+    fingerprint stays consistent. Cloudflare's bot check flags mismatches
+    between the UA string and navigator.platform.
+    """
+    from playwright_stealth import Stealth
+
+    return Stealth(
+        navigator_platform_override=_platform_from_ua(user_agent),
+        navigator_user_agent_override=user_agent,
+    )
+
+
+def _locale_from_ua(user_agent: str) -> tuple[str, str]:
+    """Extract (locale, timezone) hints from UA; fall back to Dutch locale."""
+    # Most browsers don't put locale in UA strings, so this is mostly a hook
+    # for future accept-language inference. For now: sensible NL default.
+    match = re.search(r"\b([a-z]{2}-[A-Z]{2})\b", user_agent)
+    locale = match.group(1) if match else "nl-NL"
+    return locale, "Europe/Amsterdam"
+
+
+async def _launch_browser(pw):
+    """Launch Chromium using the configured channel, falling back gracefully."""
+    try:
+        return await pw.chromium.launch(headless=True, channel=_BROWSER_CHANNEL)
+    except Exception as exc:
+        if _BROWSER_CHANNEL:
+            logger.warning(
+                "Failed to launch channel=%r (%s) — falling back to bundled Chromium",
+                _BROWSER_CHANNEL, exc,
+            )
+            return await pw.chromium.launch(headless=True)
+        raise
 
 
 def _normalize_cookies(raw_cookies: list[dict]) -> list[dict]:
@@ -60,10 +123,15 @@ async def capture_page_html(
     login_indicators: list[str] | None = None,
     wait_selector: str | None = None,
     wait_timeout_ms: int = 15_000,
+    user_agent: str | None = None,
 ) -> tuple[str, str]:
     """Launch headless Chromium, load cookies, navigate, capture rendered HTML.
 
     Returns ``(html, updated_cookies_json)``.
+
+    ``user_agent`` should match the browser that issued the cookies — Cloudflare
+    binds ``cf_clearance`` to (IP, UA, TLS fingerprint), so a mismatch
+    invalidates the session. When omitted, the default Linux Chrome UA is used.
 
     Raises :class:`CarrierAuthError` when the session has expired (login
     redirect detected) or the browser cannot be started.
@@ -82,19 +150,18 @@ async def capture_page_html(
         )
 
     cookies = _normalize_cookies(cookies)
+    effective_ua = user_agent or _USER_AGENT
+    locale, tz = _locale_from_ua(effective_ua)
 
     async with _browser_lock:
-        async with async_playwright() as pw:
-            browser = await pw.chromium.launch(headless=True)
+        async with _stealth(effective_ua).use_async(async_playwright()) as pw:
+            browser = await _launch_browser(pw)
             try:
                 context = await browser.new_context(
-                    user_agent=(
-                        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                        "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-                    ),
+                    user_agent=effective_ua,
                     viewport={"width": 1280, "height": 800},
-                    locale="nl-NL",
-                    timezone_id="Europe/Amsterdam",
+                    locale=locale,
+                    timezone_id=tz,
                 )
                 await context.add_cookies(cookies)
 

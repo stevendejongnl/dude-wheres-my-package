@@ -1,4 +1,4 @@
-from dwmp.carriers.browser import _normalize_cookies
+from dwmp.carriers.browser import _normalize_cookies, _platform_from_ua
 
 
 def test_normalize_playwright_format():
@@ -33,3 +33,18 @@ def test_normalize_bad_samesite():
     raw = [{"name": "x", "value": "y", "sameSite": "unspecified"}]
     result = _normalize_cookies(raw)
     assert result[0]["sameSite"] == "Lax"
+
+
+def test_platform_from_ua_windows():
+    assert _platform_from_ua("Mozilla/5.0 (Windows NT 10.0; Win64; x64)") == "Win32"
+
+
+def test_platform_from_ua_mac():
+    assert _platform_from_ua(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)"
+    ) == "MacIntel"
+
+
+def test_platform_from_ua_linux_default():
+    assert _platform_from_ua("Mozilla/5.0 (X11; Linux x86_64)") == "Linux x86_64"
+    assert _platform_from_ua("something/weird") == "Linux x86_64"

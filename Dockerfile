@@ -18,8 +18,12 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev --frozen --no-install-project
 
-# Install Chromium for Playwright (Amazon browser automation)
-RUN uv run playwright install --with-deps chromium
+# Install real Chrome for Playwright. Cloudflare's bot check (DPD) binds
+# cf_clearance to the TLS ClientHello fingerprint, which differs between
+# Chrome-stable and Playwright's bundled Chromium — using real Chrome keeps the
+# fingerprint consistent with what the user's browser captured. Chromium is
+# kept as a fallback for environments where Chrome install fails.
+RUN uv run playwright install --with-deps chromium chrome
 
 # Copy source and install the project itself (records version metadata)
 COPY src/ src/

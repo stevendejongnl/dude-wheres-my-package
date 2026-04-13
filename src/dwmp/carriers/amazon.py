@@ -386,17 +386,19 @@ async def _playwright_login_and_capture(
     """
     from playwright.async_api import async_playwright
 
-    from dwmp.carriers.browser import _browser_lock
+    from dwmp.carriers.browser import (
+        _USER_AGENT,
+        _browser_lock,
+        _launch_browser,
+        _stealth,
+    )
 
     async with _browser_lock:
-        async with async_playwright() as pw:
-            browser = await pw.chromium.launch(headless=True)
+        async with _stealth(_USER_AGENT).use_async(async_playwright()) as pw:
+            browser = await _launch_browser(pw)
             try:
                 context = await browser.new_context(
-                    user_agent=(
-                        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                        "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-                    ),
+                    user_agent=_USER_AGENT,
                     viewport={"width": 1280, "height": 800},
                     locale="nl-NL",
                     timezone_id="Europe/Amsterdam",

@@ -14,40 +14,7 @@
 {% else %}
 <div class="card">
   {% for account in accounts %}
-  <div class="account" id="account-{{ account.id }}">
-    <div class="account-info">
-      <span class="pkg-carrier {{ account.carrier }}">{{ account.carrier }}</span>
-      <div>
-        <div style="font-size:0.9rem;">{{ account.username or account.auth_type }}</div>
-        <div class="account-status {{ account.status }}">
-          {{ account.status }}
-          {% if account.status_message %}
-          <span style="color:var(--text-dim);font-size:0.7rem;"> — {{ account.status_message[:60] }}</span>
-          {% endif %}
-        </div>
-        {% if account.last_synced %}
-        <div style="font-size:0.7rem;color:var(--text-dim);">Last synced: {{ account.last_synced[:16] | replace('T', ' ') }}</div>
-        {% endif %}
-      </div>
-    </div>
-    <div class="account-actions">
-      <button class="btn btn-ghost btn-sm"
-        hx-post="{{ base_path }}/api/v1/accounts/{{ account.id }}/sync"
-        hx-target="#account-{{ account.id }}"
-        hx-swap="outerHTML"
-        hx-indicator="#sync-spinner-{{ account.id }}">
-        Sync
-        <span class="htmx-indicator" id="sync-spinner-{{ account.id }}"><span class="spinner"></span></span>
-      </button>
-      <button class="btn btn-danger btn-sm"
-        hx-delete="{{ base_path }}/api/v1/accounts/{{ account.id }}"
-        hx-target="#account-{{ account.id }}"
-        hx-swap="outerHTML"
-        hx-confirm="Disconnect {{ account.carrier }} account?">
-        Disconnect
-      </button>
-    </div>
-  </div>
+  {% include "_account_row.html" %}
   {% endfor %}
 </div>
 {% endif %}

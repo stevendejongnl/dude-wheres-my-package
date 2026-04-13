@@ -8,28 +8,49 @@
   </div>
 
   <p class="form-hint">
-    DPD's parcels page is behind Cloudflare bot protection — there's no JSON API to call.
-    You'll capture the rendered HTML from your logged-in browser session and paste it below.
-    Re-capture whenever you need fresh data.
+    DPD's parcels page is behind Cloudflare — there's no JSON API. Paste your
+    browser cookies as JSON and DWMP will launch a headless browser on every
+    sync, reusing your session to fetch live data. Falls back to a frozen HTML
+    snapshot if you prefer.
   </p>
 
-  <ol class="wizard-steps">
-    <li>Log in at <a href="https://www.dpdgroup.com/nl/mydpd/login" target="_blank" rel="noopener">dpdgroup.com/nl/mydpd/login</a>.</li>
-    <li>Navigate to <strong>My parcels</strong> → <strong>Incoming</strong>.</li>
-    <li>Open DevTools (<kbd>F12</kbd>) → <strong>Console</strong> tab.</li>
-    <li>Run this command:
-      <pre class="wizard-code">copy(document.documentElement.outerHTML)</pre>
-      Your clipboard now contains the page HTML.
-    </li>
-    <li>Paste it into the field below and click <strong>Test connection</strong>.</li>
-  </ol>
+  <details class="wizard-details">
+    <summary><strong>Recommended:</strong> cookies JSON (auto-refreshing)</summary>
+    <ol class="wizard-steps">
+      <li>Install the <a href="https://cookie-editor.com/" target="_blank" rel="noopener">Cookie-Editor</a> browser extension.</li>
+      <li>Log in at <a href="https://www.dpdgroup.com/nl/mydpd/login" target="_blank" rel="noopener">dpdgroup.com/nl/mydpd/login</a> and open <strong>My parcels → Incoming</strong> so the Cloudflare challenge completes.</li>
+      <li>Click Cookie-Editor → <strong>Export → JSON</strong>. Your clipboard now holds a JSON array.</li>
+      <li>Paste it in the field below and click <strong>Test connection</strong>.</li>
+    </ol>
+  </details>
+
+  <details class="wizard-details">
+    <summary>Fallback: HTML snapshot (one-shot, won't auto-refresh)</summary>
+    <ol class="wizard-steps">
+      <li>Log in and open <strong>My parcels → Incoming</strong>.</li>
+      <li>Open DevTools (<kbd>F12</kbd>) → <strong>Console</strong>.</li>
+      <li>Run: <pre class="wizard-code">copy(document.documentElement.outerHTML)</pre></li>
+      <li>Paste it below. You'll need to re-paste whenever you want new data.</li>
+    </ol>
+  </details>
 
   <div class="form-group">
-    <label for="access-token-{{ carrier }}">Page HTML</label>
+    <label for="access-token-{{ carrier }}">Cookies JSON or page HTML</label>
     <textarea id="access-token-{{ carrier }}" name="access_token" rows="8"
       required spellcheck="false" autocomplete="off"
-      placeholder="<!DOCTYPE html>..."></textarea>
-    <small class="form-help">Strip surrounding quotes if your clipboard wrapped the HTML in a string literal.</small>
+      placeholder='[{"name":"cf_clearance", ...}]  or  <!DOCTYPE html>...'></textarea>
+    <small class="form-help">DWMP detects the format automatically: starts with <code>[</code> = cookies, starts with <code>&lt;</code> = HTML.</small>
+  </div>
+
+  <div class="form-group">
+    <label for="user-agent-{{ carrier }}">Browser user-agent <span class="form-optional">(recommended for cookies mode)</span></label>
+    <input type="text" id="user-agent-{{ carrier }}" name="user_agent"
+      spellcheck="false" autocomplete="off"
+      placeholder="Mozilla/5.0 ...">
+    <small class="form-help">
+      In DevTools Console: <code>copy(navigator.userAgent)</code>.
+      Cloudflare binds <code>cf_clearance</code> to the UA that received it — a mismatch invalidates the cookie.
+    </small>
   </div>
 
   <div class="form-group">

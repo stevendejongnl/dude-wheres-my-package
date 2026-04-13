@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import UTC, datetime
 
@@ -7,11 +8,14 @@ from bs4 import BeautifulSoup
 from dwmp.carriers.base import (
     AuthTokens,
     AuthType,
+    CarrierAuthError,
     CarrierBase,
     TrackingEvent,
     TrackingResult,
     TrackingStatus,
 )
+
+logger = logging.getLogger(__name__)
 
 # DPD Group (NL) endpoints
 DPD_BASE = "https://www.dpdgroup.com"
@@ -62,20 +66,55 @@ class DPD(CarrierBase):
 
     def __init__(self, http_client: httpx.AsyncClient | None = None) -> None:
         self._client = http_client
+        self._updated_tokens: AuthTokens | None = None
+
+    def get_updated_tokens(self) -> AuthTokens | None:
+        """Return refreshed browser cookies captured during the last sync."""
+        tokens = self._updated_tokens
+        self._updated_tokens = None
+        return tokens
 
     async def sync_packages(
         self, tokens: AuthTokens, lookback_days: int = 30
     ) -> list[TrackingResult]:
-        # DPD has Cloudflare bot protection — httpx can't bypass the JS challenge.
-        # The access_token stores the page HTML captured from the browser session.
-        # The sync is triggered after Playwright captures fresh HTML.
-        html = tokens.access_token
-        if not html or not html.startswith("<"):
-            raise ValueError(
-                "DPD requires browser-captured HTML. "
-                "Use Playwright to log in and capture the parcels page."
+        # DPD has Cloudflare bot protection — plain HTTP can't bypass the JS
+        # challenge. Two supported modes:
+        #   1. Cookies JSON → Playwright re-captures live HTML every sync and
+        #      persists refreshed cookies (including cf_clearance).
+        #   2. Legacy HTML paste → parsed as a frozen snapshot (no refresh).
+        raw = tokens.access_token
+        self._updated_tokens = None
+
+        if raw and raw.lstrip().startswith("["):
+            from dwmp.carriers.browser import capture_page_html
+
+            html, updated_cookies = await capture_page_html(
+                url=DPD_PARCELS_URL,
+                cookies_json=raw,
+                carrier_name=self.name,
+                login_indicators=["auth/realms", "login.dpdgroup", "signin"],
+                wait_selector="a[href*='parcelNumber']",
+                user_agent=tokens.user_agent,
             )
-        return self._parse_parcels_page(html, lookback_days)
+            self._updated_tokens = AuthTokens(
+                access_token=updated_cookies,
+                refresh_token=tokens.refresh_token,
+                user_agent=tokens.user_agent,
+            )
+            logger.info("DPD browser capture complete, %d bytes", len(html))
+            return self._parse_parcels_page(html, lookback_days)
+
+        if raw and raw.lstrip().startswith("<"):
+            return self._parse_parcels_page(raw, lookback_days)
+
+        raise CarrierAuthError(
+            carrier=self.name,
+            message=(
+                "DPD account not configured. Paste a cookies JSON (auto-refreshes "
+                "on every sync) or a one-time HTML snapshot. See the add-account "
+                "form for instructions."
+            ),
+        )
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
         url = f"{DPD_TRACKING_URL}/{tracking_number}"

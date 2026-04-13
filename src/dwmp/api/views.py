@@ -254,6 +254,7 @@ async def add_account_test(
     totp_secret: str = Form(default=""),
     access_token: str = Form(default=""),
     refresh_token: str = Form(default=""),
+    user_agent: str = Form(default=""),
 ):
     template = _form_template(carrier)
     try:
@@ -264,12 +265,42 @@ async def add_account_test(
         else:
             await service.validate_account_manual_token(
                 carrier, access_token, refresh_token or None,
+                user_agent=user_agent or None,
             )
     except CarrierAuthError as exc:
         return _result_html(False, exc.message)
     except ValueError as exc:
         return _result_html(False, str(exc))
     return _result_html(True, "Connection works — click Save to add this account.")
+
+
+@router.post("/accounts/{account_id}/sync", response_class=HTMLResponse)
+async def sync_account_view(
+    request: Request,
+    account_id: int,
+    service: TrackingService = Depends(get_tracking_service),
+):
+    """HTMX endpoint: sync an account and return the refreshed row."""
+    sync_result: dict | None = None
+    try:
+        results = await service.sync_account(account_id)
+        sync_result = {"ok": True, "count": len(results), "message": None}
+    except CarrierAuthError as exc:
+        sync_result = {"ok": False, "count": 0, "message": exc.message}
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    account = await service.get_account(account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    account.pop("tokens", None)
+
+    ctx = {
+        "account": account,
+        "base_path": _base_path(request),
+        "sync_result": sync_result,
+    }
+    return templates.TemplateResponse(request, "_account_row.html", ctx)
 
 
 @router.post("/accounts/add/{carrier}/save", response_class=HTMLResponse)
@@ -282,6 +313,7 @@ async def add_account_save(
     totp_secret: str = Form(default=""),
     access_token: str = Form(default=""),
     refresh_token: str = Form(default=""),
+    user_agent: str = Form(default=""),
     lookback_days: int = Form(default=30),
 ):
     template = _form_template(carrier)
@@ -294,6 +326,7 @@ async def add_account_save(
         else:
             await service.connect_account_manual_token(
                 carrier, access_token, refresh_token or None, lookback_days,
+                user_agent=user_agent or None,
             )
     except CarrierAuthError as exc:
         return _result_html(False, exc.message)

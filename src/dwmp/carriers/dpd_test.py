@@ -1,6 +1,6 @@
 import pytest
 
-from dwmp.carriers.base import AuthType, TrackingStatus
+from dwmp.carriers.base import AuthTokens, AuthType, CarrierAuthError, TrackingStatus
 from dwmp.carriers.dpd import DPD, _parse_status
 
 
@@ -81,3 +81,66 @@ async def test_dpd_rejects_oauth():
     carrier = DPD()
     with pytest.raises(NotImplementedError):
         await carrier.get_auth_url("http://callback")
+
+
+async def test_sync_packages_cookies_mode_captures_live_html(monkeypatch):
+    """Cookies JSON → Playwright re-captures the page and refreshes tokens."""
+    carrier = DPD()
+    captured_html = """
+    <html><body>
+      <a href="/nl/mydpd/my-parcels/incoming?parcelNumber=NEWPARCEL123">
+        <span class="parcelAlias">Parcel from Fresh Sender</span>
+      </a>
+    </body></html>
+    """
+    capture_calls: list[dict] = []
+
+    async def fake_capture(**kwargs):
+        capture_calls.append(kwargs)
+        return captured_html, '[{"name":"cf_clearance","value":"rotated"}]'
+
+    monkeypatch.setattr("dwmp.carriers.browser.capture_page_html", fake_capture)
+
+    tokens = AuthTokens(
+        access_token='[{"name":"cf_clearance","value":"old"}]',
+        user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X) SafariTest/1.0",
+    )
+    results = await carrier.sync_packages(tokens)
+
+    assert len(capture_calls) == 1
+    assert capture_calls[0]["carrier_name"] == "dpd"
+    assert "parcelNumber" in capture_calls[0]["wait_selector"]
+    # UA must be forwarded so the headless replay matches the issuing browser.
+    assert capture_calls[0]["user_agent"] == tokens.user_agent
+    assert len(results) == 1
+    assert results[0].tracking_number == "NEWPARCEL123"
+
+    refreshed = carrier.get_updated_tokens()
+    assert refreshed is not None
+    assert "rotated" in refreshed.access_token
+    # UA survives the token rotation — next sync keeps matching the original browser.
+    assert refreshed.user_agent == tokens.user_agent
+    # Consumed on read — next call returns None.
+    assert carrier.get_updated_tokens() is None
+
+
+async def test_sync_packages_legacy_html_still_works():
+    """Backwards compat: existing accounts with pasted HTML keep parsing locally."""
+    carrier = DPD()
+    html = (
+        "<html><body>"
+        "<a href='/nl/mydpd/my-parcels/incoming?parcelNumber=LEGACY999'>"
+        "<span class='parcelAlias'>Parcel from Old Sender</span></a>"
+        "</body></html>"
+    )
+    results = await carrier.sync_packages(AuthTokens(access_token=html))
+    assert len(results) == 1
+    assert results[0].tracking_number == "LEGACY999"
+    # Legacy mode never sets updated tokens.
+    assert carrier.get_updated_tokens() is None
+
+
+async def test_sync_packages_empty_token_raises_auth_error():
+    carrier = DPD()
+    with pytest.raises(CarrierAuthError):
+        await carrier.sync_packages(AuthTokens(access_token=""))

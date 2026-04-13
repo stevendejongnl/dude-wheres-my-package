@@ -160,6 +160,7 @@ class TrackingService:
         carrier_name: str,
         access_token: str,
         refresh_token: str | None = None,
+        user_agent: str | None = None,
     ) -> AuthTokens:
         """Validate a manual token by attempting a minimal sync. Raises CarrierAuthError on failure."""
         carrier = self._carriers.get(carrier_name)
@@ -169,6 +170,7 @@ class TrackingService:
         tokens = AuthTokens(
             access_token=access_token,
             refresh_token=refresh_token,
+            user_agent=user_agent,
         )
 
         try:
@@ -188,9 +190,10 @@ class TrackingService:
         access_token: str,
         refresh_token: str | None = None,
         lookback_days: int = 30,
+        user_agent: str | None = None,
     ) -> dict:
         tokens = await self.validate_account_manual_token(
-            carrier_name, access_token, refresh_token
+            carrier_name, access_token, refresh_token, user_agent=user_agent
         )
 
         account_id = await self._repository.add_account(
@@ -226,6 +229,7 @@ class TrackingService:
             access_token=tokens_dict.get("access_token", ""),
             refresh_token=tokens_dict.get("refresh_token"),
             expires_at=None,
+            user_agent=tokens_dict.get("user_agent"),
         )
 
         try:
