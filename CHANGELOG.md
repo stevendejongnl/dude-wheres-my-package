@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.18.0 (2026-04-13)
+
+### Features
+
+- **dpd**: Auto-refreshing cookies mode with stealth and real Chrome
+  ([`8f34439`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/8f3443996b98430ac424907a5b6b4191665532dc))
+
+
 ## v1.17.3 (2026-04-13)
 
 ### Bug Fixes
