@@ -274,6 +274,67 @@ async def add_account_test(
     return _result_html(True, "Connection works — click Save to add this account.")
 
 
+@router.get("/accounts/{account_id}/edit", response_class=HTMLResponse)
+async def edit_account_form(
+    request: Request,
+    account_id: int,
+    service: TrackingService = Depends(get_tracking_service),
+):
+    """Render the account form pre-filled with the existing account's values."""
+    account = await service.get_account(account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    template = _form_template(account["carrier"])
+    ctx = {
+        "carrier": account["carrier"],
+        "account": account,
+        "base_path": _base_path(request),
+    }
+    return templates.TemplateResponse(request, template, ctx)
+
+
+@router.get("/accounts/{account_id}/edit/cancel", response_class=HTMLResponse)
+async def edit_account_form_cancel(account_id: int):
+    """Empty response — used to clear the inline edit form via HTMX swap."""
+    return HTMLResponse("")
+
+
+@router.post("/accounts/{account_id}/edit/save", response_class=HTMLResponse)
+async def edit_account_save(
+    request: Request,
+    account_id: int,
+    service: TrackingService = Depends(get_tracking_service),
+    username: str = Form(default=""),
+    password: str = Form(default=""),
+    totp_secret: str = Form(default=""),
+    access_token: str = Form(default=""),
+    refresh_token: str = Form(default=""),
+    user_agent: str = Form(default=""),
+    lookback_days: int = Form(default=30),
+):
+    account = await service.get_account(account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    template = _form_template(account["carrier"])
+    try:
+        if template == "account_form_credentials.html":
+            await service.update_account_credentials(
+                account_id, account["carrier"], username, password,
+                lookback_days, totp_secret=totp_secret or None,
+            )
+        else:
+            await service.update_account_manual_token(
+                account_id, account["carrier"], access_token,
+                refresh_token or None, lookback_days,
+                user_agent=user_agent or None,
+            )
+    except CarrierAuthError as exc:
+        return _result_html(False, exc.message)
+    except ValueError as exc:
+        return _result_html(False, str(exc))
+    return HTMLResponse("", headers={"HX-Refresh": "true"})
+
+
 @router.post("/accounts/{account_id}/sync", response_class=HTMLResponse)
 async def sync_account_view(
     request: Request,

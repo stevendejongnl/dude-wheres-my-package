@@ -158,6 +158,41 @@ class PackageRepository:
         await self.db.commit()
         return cursor.rowcount > 0
 
+    async def update_account(
+        self,
+        account_id: int,
+        tokens: dict,
+        username: str | None = None,
+        lookback_days: int = 30,
+    ) -> bool:
+        """Update an existing account's credentials and settings.
+
+        Overwrites tokens, username, and lookback_days; resets status to
+        'connected' and clears status_message (callers reach this method only
+        after a successful Test). Leaves carrier, auth_type, created_at, and
+        last_synced untouched. Returns True if a row was updated, False if the
+        account_id was not found. Re-raises aiosqlite.IntegrityError from the
+        UNIQUE(carrier, username) constraint as ValueError so views can render
+        a friendly error.
+        """
+        now = datetime.now(UTC).isoformat()
+        tokens_json = json.dumps(tokens)
+        try:
+            cursor = await self.db.execute(
+                """UPDATE accounts
+                   SET tokens = ?, username = ?, lookback_days = ?,
+                       status = 'connected', status_message = NULL,
+                       updated_at = ?
+                   WHERE id = ?""",
+                (tokens_json, username, lookback_days, now, account_id),
+            )
+            await self.db.commit()
+        except aiosqlite.IntegrityError:
+            raise ValueError(
+                "Another account with that username already exists for this carrier",
+            )
+        return cursor.rowcount > 0
+
     async def update_account_tokens(
         self, account_id: int, tokens: dict
     ) -> None:

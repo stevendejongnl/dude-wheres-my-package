@@ -1,9 +1,25 @@
-<form class="add-form" id="add-form-{{ carrier }}-form">
+{#
+  DPD form — used for both Add and Edit.
+
+  Context:
+    carrier   — "dpd"
+    account   — optional; when present, form is in Edit mode and pre-fills
+                access_token (cookies JSON or HTML snapshot), user_agent,
+                and lookback_days.
+    base_path — reverse-proxy prefix
+#}
+{% set form_id = ("edit-" ~ account.id) if account else carrier %}
+{% set save_url = ("/accounts/" ~ account.id ~ "/edit/save") if account else ("/accounts/add/" ~ carrier ~ "/save") %}
+{% set cancel_url = ("/accounts/" ~ account.id ~ "/edit/cancel") if account else ("/accounts/add/" ~ carrier ~ "/cancel") %}
+{% set cancel_target = ("#edit-form-" ~ account.id) if account else ("#add-form-" ~ carrier) %}
+{% set title_verb = "Edit" if account else "Connect" %}
+{% set tokens = account.tokens if account else {} %}
+<form class="add-form" id="add-form-{{ form_id }}-form">
   <div class="form-header">
-    <h3>Connect DPD</h3>
+    <h3>{{ title_verb }} DPD</h3>
     <button type="button" class="btn btn-ghost btn-sm"
-      hx-get="{{ base_path }}/accounts/add/{{ carrier }}/cancel"
-      hx-target="#add-form-{{ carrier }}"
+      hx-get="{{ base_path }}{{ cancel_url }}"
+      hx-target="{{ cancel_target }}"
       hx-swap="innerHTML">Cancel</button>
   </div>
 
@@ -35,18 +51,19 @@
   </details>
 
   <div class="form-group">
-    <label for="access-token-{{ carrier }}">Cookies JSON or page HTML</label>
-    <textarea id="access-token-{{ carrier }}" name="access_token" rows="8"
+    <label for="access-token-{{ form_id }}">Cookies JSON or page HTML</label>
+    <textarea id="access-token-{{ form_id }}" name="access_token" rows="8"
       required spellcheck="false" autocomplete="off"
-      placeholder='[{"name":"cf_clearance", ...}]  or  <!DOCTYPE html>...'></textarea>
+      placeholder='[{"name":"cf_clearance", ...}]  or  <!DOCTYPE html>...'>{{ tokens.access_token or '' }}</textarea>
     <small class="form-help">DWMP detects the format automatically: starts with <code>[</code> = cookies, starts with <code>&lt;</code> = HTML.</small>
   </div>
 
   <div class="form-group">
-    <label for="user-agent-{{ carrier }}">Browser user-agent <span class="form-optional">(recommended for cookies mode)</span></label>
-    <input type="text" id="user-agent-{{ carrier }}" name="user_agent"
+    <label for="user-agent-{{ form_id }}">Browser user-agent <span class="form-optional">(recommended for cookies mode)</span></label>
+    <input type="text" id="user-agent-{{ form_id }}" name="user_agent"
       spellcheck="false" autocomplete="off"
-      placeholder="Mozilla/5.0 ...">
+      placeholder="Mozilla/5.0 ..."
+      value="{{ tokens.user_agent or '' }}">
     <small class="form-help">
       In DevTools Console: <code>copy(navigator.userAgent)</code>.
       Cloudflare binds <code>cf_clearance</code> to the UA that received it — a mismatch invalidates the cookie.
@@ -54,29 +71,30 @@
   </div>
 
   <div class="form-group">
-    <label for="lookback-{{ carrier }}">Look back (days)</label>
-    <input type="number" id="lookback-{{ carrier }}" name="lookback_days" value="30" min="1" max="365">
+    <label for="lookback-{{ form_id }}">Look back (days)</label>
+    <input type="number" id="lookback-{{ form_id }}" name="lookback_days"
+      value="{{ account.lookback_days if account else 30 }}" min="1" max="365">
   </div>
 
-  <div id="test-result-{{ carrier }}"></div>
+  <div id="test-result-{{ form_id }}"></div>
 
   <div class="form-actions">
     <button type="button" class="btn btn-ghost"
       hx-post="{{ base_path }}/accounts/add/{{ carrier }}/test"
       hx-include="closest form"
-      hx-target="#test-result-{{ carrier }}"
-      hx-indicator="#test-spinner-{{ carrier }}"
-      hx-on::after-request="this.closest('form').querySelector('.save-btn').disabled = !document.querySelector('#test-result-{{ carrier }} .test-result.ok')">
+      hx-target="#test-result-{{ form_id }}"
+      hx-indicator="#test-spinner-{{ form_id }}"
+      hx-on::after-request="this.closest('form').querySelector('.save-btn').disabled = !document.querySelector('#test-result-{{ form_id }} .test-result.ok')">
       Test connection
-      <span class="htmx-indicator" id="test-spinner-{{ carrier }}"><span class="spinner"></span></span>
+      <span class="htmx-indicator" id="test-spinner-{{ form_id }}"><span class="spinner"></span></span>
     </button>
     <button type="button" class="btn btn-primary save-btn" disabled
-      hx-post="{{ base_path }}/accounts/add/{{ carrier }}/save"
+      hx-post="{{ base_path }}{{ save_url }}"
       hx-include="closest form"
-      hx-target="#test-result-{{ carrier }}"
-      hx-indicator="#save-spinner-{{ carrier }}">
+      hx-target="#test-result-{{ form_id }}"
+      hx-indicator="#save-spinner-{{ form_id }}">
       Save
-      <span class="htmx-indicator" id="save-spinner-{{ carrier }}"><span class="spinner"></span></span>
+      <span class="htmx-indicator" id="save-spinner-{{ form_id }}"><span class="spinner"></span></span>
     </button>
   </div>
 </form>

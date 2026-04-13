@@ -206,6 +206,56 @@ class TrackingService:
         assert account is not None
         return account
 
+    async def update_account_credentials(
+        self,
+        account_id: int,
+        carrier_name: str,
+        username: str,
+        password: str,
+        lookback_days: int = 30,
+        totp_secret: str | None = None,
+    ) -> dict:
+        """Re-validate credentials and update an existing account in place."""
+        tokens = await self.validate_account_credentials(
+            carrier_name, username, password, totp_secret=totp_secret,
+        )
+        updated = await self._repository.update_account(
+            account_id=account_id,
+            tokens=asdict(tokens),
+            username=username,
+            lookback_days=lookback_days,
+        )
+        if not updated:
+            raise ValueError(f"Account {account_id} not found")
+        account = await self._repository.get_account(account_id)
+        assert account is not None
+        return account
+
+    async def update_account_manual_token(
+        self,
+        account_id: int,
+        carrier_name: str,
+        access_token: str,
+        refresh_token: str | None = None,
+        lookback_days: int = 30,
+        user_agent: str | None = None,
+    ) -> dict:
+        """Re-validate a manual token and update an existing account in place."""
+        tokens = await self.validate_account_manual_token(
+            carrier_name, access_token, refresh_token, user_agent=user_agent,
+        )
+        updated = await self._repository.update_account(
+            account_id=account_id,
+            tokens=asdict(tokens),
+            username=None,
+            lookback_days=lookback_days,
+        )
+        if not updated:
+            raise ValueError(f"Account {account_id} not found")
+        account = await self._repository.get_account(account_id)
+        assert account is not None
+        return account
+
     async def list_accounts(self) -> list[dict]:
         return await self._repository.list_accounts()
 

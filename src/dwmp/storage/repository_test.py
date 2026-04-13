@@ -149,6 +149,64 @@ async def test_update_account_tokens(repo: PackageRepository):
     assert account["tokens"]["access_token"] == "new"
 
 
+async def test_update_account_preserves_identity_and_resets_status(repo: PackageRepository):
+    """update_account overwrites tokens/username/lookback, resets status to 'connected',
+    clears status_message, and leaves carrier/auth_type/created_at/last_synced alone."""
+    account_id = await repo.add_account(
+        carrier="dpd", auth_type="manual_token",
+        tokens={"access_token": "old_cookies", "user_agent": "old-UA"},
+        username=None, lookback_days=30,
+    )
+    # Put the account into a bad state to prove update clears it
+    await repo.update_account_status(account_id, "auth_failed", "Cookies expired")
+    await repo.update_account_last_synced(account_id)
+    original = await repo.get_account(account_id)
+    assert original["status"] == "auth_failed"
+    assert original["last_synced"] is not None
+
+    updated = await repo.update_account(
+        account_id,
+        tokens={"access_token": "new_cookies", "user_agent": "new-UA"},
+        username=None,
+        lookback_days=7,
+    )
+    assert updated is True
+
+    after = await repo.get_account(account_id)
+    assert after["tokens"]["access_token"] == "new_cookies"
+    assert after["tokens"]["user_agent"] == "new-UA"
+    assert after["lookback_days"] == 7
+    assert after["status"] == "connected"
+    assert after["status_message"] is None
+    # Untouched fields
+    assert after["carrier"] == "dpd"
+    assert after["auth_type"] == "manual_token"
+    assert after["created_at"] == original["created_at"]
+    assert after["last_synced"] == original["last_synced"]
+
+
+async def test_update_account_missing_returns_false(repo: PackageRepository):
+    updated = await repo.update_account(99999, tokens={"access_token": "x"})
+    assert updated is False
+
+
+async def test_update_account_username_collision_raises(repo: PackageRepository):
+    """Changing username to one already used by another account on the same carrier
+    must raise ValueError (re-wrapped from aiosqlite.IntegrityError)."""
+    await repo.add_account(
+        carrier="amazon", auth_type="credentials",
+        tokens={"access_token": "a"}, username="first@example.com",
+    )
+    second = await repo.add_account(
+        carrier="amazon", auth_type="credentials",
+        tokens={"access_token": "b"}, username="second@example.com",
+    )
+    with pytest.raises(ValueError, match="already exists"):
+        await repo.update_account(
+            second, tokens={"access_token": "b2"}, username="first@example.com",
+        )
+
+
 async def test_update_account_status(repo: PackageRepository):
     account_id = await repo.add_account(carrier="postnl", auth_type="oauth")
     await repo.update_account_status(
