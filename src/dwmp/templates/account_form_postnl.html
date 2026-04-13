@@ -14,6 +14,10 @@
 {% set title_verb = "Edit" if account else "Connect" %}
 {% set tokens = account.tokens if account else {} %}
 <form class="add-form" id="add-form-{{ form_id }}-form">
+  {% with loading_label = "Verifying PostNL token…" %}
+  {% include "_form_loader.html" %}
+  {% endwith %}
+  <div class="form-body">
   <div class="form-header">
     <h3>{{ title_verb }} PostNL</h3>
     <button type="button" class="btn btn-ghost btn-sm"
@@ -77,5 +81,6 @@
       Save
       <span class="htmx-indicator" id="save-spinner-{{ form_id }}"><span class="spinner"></span></span>
     </button>
+  </div>
   </div>
 </form>

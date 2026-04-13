@@ -12,6 +12,10 @@
   hx-swap="innerHTML">
   <div class="modal" onclick="event.stopPropagation()">
     <form class="add-form" id="track-package-form">
+      {% with loading_label = "Fetching tracking info…" %}
+      {% include "_form_loader.html" %}
+      {% endwith %}
+      <div class="form-body">
       <div class="form-header">
         <h3>Track a package</h3>
         <button type="button" class="btn btn-ghost btn-sm"
@@ -70,6 +74,7 @@
           Add
           <span class="htmx-indicator" id="track-spinner"><span class="spinner"></span></span>
         </button>
+      </div>
       </div>
     </form>
   </div>

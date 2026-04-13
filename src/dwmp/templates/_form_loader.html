@@ -1,0 +1,12 @@
+{#
+  Full-form loader overlay. Shown whenever a button inside .add-form is in the
+  middle of an HTMX request (see .add-form:has(button.htmx-request) in base.html).
+  Blurs the form body and centers a spinner + label. No JavaScript needed.
+
+  Context (optional):
+    loading_label — short text under the spinner. Defaults to "Working…".
+#}
+<div class="form-loading-overlay" aria-live="polite" aria-busy="true">
+  <span class="spinner spinner-lg" aria-hidden="true"></span>
+  <span class="form-loading-label">{{ loading_label | default("Working…") }}</span>
+</div>
