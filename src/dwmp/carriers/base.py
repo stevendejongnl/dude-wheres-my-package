@@ -55,6 +55,17 @@ class TrackingResult:
     status: TrackingStatus
     estimated_delivery: datetime | None = None
     events: list[TrackingEvent] = field(default_factory=list)
+    # Destination postal code discovered during an authenticated sync.
+    # Persisted on the package row so that once the carrier's account list
+    # drops the parcel, the unified refresh loop can still call public
+    # track(tn, postal_code=...) for carriers that require it (PostNL, GLS).
+    postal_code: str | None = None
+    # Direct public-tracking URL captured during an authenticated sync.
+    # Used by carriers where (tracking_number, postal_code) alone is not
+    # enough — notably Amazon, whose per-parcel share token is only visible
+    # on the authenticated orders page and must be captured at discovery time
+    # for unauthenticated refreshes to work afterwards.
+    tracking_url: str | None = None
 
 
 @dataclass(frozen=True)

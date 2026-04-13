@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -40,6 +41,22 @@ fragment parcelShipment on TrackedShipmentResultType {
   creationDateTime
 }
 """
+
+# detailsUrl from the GraphQL response looks like
+#   https://jouw.postnl.nl/track-and-trace/{barcode}/{postal_code}/{country}[/...]
+# We mine the postal code from it so the unified refresh loop can still call
+# public track() once the parcel drops off the authenticated account list.
+_DETAILS_URL_POSTAL_CODE_RE = re.compile(
+    r"/track-and-trace/[^/]+/([A-Za-z0-9]{4,10})/[A-Z]{2}"
+)
+
+
+def _postal_code_from_details_url(details_url: str | None) -> str | None:
+    if not details_url:
+        return None
+    match = _DETAILS_URL_POSTAL_CODE_RE.search(details_url)
+    return match.group(1) if match else None
+
 
 # Ordered most-specific first to avoid partial matches
 STATUS_MAP: list[tuple[str, TrackingStatus]] = [
@@ -186,6 +203,7 @@ class PostNL(CarrierBase):
             status=status,
             estimated_delivery=estimated,
             events=sorted(events, key=lambda e: e.timestamp),
+            postal_code=_postal_code_from_details_url(shipment.get("detailsUrl")),
         )
 
     def _parse_json(self, tracking_number: str, data: dict) -> TrackingResult:

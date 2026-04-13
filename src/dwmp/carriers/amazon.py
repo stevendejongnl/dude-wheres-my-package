@@ -20,6 +20,17 @@ logger = logging.getLogger(__name__)
 
 AMAZON_BASE = "https://www.amazon.nl"
 AMAZON_ORDERS_URL = f"{AMAZON_BASE}/your-orders/orders"
+# Public share-tracking endpoint. Accessible without login when called with
+# `unauthenticated=1&shareToken=<tok>`. The short-link domain `amzn.eu/d/<id>`
+# 301s here. We extract either form during sync and store it as tracking_url.
+AMAZON_SHARE_TRACKER_PREFIX = f"{AMAZON_BASE}/progress-tracker/package/share"
+
+# Links on the orders page that surface the public shareable tracker.
+# Matches both the short domain and the full tracker path.
+_SHARE_LINK_PATTERNS = (
+    "progress-tracker/package/share",
+    "amzn.eu/d/",
+)
 
 # Dutch and English status texts from Amazon order pages.
 # Ordered most-specific first to avoid partial matches
@@ -230,10 +241,111 @@ class Amazon(CarrierBase):
         return html
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        """Public tracking via the `share` endpoint.
+
+        Amazon has no public (tracking_number → status) lookup — the order ID
+        alone isn't a carrier-portal tracking number. But the orders page
+        exposes a per-parcel shareable URL that renders without login. Sync
+        captures that URL as `tracking_url`; this method fetches it.
+
+        If no `tracking_url` is available we return UNKNOWN with no events —
+        the TrackingService downgrade safeguard preserves any prior status.
+        """
+        tracking_url = kwargs.get("tracking_url") or ""
+        if not tracking_url:
+            return TrackingResult(
+                tracking_number=tracking_number,
+                carrier=self.name,
+                status=TrackingStatus.UNKNOWN,
+            )
+
+        async with self._get_client() as client:
+            try:
+                response = await client.get(
+                    tracking_url,
+                    headers={
+                        "User-Agent": (
+                            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                            "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+                        ),
+                        "Accept": "text/html",
+                        "Accept-Language": "nl-NL,nl;q=0.9",
+                    },
+                    follow_redirects=True,
+                    timeout=15,
+                )
+            except httpx.HTTPError as exc:
+                logger.debug("Amazon share-track fetch failed: %s", exc)
+                return TrackingResult(
+                    tracking_number=tracking_number,
+                    carrier=self.name,
+                    status=TrackingStatus.UNKNOWN,
+                )
+
+        if response.status_code != 200:
+            logger.debug(
+                "Amazon share-track returned %s for %s",
+                response.status_code, tracking_url,
+            )
+            return TrackingResult(
+                tracking_number=tracking_number,
+                carrier=self.name,
+                status=TrackingStatus.UNKNOWN,
+            )
+
+        return self._parse_share_tracker(tracking_number, response.text)
+
+    def _parse_share_tracker(
+        self, tracking_number: str, html: str
+    ) -> TrackingResult:
+        """Parse the public progress-tracker share page.
+
+        The page is server-rendered enough that the primary status line is
+        present in the initial HTML response. Status copy is the same Dutch
+        phrasing as the authenticated orders page, so STATUS_MAP still applies.
+        """
+        soup = BeautifulSoup(html, "lxml")
+
+        # The primary status headline lives in #primaryStatus or a similar
+        # wrapper. Fall back to scanning the whole body for known phrases.
+        status_el = soup.select_one(
+            "#primaryStatus, [data-testid='primary-status'], "
+            ".pt-delivery-card-primary-status, .pt-primary-status"
+        )
+        status_text = status_el.get_text(" ", strip=True) if status_el else ""
+        status = _parse_status(status_text) if status_text else TrackingStatus.UNKNOWN
+
+        if status == TrackingStatus.UNKNOWN:
+            body_text = soup.get_text(" ", strip=True)
+            status = _parse_status(body_text)
+            if not status_text:
+                status_text = body_text[:200]
+
+        events: list[TrackingEvent] = []
+        for item in soup.select(
+            ".milestone-list li, .pt-tracking-event, [data-testid='tracking-event']"
+        ):
+            text = item.get_text(" ", strip=True)
+            if not text:
+                continue
+            events.append(TrackingEvent(
+                timestamp=datetime.now(UTC),
+                status=_parse_status(text),
+                description=text,
+            ))
+
+        if not events and status != TrackingStatus.UNKNOWN:
+            events.append(TrackingEvent(
+                timestamp=datetime.now(UTC),
+                status=status,
+                description=status_text or status.value,
+            ))
+
         return TrackingResult(
             tracking_number=tracking_number,
             carrier=self.name,
-            status=TrackingStatus.UNKNOWN,
+            status=status,
+            events=events,
         )
 
     def _get_client(self):
@@ -284,6 +396,13 @@ class Amazon(CarrierBase):
         if not order_match:
             return None
         order_id = order_match.group()
+
+        # Harvest the public "Track package" share URL if Amazon exposes one
+        # on this card. Present only for shipped/in-flight orders, missing for
+        # digital / not-yet-shipped / delivered-long-ago orders — in those
+        # cases we still persist the package with just the order ID and fall
+        # back to sync-only status updates.
+        tracking_url = _extract_share_url(card)
 
         # --- delivery status ---
         status = TrackingStatus.UNKNOWN
@@ -368,7 +487,27 @@ class Amazon(CarrierBase):
             status=status,
             estimated_delivery=estimated,
             events=sorted(events, key=lambda e: e.timestamp),
+            tracking_url=tracking_url,
         )
+
+
+def _extract_share_url(card: object) -> str | None:
+    """Find a public Amazon share-tracking URL inside an order card.
+
+    Matches both `/progress-tracker/package/share?...` (same-host) and the
+    `amzn.eu/d/...` short links (which 301 to the same tracker). Returns the
+    absolute URL or None if the card has no shareable tracking link.
+    """
+    for link in card.select("a[href]"):  # type: ignore[union-attr]
+        href = link.get("href") or ""
+        if not any(pattern in href for pattern in _SHARE_LINK_PATTERNS):
+            continue
+        if href.startswith("http"):
+            return href
+        if href.startswith("/"):
+            return f"{AMAZON_BASE}{href}"
+        return f"{AMAZON_BASE}/{href.lstrip('/')}"
+    return None
 
 
 async def _playwright_login_and_capture(

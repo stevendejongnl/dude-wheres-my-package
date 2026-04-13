@@ -7,6 +7,7 @@ from dwmp.carriers.base import (
     AuthType,
     CarrierAuthError,
     CarrierBase,
+    TrackingStatus,
 )
 from dwmp.storage.repository import PackageRepository
 
@@ -322,8 +323,23 @@ class TrackingService:
                 pkg_id = await self._repository.add_package(
                     tracking_number=result.tracking_number,
                     carrier=result.carrier,
+                    postal_code=result.postal_code,
                     account_id=account_id,
                     source="account",
+                    tracking_url=result.tracking_url,
+                )
+
+            # Backfill postal_code / tracking_url onto pre-existing rows when
+            # discovery newly surfaces them. Without this, packages added before
+            # the carrier started capturing these fields would never benefit
+            # from public-track fallback once they drop off the account list.
+            if result.postal_code and existing and not existing.get("postal_code"):
+                await self._repository.update_package_postal_code(
+                    pkg_id, result.postal_code
+                )
+            if result.tracking_url and existing and not existing.get("tracking_url"):
+                await self._repository.update_package_tracking_url(
+                    pkg_id, result.tracking_url
                 )
 
             await self._update_package_status(
@@ -390,8 +406,27 @@ class TrackingService:
 
         result = await carrier.track(
             pkg["tracking_number"],
-            postal_code=pkg.get("postal_code", ""),
+            postal_code=pkg.get("postal_code") or "",
+            tracking_url=pkg.get("tracking_url") or "",
         )
+
+        # Downgrade safeguard: a public track() that returns UNKNOWN with no
+        # events means the carrier couldn't resolve the package (missing
+        # postal_code, unimplemented endpoint, transient error). Don't let that
+        # overwrite a good status from a prior sync — just bump last_refreshed_at
+        # so the scheduler won't retry it immediately.
+        is_empty_result = (
+            result.status == TrackingStatus.UNKNOWN
+            and not result.events
+        )
+        stored_status = pkg.get("current_status", TrackingStatus.UNKNOWN.value)
+        if is_empty_result and stored_status != TrackingStatus.UNKNOWN.value:
+            await self._repository.mark_refreshed(package_id)
+            logger.debug(
+                "Preserved status for package %s (%s): track() returned empty UNKNOWN",
+                package_id, pkg["carrier"],
+            )
+            return await self.get_package(package_id)
 
         await self._update_package_status(
             package_id, result.status.value,

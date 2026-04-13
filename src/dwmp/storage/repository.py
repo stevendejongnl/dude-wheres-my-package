@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS packages (
     source TEXT NOT NULL DEFAULT 'manual',
     current_status TEXT NOT NULL DEFAULT 'unknown',
     estimated_delivery TEXT,
+    last_refreshed_at TEXT,
+    tracking_url TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE(tracking_number, carrier)
@@ -101,6 +103,24 @@ class PackageRepository:
                     ALTER TABLE notifications_new RENAME TO notifications;
                 """)
                 break
+
+        # v1.20: add packages.last_refreshed_at for unified-refresh scheduling,
+        # plus packages.tracking_url as the escape hatch for carriers whose
+        # public tracking lookup needs more than (tracking_number, postal_code)
+        # — notably Amazon, where the per-parcel share token only surfaces on
+        # the authenticated orders page and must be captured at discovery time.
+        cursor = await self.db.execute("PRAGMA table_info(packages)")
+        cols = {col["name"] for col in await cursor.fetchall()}
+        if "last_refreshed_at" not in cols:
+            await self.db.execute(
+                "ALTER TABLE packages ADD COLUMN last_refreshed_at TEXT"
+            )
+            await self.db.commit()
+        if "tracking_url" not in cols:
+            await self.db.execute(
+                "ALTER TABLE packages ADD COLUMN tracking_url TEXT"
+            )
+            await self.db.commit()
 
     @property
     def db(self) -> aiosqlite.Connection:
@@ -231,14 +251,15 @@ class PackageRepository:
         postal_code: str | None = None,
         account_id: int | None = None,
         source: str = "manual",
+        tracking_url: str | None = None,
     ) -> int:
         now = datetime.now(UTC).isoformat()
         try:
             cursor = await self.db.execute(
                 """INSERT INTO packages
-                   (tracking_number, carrier, label, postal_code, account_id, source, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (tracking_number, carrier, label, postal_code, account_id, source, now, now),
+                   (tracking_number, carrier, label, postal_code, account_id, source, tracking_url, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (tracking_number, carrier, label, postal_code, account_id, source, tracking_url, now, now),
             )
             await self.db.commit()
             assert cursor.lastrowid is not None
@@ -282,10 +303,59 @@ class PackageRepository:
         return cursor.rowcount > 0
 
     async def update_status(self, package_id: int, status: str) -> None:
+        """Update current_status, updated_at, and last_refreshed_at in one go.
+
+        Writing last_refreshed_at here (rather than exposing a separate method)
+        means every successful status read — whether via sync_packages or
+        track() — is recorded as a refresh. The scheduler uses this to avoid
+        calling track() on packages an account sync just wrote.
+        """
         now = datetime.now(UTC).isoformat()
         await self.db.execute(
-            "UPDATE packages SET current_status = ?, updated_at = ? WHERE id = ?",
-            (status, now, package_id),
+            "UPDATE packages SET current_status = ?, updated_at = ?, last_refreshed_at = ? WHERE id = ?",
+            (status, now, now, package_id),
+        )
+        await self.db.commit()
+
+    async def update_package_tracking_url(
+        self, package_id: int, tracking_url: str
+    ) -> None:
+        """Backfill tracking_url on a package row (discovery started capturing one)."""
+        now = datetime.now(UTC).isoformat()
+        await self.db.execute(
+            "UPDATE packages SET tracking_url = ?, updated_at = ? WHERE id = ?",
+            (tracking_url, now, package_id),
+        )
+        await self.db.commit()
+
+    async def update_package_postal_code(
+        self, package_id: int, postal_code: str
+    ) -> None:
+        """Backfill postal_code on a package row.
+
+        Used during account sync when the carrier now surfaces a postal_code
+        it didn't before (e.g. a PostNL parcel whose detailsUrl we only
+        started mining after v1.20). No-ops if the value is unchanged.
+        """
+        now = datetime.now(UTC).isoformat()
+        await self.db.execute(
+            "UPDATE packages SET postal_code = ?, updated_at = ? WHERE id = ?",
+            (postal_code, now, package_id),
+        )
+        await self.db.commit()
+
+    async def mark_refreshed(self, package_id: int) -> None:
+        """Bump last_refreshed_at without changing status.
+
+        Used when a carrier returned a result but status didn't warrant an
+        update (e.g. track() returned UNKNOWN and we chose to preserve the
+        existing status). Still counts as 'refreshed this cycle' so the
+        scheduler won't retry it immediately.
+        """
+        now = datetime.now(UTC).isoformat()
+        await self.db.execute(
+            "UPDATE packages SET last_refreshed_at = ?, updated_at = ? WHERE id = ?",
+            (now, now, package_id),
         )
         await self.db.commit()
 

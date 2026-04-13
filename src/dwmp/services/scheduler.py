@@ -1,4 +1,5 @@
 import logging
+from datetime import UTC, datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -36,7 +37,13 @@ class PackageScheduler:
         logger.info("Scheduler stopped")
 
     async def _poll_all(self) -> None:
-        # 1. Sync packages from all connected accounts
+        # Stamp the cycle start so we can tell which packages the account
+        # sync already touched this pass. Any package with last_refreshed_at
+        # >= cycle_start was just written by step 1; step 2 skips it.
+        cycle_start = datetime.now(UTC)
+
+        # 1. Sync packages from all connected accounts. This writes status and
+        #    stamps last_refreshed_at for every parcel the account still sees.
         accounts = await self._service.list_accounts()
         for account in accounts:
             if account["status"] == "auth_failed":
@@ -71,15 +78,24 @@ class PackageScheduler:
                     account["carrier"],
                 )
 
-        # 2. Refresh manually tracked packages (no account)
+        # 2. Refresh every package that the account sync didn't already touch.
+        #    This covers: (a) manual packages, (b) account-discovered packages
+        #    that fell off the carrier's account list (delivered, archived,
+        #    beyond the lookback window). Before the unified refresh, those
+        #    (b) packages stopped updating the moment the account forgot about
+        #    them — now they fall through to public track() and keep updating.
         packages = await self._service.list_packages()
-        manual_packages = [p for p in packages if p["source"] == "manual"]
+        stale = [
+            p for p in packages
+            if not _refreshed_since(p.get("last_refreshed_at"), cycle_start)
+        ]
         logger.info(
-            "Synced %d accounts, refreshing %d manual packages",
+            "Synced %d accounts, refreshing %d of %d packages via public track()",
             len(accounts),
-            len(manual_packages),
+            len(stale),
+            len(packages),
         )
-        for pkg in manual_packages:
+        for pkg in stale:
             try:
                 await self._service.refresh_package(pkg["id"])
             except Exception:
@@ -89,3 +105,21 @@ class PackageScheduler:
         deleted = await self._service.delete_old_notifications(days=30)
         if deleted:
             logger.info("Cleaned up %d old notifications", deleted)
+
+
+def _refreshed_since(last_refreshed_at: str | None, cycle_start: datetime) -> bool:
+    """True if the package was refreshed at or after cycle_start.
+
+    None/empty means 'never refreshed' and must be picked up this cycle.
+    Malformed ISO strings are treated as 'never refreshed' — better to
+    double-refresh than to silently skip.
+    """
+    if not last_refreshed_at:
+        return False
+    try:
+        ts = datetime.fromisoformat(last_refreshed_at)
+    except ValueError:
+        return False
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=UTC)
+    return ts >= cycle_start
