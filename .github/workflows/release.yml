@@ -63,14 +63,29 @@ jobs:
             echo "released=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Package Chrome extension and attach to the GitHub release
+      # Package Chrome extension (.zip + .crx) and attach to the GitHub release
+      - uses: actions/setup-node@v4
+        if: steps.release.outputs.released == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        if: steps.release.outputs.released == 'true'
+
       - name: Package Chrome extension
         if: steps.release.outputs.released == 'true'
         env:
           VERSION: ${{ steps.release.outputs.version }}
+          EXTENSION_KEY: ${{ secrets.EXTENSION_SIGNING_KEY }}
         run: |
           cd chrome-extension
           zip -r "../dwmp-chrome-extension-${VERSION}.zip" . -x "tests/*"
+          cd ..
+          if [ -n "$EXTENSION_KEY" ]; then
+            echo "$EXTENSION_KEY" > extension-key.pem
+            node scripts/pack-extension.mjs "$VERSION"
+            rm extension-key.pem
+          fi
 
       - name: Upload extension to release
         if: steps.release.outputs.released == 'true'
@@ -81,6 +96,11 @@ jobs:
           gh release upload "v${VERSION}" \
             "dwmp-chrome-extension-${VERSION}.zip" \
             --clobber
+          if [ -f "dwmp-chrome-extension-${VERSION}.crx" ]; then
+            gh release upload "v${VERSION}" \
+              "dwmp-chrome-extension-${VERSION}.crx" \
+              --clobber
+          fi
 
       # Build and push Docker image in the same job — no checkout race
       - name: Docker login

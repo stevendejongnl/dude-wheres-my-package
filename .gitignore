@@ -10,3 +10,5 @@ build/
 .playwright-mcp/
 node_modules/
 src/dwmp/static/js/
+extension-key.pem
+*.crx
