@@ -39,7 +39,7 @@
       </div>
     </div>
     <div class="account-actions">
-      {% if account.carrier == "dpd" %}
+      {% if account.carrier in ("dpd", "amazon") %}
       <button class="btn btn-ghost btn-sm"
         onclick="document.getElementById('browser-sync-modal-{{ account.id }}').style.display='flex'">
         Browser Sync
@@ -70,33 +70,34 @@
   </div>
   <div id="edit-form-{{ account.id }}" class="add-form-slot"></div>
 
-  {% if account.carrier == "dpd" %}
+  {% if account.carrier in ("dpd", "amazon") %}
+  {% set carrier_urls = {"dpd": "https://www.dpdgroup.com/nl/mydpd/my-parcels/incoming", "amazon": "https://www.amazon.nl/your-orders/orders"} %}
   <div class="modal-overlay" id="browser-sync-modal-{{ account.id }}" style="display:none;"
     onclick="if(event.target===this)this.style.display='none'">
     <div class="modal" onclick="event.stopPropagation()">
       <div class="add-form" style="border-top:none;">
         <div class="form-header">
-          <h3>Browser Sync for DPD</h3>
+          <h3>Browser Sync for {{ account.carrier | upper }}</h3>
           <button type="button" class="btn btn-ghost btn-sm"
             onclick="this.closest('.modal-overlay').style.display='none'">Close</button>
         </div>
         <p class="form-hint">
-          DPD's session cookies can't be replayed from the server. Instead, your
-          browser captures the page and sends the HTML directly to DWMP.
+          Your browser captures the page and sends the HTML directly to DWMP.
+          No cookies leave your browser — works on any carrier site.
         </p>
         <div class="wizard-steps">
           <li>Drag the button below to your <strong>bookmarks bar</strong>.</li>
-          <li>Open <a href="https://www.dpdgroup.com/nl/mydpd/my-parcels/incoming" target="_blank" rel="noopener">DPD My Parcels → Incoming</a> and make sure you're logged in.</li>
-          <li>Click the <strong>Sync DPD</strong> bookmark. Your packages sync instantly.</li>
+          <li>Open <a href="{{ carrier_urls[account.carrier] }}" target="_blank" rel="noopener">{{ account.carrier | upper }} parcels page</a> and make sure you're logged in.</li>
+          <li>Click the <strong>Sync Packages</strong> bookmark. Your packages sync instantly.</li>
         </div>
 
         <div style="text-align:center;padding:20px 0;">
           <a class="btn btn-primary" style="cursor:grab;user-select:none;font-size:0.9rem;padding:10px 24px;"
-            href="javascript:void(function(){var html=document.documentElement.outerHTML;var w=window.open('{{ dwmp_origin }}{{ base_path }}/accounts/{{ account.id }}/browser-push?token={{ api_token }}','_blank');window.addEventListener('message',function h(e){if(e.data&&e.data.type==='dwmp-relay-ready'){window.removeEventListener('message',h);w.postMessage({type:'dwmp-browser-push',html:html},'*');}});}())">
-            Sync DPD
+            href="javascript:void(function(){var html=document.documentElement.outerHTML;var url=location.href;var w=window.open('{{ dwmp_origin }}{{ base_path }}/browser-push?token={{ api_token }}','_blank');window.addEventListener('message',function h(e){if(e.data&&e.data.type==='dwmp-relay-ready'){window.removeEventListener('message',h);w.postMessage({type:'dwmp-browser-push',html:html,url:url},'*');}});}())">
+            Sync Packages
           </a>
           <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;">
-            Drag this button to your bookmarks bar
+            Drag this button to your bookmarks bar — works on Amazon, DPD, and more
           </p>
         </div>
       </div>

@@ -599,6 +599,71 @@ async def browser_push_relay(
     return HTMLResponse(page)
 
 
+# --- Universal browser-push relay ---
+
+_UNIVERSAL_RELAY_PAGE = """<!DOCTYPE html>
+<html><head><title>DWMP Sync</title><meta charset="utf-8">
+<style>
+body{font-family:system-ui;background:#1a1b2e;color:#e0e0e0;
+  display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
+.card{background:#252640;padding:40px;border-radius:16px;text-align:center;max-width:420px;}
+.ok{color:#00b894;font-size:1.8rem;font-weight:600;}
+.err{color:#d63031;font-size:1.2rem;font-weight:600;}
+.spin{color:#74b9ff;font-size:1.2rem;}
+p{color:#a0a0b0;margin-top:12px;font-size:0.9rem;line-height:1.5;}
+</style></head><body><div class="card" id="card">
+<div class="spin" id="status">Waiting for page data...</div>
+<p id="detail">The bookmarklet is sending parcel data.</p>
+</div>
+<script>
+var TOKEN = "TOKEN_PLACEHOLDER";
+var BASE = "BASE_PLACEHOLDER";
+
+window.addEventListener("message", function handler(evt) {
+  if (!evt.data || evt.data.type !== "dwmp-browser-push") return;
+  window.removeEventListener("message", handler);
+  document.getElementById("status").textContent = "Syncing...";
+  document.getElementById("detail").textContent = "Detected: " + (evt.data.url || "unknown");
+  fetch(BASE + "/api/v1/browser-push", {
+    method: "POST",
+    headers: {"Content-Type":"application/json","Authorization":"Bearer "+TOKEN},
+    body: JSON.stringify({html: evt.data.html, url: evt.data.url})
+  }).then(function(r){return r.json().then(function(d){
+    if(!r.ok) throw d.detail||r.statusText; return d;
+  })}).then(function(d){
+    document.getElementById("status").className="ok";
+    document.getElementById("status").textContent="Synced "+d.length+" package"+(d.length===1?"":"s");
+    document.getElementById("detail").textContent="You can close this tab.";
+  }).catch(function(e){
+    document.getElementById("status").className="err";
+    document.getElementById("status").textContent="Sync failed";
+    document.getElementById("detail").textContent=String(e);
+  });
+});
+
+if (window.opener) window.opener.postMessage({type:"dwmp-relay-ready"}, "*");
+</script></body></html>"""
+
+
+@router.get("/browser-push", response_class=HTMLResponse)
+async def universal_browser_push_relay(token: str = ""):
+    """Universal relay page for the browser-push bookmarklet.
+
+    Works with any supported carrier — the relay sends the source URL
+    along with the HTML so the server can detect which carrier it is.
+    """
+    if not verify_token(token):
+        return HTMLResponse(
+            "<h2>Auth failed</h2><p>The bookmarklet token has expired. "
+            "Open the Accounts page in dwmp to get a fresh one.</p>",
+            status_code=401,
+        )
+
+    page = _UNIVERSAL_RELAY_PAGE.replace("TOKEN_PLACEHOLDER", token)
+    page = page.replace("BASE_PLACEHOLDER", _PUBLIC_URL or "")
+    return HTMLResponse(page)
+
+
 # --- Package refresh view ---
 
 

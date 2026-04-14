@@ -47,6 +47,8 @@ curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
 
 **How it works:** Playwright launches headless Chromium, logs in with your credentials, navigates to the orders page, waits for JavaScript to render, and captures the HTML. The HTML is parsed for order status, dates, and tracking info. Cookies are saved so subsequent syncs skip the login step.
 
+**Recommended: Browser-push bookmarklet** — Amazon's bot detection often blocks headless login. The browser-push bookmarklet (available on the Accounts page) lets your real browser capture the orders page and send it to dwmp — no cookies leave your browser. Works with the universal **Sync Packages** bookmarklet alongside DPD.
+
 **MFA:** TOTP (authenticator app) is supported. Push notification MFA is not — switch to TOTP in your Amazon security settings if you use push-based approval.
 
 ### PostNL
@@ -123,12 +125,12 @@ DPD uses Keycloak SSO at `login.dpdgroup.com` with Cloudflare bot protection on 
 
 **Recommended: Browser-push bookmarklet**
 
-The simplest way to sync DPD parcels is via the browser-push bookmarklet:
+The simplest way to sync DPD parcels is via the universal browser-push bookmarklet:
 
 1. Open the **Accounts** page in dwmp
-2. Drag the **Browser Sync** bookmarklet to your bookmarks bar (shown next to your DPD account)
+2. Drag the **Sync Packages** bookmarklet to your bookmarks bar (shown next to your DPD or Amazon account)
 3. Log in to DPD at https://www.dpdgroup.com/nl/mydpd and navigate to **My parcels** > **Incoming**
-4. Click the bookmarklet — it captures the page HTML and sends it to dwmp via a postMessage relay
+4. Click the bookmarklet — it detects the carrier site, captures the page HTML, and sends it to dwmp
 
 The bookmarklet contains a JWT token (365-day expiry) embedded at render time, so no manual authentication is needed.
 
@@ -285,8 +287,10 @@ GET    /api/v1/accounts                   # List connected accounts (tokens stri
 GET    /api/v1/accounts/{id}              # Account details
 DELETE /api/v1/accounts/{id}              # Disconnect account
 POST   /api/v1/accounts/{id}/sync         # Force sync packages from account
-POST   /api/v1/accounts/{id}/browser-push # Accept raw HTML for parsing (bookmarklet)
-GET    /api/v1/accounts/{id}/browser-push?token=...  # Relay page for bookmarklet postMessage
+POST   /api/v1/accounts/{id}/browser-push # Accept raw HTML for parsing (per-account bookmarklet)
+GET    /api/v1/accounts/{id}/browser-push?token=...  # Per-account relay page
+POST   /api/v1/browser-push               # Universal browser-push (auto-detects carrier from URL)
+GET    /browser-push?token=...             # Universal relay page for bookmarklet
 ```
 
 ### Packages

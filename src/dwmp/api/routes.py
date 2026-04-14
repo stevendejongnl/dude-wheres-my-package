@@ -230,6 +230,67 @@ class BrowserPushRequest(BaseModel):
     html: str
 
 
+class UniversalBrowserPushRequest(BaseModel):
+    html: str
+    url: str
+
+
+# URL hostname → carrier name mapping for universal browser-push.
+_URL_CARRIER_MAP: list[tuple[str, str]] = [
+    ("amazon.nl", "amazon"),
+    ("amazon.com", "amazon"),
+    ("amazon.de", "amazon"),
+    ("dpdgroup.com", "dpd"),
+    ("dpd.nl", "dpd"),
+    ("postnl.nl", "postnl"),
+    ("dhlecommerce.nl", "dhl"),
+    ("dhl.nl", "dhl"),
+    ("dhl.com", "dhl"),
+]
+
+
+@router.post("/browser-push")
+async def universal_browser_push(
+    body: UniversalBrowserPushRequest,
+    service: TrackingService = Depends(get_tracking_service),
+) -> list[dict]:
+    """Universal browser-push: detect carrier from URL, find account, sync.
+
+    The universal bookmarklet sends {html, url}. We map the URL to a carrier,
+    find the account, and sync.
+    """
+    from urllib.parse import urlparse
+    hostname = urlparse(body.url).hostname or ""
+
+    carrier_name = None
+    for domain, carrier in _URL_CARRIER_MAP:
+        if hostname == domain or hostname.endswith("." + domain):
+            carrier_name = carrier
+            break
+
+    if not carrier_name:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown carrier site: {hostname}. "
+            f"Supported: Amazon, DPD, PostNL, DHL.",
+        )
+
+    account = await service.find_account_by_carrier(carrier_name)
+    if not account:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No {carrier_name} account connected. "
+            f"Add one in the Accounts page first.",
+        )
+
+    try:
+        return await service.sync_account_from_html(account["id"], body.html)
+    except CarrierAuthError as exc:
+        raise HTTPException(status_code=502, detail=exc.message)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @router.post("/accounts/{account_id}/browser-push")
 async def browser_push(
     account_id: int,
@@ -239,7 +300,7 @@ async def browser_push(
     """Accept raw HTML captured by the user's browser and sync from it.
 
     Called by the browser-push relay page (same-origin) after receiving
-    the HTML via postMessage from the bookmarklet on dpdgroup.com.
+    the HTML via postMessage from the bookmarklet on the carrier site.
     """
     try:
         return await service.sync_account_from_html(account_id, body.html)

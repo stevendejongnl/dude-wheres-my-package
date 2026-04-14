@@ -449,6 +449,12 @@ class Amazon(CarrierBase):
             return _noop_ctx(self._client)
         return httpx.AsyncClient()
 
+    def _parse_parcels_page(
+        self, html: str, lookback_days: int = 30
+    ) -> list[TrackingResult]:
+        """Alias for browser-push compatibility (same interface as DPD)."""
+        return self._parse_orders_page(html, lookback_days)
+
     def _parse_orders_page(
         self, html: str, lookback_days: int = 30
     ) -> list[TrackingResult]:

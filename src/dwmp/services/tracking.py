@@ -275,6 +275,14 @@ class TrackingService:
         assert account is not None
         return account
 
+    async def find_account_by_carrier(self, carrier_name: str) -> dict | None:
+        """Find the first connected account for a carrier."""
+        accounts = await self._repository.list_accounts()
+        for acct in accounts:
+            if acct["carrier"] == carrier_name:
+                return acct
+        return None
+
     async def list_accounts(self) -> list[dict]:
         return await self._repository.list_accounts()
 
