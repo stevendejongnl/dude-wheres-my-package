@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.31.5 (2026-04-14)
+
+### Bug Fixes
+
+- **amazon**: Preserve credentials on cookie update, enrich timeline via share tracker
+  ([`8f74e4a`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/8f74e4a904591cb055708482092e4363641e560a))
+
+
 ## v1.31.4 (2026-04-14)
 
 ### Bug Fixes
