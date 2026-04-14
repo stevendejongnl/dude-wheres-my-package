@@ -40,7 +40,48 @@
         Refresh
         <span class="htmx-indicator"><span class="spinner"></span></span>
       </button>
+      <button class="btn btn-danger btn-sm"
+        hx-delete="{{ base_path }}/api/v1/packages/{{ pkg.id }}"
+        hx-target="#pkg-{{ pkg.id }}"
+        hx-swap="outerHTML"
+        hx-confirm="Stop tracking this package?">
+        Delete
+      </button>
     </div>
+
+    <details class="pkg-metadata">
+      <summary>Details</summary>
+      <div class="pkg-metadata-grid">
+        <span class="meta-label">Source</span>
+        <span class="meta-value">{{ pkg.source or 'manual' }}</span>
+        {% if pkg.postal_code %}
+        <span class="meta-label">Postal code</span>
+        <span class="meta-value"><code>{{ pkg.postal_code }}</code></span>
+        {% else %}
+        <span class="meta-label">Postal code</span>
+        <span class="meta-value meta-missing">not set</span>
+        {% endif %}
+        {% if pkg.tracking_url %}
+        <span class="meta-label">Tracking URL</span>
+        <span class="meta-value"><a href="{{ pkg.tracking_url }}" target="_blank" rel="noopener">{{ pkg.tracking_url[:60] }}{% if pkg.tracking_url|length > 60 %}…{% endif %}</a></span>
+        {% endif %}
+        {% if pkg.account_id %}
+        <span class="meta-label">Account</span>
+        <span class="meta-value">#{{ pkg.account_id }}</span>
+        {% endif %}
+        {% if pkg.estimated_delivery %}
+        <span class="meta-label">ETA</span>
+        <span class="meta-value">{{ pkg.estimated_delivery[:16] | replace('T', ' ') }}</span>
+        {% endif %}
+        <span class="meta-label">Last refreshed</span>
+        <span class="meta-value">{{ pkg.last_refreshed_at[:16] | replace('T', ' ') if pkg.last_refreshed_at else 'never' }}</span>
+        <span class="meta-label">Created</span>
+        <span class="meta-value">{{ pkg.created_at[:16] | replace('T', ' ') }}</span>
+        <span class="meta-label">Updated</span>
+        <span class="meta-value">{{ pkg.updated_at[:16] | replace('T', ' ') }}</span>
+      </div>
+    </details>
+
     {% if pkg.events %}
     <div class="timeline">
       {% for event in pkg.events | reverse %}

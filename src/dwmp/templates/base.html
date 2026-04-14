@@ -130,6 +130,30 @@
       transition: opacity 0.15s ease-out;
     }
 
+    /* Package metadata */
+    .pkg-metadata {
+      margin: 8px 0; border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px 10px; font-size: 0.78rem;
+    }
+    .pkg-metadata summary {
+      cursor: pointer; color: var(--text-dim); font-size: 0.75rem;
+      padding: 2px 0; list-style: revert;
+    }
+    .pkg-metadata[open] summary { margin-bottom: 8px; }
+    .pkg-metadata-grid {
+      display: grid; grid-template-columns: auto 1fr;
+      gap: 4px 12px; align-items: baseline;
+    }
+    .meta-label { color: var(--text-dim); font-weight: 500; white-space: nowrap; }
+    .meta-value { word-break: break-all; }
+    .meta-value code {
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.75rem;
+      background: var(--surface); padding: 1px 5px; border-radius: 4px;
+    }
+    .meta-value a { color: var(--accent); text-decoration: none; }
+    .meta-value a:hover { text-decoration: underline; }
+    .meta-missing { color: var(--text-dim); font-style: italic; }
+
     /* Timeline */
     .timeline { padding: 12px 0 4px; }
     .timeline-event {
