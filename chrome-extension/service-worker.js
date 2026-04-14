@@ -1,5 +1,11 @@
-import { browserPush, checkForUpdate, isConfigured, listAccounts } from "./lib/api.js";
-import { CARRIER_SYNC_URLS } from "./lib/carriers.js";
+import {
+  browserPush,
+  checkForUpdate,
+  getAccountCredentials,
+  isConfigured,
+  listAccounts,
+} from "./lib/api.js";
+import { CARRIER_LOGIN_PATTERNS, CARRIER_SYNC_URLS } from "./lib/carriers.js";
 
 const DEFAULT_SYNC_INTERVAL_MIN = 60;
 const RENDER_WAIT_MS = 5_000;
@@ -68,6 +74,17 @@ async function syncCarrierViaTab(account) {
     return;
   }
 
+  // Carriers with login patterns (e.g. DPD) require stored credentials
+  // so the extension can fill in the login form automatically.
+  if (CARRIER_LOGIN_PATTERNS[account.carrier] && !account.has_credentials) {
+    await storeSyncResult(
+      account.id,
+      false,
+      "No credentials configured -- add them in the DWMP dashboard",
+    );
+    return;
+  }
+
   let tabId = null;
   let shouldCloseTab = true;
 
@@ -86,6 +103,17 @@ async function syncCarrierViaTab(account) {
     }
 
     await waitForTabLoad(tabId);
+
+    // If the tab landed on a login page, fill credentials and submit
+    const tabInfo = await chrome.tabs.get(tabId);
+    if (isCarrierLoginPage(account.carrier, tabInfo.url)) {
+      const loggedIn = await handleCarrierLogin(tabId, account);
+      if (!loggedIn) {
+        await storeSyncResult(account.id, false, "Login failed -- check credentials");
+        return;
+      }
+    }
+
     await sleep(RENDER_WAIT_MS);
 
     const html = await captureTabHtml(tabId);
@@ -152,6 +180,80 @@ function isCloudflareChallenge(html) {
     lower.includes("checking your browser") ||
     lower.includes("cf-challenge")
   );
+}
+
+function isCarrierLoginPage(carrier, url) {
+  const patterns = CARRIER_LOGIN_PATTERNS[carrier];
+  if (!patterns) return false;
+  const lower = (url || "").toLowerCase();
+  return patterns.some((p) => lower.includes(p));
+}
+
+async function handleCarrierLogin(tabId, account) {
+  const result = await getAccountCredentials(account.id);
+  if (!result.ok || !result.data?.has_credentials) return false;
+
+  const { username, password } = result.data;
+
+  // Register navigation listener BEFORE submitting the form so we don't
+  // miss the "loading" event if the redirect fires quickly.
+  const nav = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
+
+  // Fill in the Keycloak login form and submit
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    func: (email, pass) => {
+      const emailEl =
+        document.querySelector("#username") ||
+        document.querySelector("input[name='username']");
+      const passEl =
+        document.querySelector("#password") ||
+        document.querySelector("input[name='password']");
+
+      if (emailEl) {
+        emailEl.value = email;
+        emailEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (passEl) {
+        passEl.value = pass;
+        passEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      const btn =
+        document.querySelector("#kc-login") ||
+        document.querySelector("input[type='submit']") ||
+        document.querySelector("button[type='submit']");
+      if (btn) btn.click();
+    },
+    args: [username, password],
+  });
+
+  await nav;
+
+  // Verify we left the login page
+  const info = await chrome.tabs.get(tabId);
+  return !isCarrierLoginPage(account.carrier, info.url);
+}
+
+function waitForTabNavigation(tabId, timeout) {
+  return new Promise((resolve, reject) => {
+    let sawLoading = false;
+    const timer = setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(listener);
+      reject(new Error("Login navigation timeout"));
+    }, timeout);
+
+    function listener(id, changeInfo) {
+      if (id !== tabId) return;
+      if (changeInfo.status === "loading") sawLoading = true;
+      if (sawLoading && changeInfo.status === "complete") {
+        chrome.tabs.onUpdated.removeListener(listener);
+        clearTimeout(timer);
+        resolve();
+      }
+    }
+    chrome.tabs.onUpdated.addListener(listener);
+  });
 }
 
 async function storeSyncResult(accountId, ok, error, count) {

@@ -21,6 +21,13 @@ export const CARRIER_SYNC_URLS = {
   dpd: "https://www.dpdgroup.com/nl/mydpd/my-parcels",
 };
 
+// URL patterns that indicate a carrier login page (not yet authenticated).
+// Used by the service worker to detect when the sync tab landed on a login
+// page instead of the parcels page.
+export const CARRIER_LOGIN_PATTERNS = {
+  dpd: ["login.dpdgroup.com", "auth/realms"],
+};
+
 // Carrier display names for the UI.
 export const CARRIER_LABELS = {
   amazon: "Amazon",

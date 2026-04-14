@@ -234,6 +234,18 @@ function renderAccountRow(account, autoSyncEnabled, syncResult) {
     }, 3000);
   });
 
+  // Carriers with login patterns (e.g. DPD) need stored credentials for
+  // the extension to auto-login. Disable sync controls when missing.
+  const needsCredentials = ["dpd"].includes(carrier) && !account.has_credentials;
+  if (needsCredentials) {
+    toggleInput.disabled = true;
+    toggleInput.checked = false;
+    toggleLabel.title = "Add credentials in DWMP dashboard to enable sync";
+    syncBtn.disabled = true;
+    syncBtn.title = "No credentials configured";
+    meta.textContent = "Add credentials to enable extension sync";
+  }
+
   actions.appendChild(toggleLabel);
   actions.appendChild(syncBtn);
 

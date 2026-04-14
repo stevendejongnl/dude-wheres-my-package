@@ -1,3 +1,4 @@
+import json
 from importlib.metadata import version as pkg_version
 from urllib.parse import parse_qs
 
@@ -55,6 +56,22 @@ class ManualTokenRequest(BaseModel):
 
 class AuthTokenRequest(BaseModel):
     password: str
+
+
+def _has_stored_credentials(tokens: dict | None) -> bool:
+    """Check if an account has stored login credentials in its refresh_token."""
+    if not tokens:
+        return False
+    refresh = tokens.get("refresh_token")
+    if not refresh or not isinstance(refresh, str):
+        return False
+    try:
+        creds = json.loads(refresh)
+        return isinstance(creds, dict) and bool(
+            creds.get("email") or creds.get("username")
+        )
+    except (json.JSONDecodeError, TypeError):
+        return False
 
 
 # --- Auth endpoints ---
@@ -190,8 +207,10 @@ async def list_accounts(
     service: TrackingService = Depends(get_tracking_service),
 ) -> list[dict]:
     accounts = await service.list_accounts()
-    # Strip tokens from response for security
     for account in accounts:
+        account["has_credentials"] = _has_stored_credentials(
+            account.get("tokens"),
+        )
         account.pop("tokens", None)
     return accounts
 
@@ -204,8 +223,28 @@ async def get_account(
     account = await service.get_account(account_id)
     if account is None:
         raise HTTPException(status_code=404, detail="Account not found")
+    account["has_credentials"] = _has_stored_credentials(
+        account.get("tokens"),
+    )
     account.pop("tokens", None)
     return account
+
+
+@router.get("/accounts/{account_id}/credentials")
+async def get_account_credentials(
+    account_id: int,
+    service: TrackingService = Depends(get_tracking_service),
+) -> dict:
+    """Return stored login credentials for the Chrome extension auto-login.
+
+    Only returns credentials when they are stored in the account's
+    refresh_token (e.g. DPD Keycloak email + password). The extension
+    uses these to fill in the carrier login form in a real browser tab.
+    """
+    try:
+        return await service.get_account_credentials(account_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.delete("/accounts/{account_id}", status_code=204)

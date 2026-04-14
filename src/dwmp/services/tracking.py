@@ -1,3 +1,4 @@
+import json
 import logging
 from dataclasses import asdict
 
@@ -274,6 +275,36 @@ class TrackingService:
         account = await self._repository.get_account(account_id)
         assert account is not None
         return account
+
+    async def get_account_credentials(self, account_id: int) -> dict:
+        """Return stored login credentials for the Chrome extension.
+
+        For credentials-based accounts (e.g. DPD), the email/password is
+        stored as JSON in ``refresh_token`` so the extension can fill in
+        the carrier's Keycloak login form in a real browser tab.
+        """
+        account = await self._repository.get_account(account_id)
+        if account is None:
+            raise ValueError(f"Account {account_id} not found")
+
+        tokens = account.get("tokens") or {}
+        refresh = tokens.get("refresh_token")
+        if refresh and isinstance(refresh, str):
+            try:
+                creds = json.loads(refresh)
+                if isinstance(creds, dict) and (
+                    creds.get("email") or creds.get("username")
+                ):
+                    return {
+                        "has_credentials": True,
+                        "username": creds.get("email")
+                        or creds.get("username", ""),
+                        "password": creds.get("password", ""),
+                    }
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        return {"has_credentials": False}
 
     async def find_account_by_carrier(self, carrier_name: str) -> dict | None:
         """Find the first connected account for a carrier."""

@@ -109,6 +109,10 @@ export function browserPush(html, url) {
   return apiCall("POST", "/api/v1/browser-push", { html, url });
 }
 
+export function getAccountCredentials(accountId) {
+  return apiCall("GET", `/api/v1/accounts/${accountId}/credentials`);
+}
+
 // ── Self-update check ──────────────────────────────────────────────
 
 export async function checkForUpdate() {
