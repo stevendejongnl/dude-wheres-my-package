@@ -39,11 +39,14 @@ class TrackingService:
         carrier: str,
         label: str | None,
         description: str | None = None,
+        estimated_delivery: str | None = None,
     ) -> None:
         """Update package status and create a notification if it changed."""
         existing = await self._repository.get_package(pkg_id)
         old_status = existing["current_status"] if existing else "unknown"
-        await self._repository.update_status(pkg_id, new_status)
+        await self._repository.update_status(
+            pkg_id, new_status, estimated_delivery=estimated_delivery,
+        )
         if old_status != new_status:
             await self._repository.add_notification(
                 package_id=pkg_id,
@@ -369,10 +372,12 @@ class TrackingService:
 
             # Latest event description for the notification
             latest_desc = result.events[-1].description if result.events else None
+            est = result.estimated_delivery.isoformat() if result.estimated_delivery else None
             await self._update_package_status(
                 pkg_id, result.status.value, result.tracking_number,
                 result.carrier, existing.get("label") if existing else None,
                 description=latest_desc,
+                estimated_delivery=est,
             )
             for event in result.events:
                 await self._repository.add_event(
@@ -446,10 +451,12 @@ class TrackingService:
                 )
 
             latest_desc = result.events[-1].description if result.events else None
+            est = result.estimated_delivery.isoformat() if result.estimated_delivery else None
             await self._update_package_status(
                 pkg_id, result.status.value, result.tracking_number,
                 result.carrier, existing.get("label") if existing else None,
                 description=latest_desc,
+                estimated_delivery=est,
             )
             for event in result.events:
                 await self._repository.add_event(
@@ -534,10 +541,12 @@ class TrackingService:
             return await self.get_package(package_id)
 
         latest_desc = result.events[-1].description if result.events else None
+        est = result.estimated_delivery.isoformat() if result.estimated_delivery else None
         await self._update_package_status(
             package_id, result.status.value,
             pkg["tracking_number"], pkg["carrier"], pkg.get("label"),
             description=latest_desc,
+            estimated_delivery=est,
         )
         for event in result.events:
             await self._repository.add_event(

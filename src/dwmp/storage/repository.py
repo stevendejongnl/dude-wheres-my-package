@@ -328,8 +328,13 @@ class PackageRepository:
         await self.db.commit()
         return cursor.rowcount > 0
 
-    async def update_status(self, package_id: int, status: str) -> None:
-        """Update current_status, updated_at, and last_refreshed_at in one go.
+    async def update_status(
+        self,
+        package_id: int,
+        status: str,
+        estimated_delivery: str | None = None,
+    ) -> None:
+        """Update current_status, estimated_delivery, updated_at, and last_refreshed_at.
 
         Writing last_refreshed_at here (rather than exposing a separate method)
         means every successful status read — whether via sync_packages or
@@ -338,8 +343,9 @@ class PackageRepository:
         """
         now = datetime.now(UTC).isoformat()
         await self.db.execute(
-            "UPDATE packages SET current_status = ?, updated_at = ?, last_refreshed_at = ? WHERE id = ?",
-            (status, now, now, package_id),
+            "UPDATE packages SET current_status = ?, estimated_delivery = ?,"
+            " updated_at = ?, last_refreshed_at = ? WHERE id = ?",
+            (status, estimated_delivery, now, now, package_id),
         )
         await self.db.commit()
 

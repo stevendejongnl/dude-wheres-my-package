@@ -363,10 +363,15 @@ class Amazon(CarrierBase):
                 description=status_text or status.value,
             ))
 
+        estimated = None
+        if status in (TrackingStatus.IN_TRANSIT, TrackingStatus.OUT_FOR_DELIVERY):
+            estimated = _parse_dutch_date(status_text) if status_text else None
+
         return TrackingResult(
             tracking_number=tracking_number,
             carrier=self.name,
             status=status,
+            estimated_delivery=estimated,
             events=events,
         )
 

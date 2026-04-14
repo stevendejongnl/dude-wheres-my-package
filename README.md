@@ -224,7 +224,7 @@ notifications), or hit the JSON API directly — see below.
 
 Dwmp ships a server-rendered HTML UI at `/`:
 
-- `/` — package list with the "Track a package" modal, per-package **Refresh** and **Delete** buttons, and collapsible **Details** sections showing postal code, tracking URL, source, and timestamps
+- `/` — package list with the "Track a package" modal, per-package **Refresh** and **Delete** buttons, and collapsible **Details** sections showing postal code, tracking URL, estimated delivery, source, and timestamps
 - `/accounts` — connected accounts, inline add/edit/test/sync flows, **Browser Sync** modal for DPD accounts with draggable bookmarklet, and delivery postal code field on all carrier account forms (enables public tracking fallback when account cookies expire)
 - `/notifications` — status-change history with unread badge, rich browser push notifications showing carrier, status, and event description
 - `/login` / `/logout` — password gate (only enabled when `PASSWORD_HASH` is set)
