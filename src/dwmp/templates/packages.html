@@ -28,62 +28,12 @@
   </div>
 </div>
 
-{% macro package_card(pkg) %}
-<div class="card" id="pkg-{{ pkg.id }}">
-  <div class="card-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
-    <div class="pkg-main">
-      <span class="pkg-carrier {{ pkg.carrier }}">{{ pkg.carrier }}</span>
-      <div class="pkg-info">
-        <div class="pkg-tracking">{{ pkg.tracking_number }}</div>
-        <div class="pkg-details">
-          {% if pkg.sender %}
-          <span class="pkg-sender"><strong>From:</strong> {{ pkg.sender }}</span>
-          {% endif %}
-          {% if pkg.first_event_date %}
-          <span class="pkg-first-event">{{ pkg.first_event_date }}</span>
-          {% endif %}
-          {% if pkg.label %}
-          <span class="pkg-label">{{ pkg.label }}</span>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-    <div class="pkg-meta">
-      <span class="status status-{{ pkg.current_status }}">{{ pkg.current_status | replace('_', ' ') }}</span>
-      <span class="pkg-date">{{ pkg.last_update }}</span>
-    </div>
-  </div>
-  <div class="card-body collapsed">
-    {% if pkg.events %}
-    <div class="timeline">
-      {% for event in pkg.events | reverse %}
-      <div class="timeline-event">
-        <div class="timeline-dot {% if loop.first %}active{% endif %}"></div>
-        <div class="timeline-content">
-          <div class="timeline-desc">{{ event.description }}</div>
-          <div class="timeline-details">
-            <span class="timeline-time">{{ event.formatted_time }}</span>
-            {% if event.location %}
-            <span class="timeline-loc">{{ event.location }}</span>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <p style="color:var(--text-dim);font-size:0.85rem;">No tracking events yet.</p>
-    {% endif %}
-  </div>
-</div>
-{% endmacro %}
-
 {% if active %}
 <div class="section-header">
   <h2>Active</h2>
 </div>
 {% for pkg in active %}
-{{ package_card(pkg) }}
+{% include "_package_card.html" %}
 {% endfor %}
 {% endif %}
 
@@ -92,7 +42,7 @@
   <h2>Delivered</h2>
 </div>
 {% for pkg in delivered %}
-{{ package_card(pkg) }}
+{% include "_package_card.html" %}
 {% endfor %}
 {% endif %}
 

@@ -89,6 +89,35 @@ class DPD(CarrierBase):
         self._updated_tokens = None
         return tokens
 
+    async def validate_token(self, tokens: AuthTokens) -> None:
+        """DPD cookies can't be validated via headless replay — Cloudflare
+        binds cf_clearance to the TLS fingerprint of the issuing browser,
+        so replaying in our headless Chrome always degrades to guest mode.
+
+        Instead, just verify the token format is sane. The first real sync
+        will surface auth issues via the guest-mode detection.
+        """
+        raw = tokens.access_token
+        if raw and raw.lstrip().startswith("["):
+            import json
+
+            try:
+                cookies = json.loads(raw)
+                if not isinstance(cookies, list):
+                    raise ValueError("Expected a JSON array of cookies")
+            except (json.JSONDecodeError, ValueError) as exc:
+                raise CarrierAuthError(
+                    self.name, f"Invalid cookies JSON: {exc}"
+                ) from exc
+            return
+        if raw and raw.lstrip().startswith("<"):
+            return  # Legacy HTML snapshot — always accepted.
+        raise CarrierAuthError(
+            self.name,
+            "Unrecognised token format. Paste a cookies JSON array "
+            "(starts with [) or an HTML snapshot (starts with <).",
+        )
+
     async def sync_packages(
         self, tokens: AuthTokens, lookback_days: int = 30
     ) -> list[TrackingResult]:

@@ -449,6 +449,27 @@ async def track_package_save(
     return HTMLResponse("", headers={"HX-Refresh": "true"})
 
 
+# --- Package refresh view ---
+
+
+@router.post("/packages/{package_id}/refresh", response_class=HTMLResponse)
+async def refresh_package_view(
+    request: Request,
+    package_id: int,
+    service: TrackingService = Depends(get_tracking_service),
+):
+    """HTMX endpoint: refresh a package via public tracking and return the updated card."""
+    pkg = await service.refresh_package(package_id)
+    if pkg is None:
+        raise HTTPException(status_code=404, detail="Package not found")
+    _enrich_package(pkg)
+    ctx = {
+        "pkg": pkg,
+        "base_path": _base_path(request),
+    }
+    return templates.TemplateResponse(request, "_package_card.html", ctx)
+
+
 # --- Notification views ---
 
 

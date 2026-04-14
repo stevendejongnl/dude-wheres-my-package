@@ -120,6 +120,16 @@
     .status-returned { background: #d6303120; color: var(--red); }
     .status-unknown { background: #636e7220; color: var(--text-dim); }
 
+    /* Package card actions */
+    .card-actions {
+      display: flex; gap: 8px; padding: 4px 0 8px;
+      border-bottom: 1px solid var(--border); margin-bottom: 8px;
+    }
+    .card:has(.htmx-request) {
+      opacity: 0.6; pointer-events: none;
+      transition: opacity 0.15s ease-out;
+    }
+
     /* Timeline */
     .timeline { padding: 12px 0 4px; }
     .timeline-event {

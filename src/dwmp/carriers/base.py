@@ -105,6 +105,16 @@ class CarrierBase(ABC):
         """Authenticate with credentials. Only for AuthType.CREDENTIALS carriers."""
         raise NotImplementedError(f"{self.name} does not use credentials")
 
+    async def validate_token(self, tokens: AuthTokens) -> None:
+        """Lightweight token validation before persisting.
+
+        Defaults to a minimal sync (lookback_days=1). Carriers where replay
+        is unreliable (e.g. DPD — Cloudflare binds ``cf_clearance`` to the
+        issuing browser's TLS fingerprint) should override this with a
+        format-only check.
+        """
+        await self.sync_packages(tokens, lookback_days=1)
+
     def get_updated_tokens(self) -> AuthTokens | None:
         """Return updated tokens if the last sync refreshed them (e.g. browser cookies)."""
         return None

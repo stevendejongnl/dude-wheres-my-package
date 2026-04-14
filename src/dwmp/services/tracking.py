@@ -163,7 +163,12 @@ class TrackingService:
         refresh_token: str | None = None,
         user_agent: str | None = None,
     ) -> AuthTokens:
-        """Validate a manual token by attempting a minimal sync. Raises CarrierAuthError on failure."""
+        """Validate a manual token. Raises CarrierAuthError on failure.
+
+        Delegates to the carrier's ``validate_token`` method, which defaults
+        to a minimal sync but can be overridden (e.g. DPD skips Playwright
+        replay because Cloudflare blocks it).
+        """
         carrier = self._carriers.get(carrier_name)
         if carrier is None:
             raise ValueError(f"Unknown carrier: {carrier_name}")
@@ -175,7 +180,7 @@ class TrackingService:
         )
 
         try:
-            await carrier.sync_packages(tokens, lookback_days=1)
+            await carrier.validate_token(tokens)
         except Exception as exc:
             raise CarrierAuthError(
                 carrier_name,
