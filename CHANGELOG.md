@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.35.0 (2026-04-14)
+
+### Bug Fixes
+
+- Wrap OPEN_PATHS to satisfy line length lint
+  ([`3fc8245`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/3fc82456c97d3b188dee9a75bd818cc7c72bdec9))
+
+### Features
+
+- **dpd**: Add credentials login and Chrome extension auto-update
+  ([`f7affd7`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/f7affd70f65548112f9b24318f459e2d43c900ce))
+
+
 ## v1.34.0 (2026-04-14)
 
 ### Bug Fixes
