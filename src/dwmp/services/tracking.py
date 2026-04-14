@@ -140,6 +140,7 @@ class TrackingService:
         password: str,
         lookback_days: int = 30,
         totp_secret: str | None = None,
+        postal_code: str | None = None,
     ) -> dict:
         tokens = await self.validate_account_credentials(
             carrier_name, username, password, totp_secret=totp_secret
@@ -151,6 +152,7 @@ class TrackingService:
             tokens=asdict(tokens),
             username=username,
             lookback_days=lookback_days,
+            postal_code=postal_code,
         )
         account = await self._repository.get_account(account_id)
         assert account is not None
@@ -197,6 +199,7 @@ class TrackingService:
         refresh_token: str | None = None,
         lookback_days: int = 30,
         user_agent: str | None = None,
+        postal_code: str | None = None,
     ) -> dict:
         tokens = await self.validate_account_manual_token(
             carrier_name, access_token, refresh_token, user_agent=user_agent
@@ -207,6 +210,7 @@ class TrackingService:
             auth_type="manual_token",
             tokens=asdict(tokens),
             lookback_days=lookback_days,
+            postal_code=postal_code,
         )
         account = await self._repository.get_account(account_id)
         assert account is not None
@@ -220,6 +224,7 @@ class TrackingService:
         password: str,
         lookback_days: int = 30,
         totp_secret: str | None = None,
+        postal_code: str | None = None,
     ) -> dict:
         """Re-validate credentials and update an existing account in place."""
         tokens = await self.validate_account_credentials(
@@ -230,6 +235,7 @@ class TrackingService:
             tokens=asdict(tokens),
             username=username,
             lookback_days=lookback_days,
+            postal_code=postal_code,
         )
         if not updated:
             raise ValueError(f"Account {account_id} not found")
@@ -245,6 +251,7 @@ class TrackingService:
         refresh_token: str | None = None,
         lookback_days: int = 30,
         user_agent: str | None = None,
+        postal_code: str | None = None,
     ) -> dict:
         """Re-validate a manual token and update an existing account in place."""
         tokens = await self.validate_account_manual_token(
@@ -255,6 +262,7 @@ class TrackingService:
             tokens=asdict(tokens),
             username=None,
             lookback_days=lookback_days,
+            postal_code=postal_code,
         )
         if not updated:
             raise ValueError(f"Account {account_id} not found")
@@ -317,8 +325,16 @@ class TrackingService:
                 account_id, asdict(updated_tokens)
             )
 
+        # The account's postal_code is the delivery address — apply it to
+        # every discovered package so public tracking (DPD verification,
+        # GLS lookup) works even after account cookies expire.
+        acct_postal = account.get("postal_code") or ""
+
         synced: list[dict] = []
         for result in results:
+            # Prefer carrier-provided postal code, fall back to account's
+            pkg_postal = result.postal_code or acct_postal or None
+
             existing = await self._repository.find_package(
                 result.tracking_number, result.carrier
             )
@@ -328,19 +344,21 @@ class TrackingService:
                 pkg_id = await self._repository.add_package(
                     tracking_number=result.tracking_number,
                     carrier=result.carrier,
-                    postal_code=result.postal_code,
+                    postal_code=pkg_postal,
                     account_id=account_id,
                     source="account",
                     tracking_url=result.tracking_url,
                 )
 
             # Backfill postal_code / tracking_url onto pre-existing rows when
-            # discovery newly surfaces them. Without this, packages added before
-            # the carrier started capturing these fields would never benefit
-            # from public-track fallback once they drop off the account list.
-            if result.postal_code and existing and not existing.get("postal_code"):
+            # discovery newly surfaces them or the account now has a postal_code
+            # that wasn't set before. Without this, packages added before the
+            # carrier started capturing these fields would never benefit from
+            # public-track fallback once they drop off the account list.
+            backfill_postal = pkg_postal if pkg_postal and existing and not existing.get("postal_code") else None
+            if backfill_postal:
                 await self._repository.update_package_postal_code(
-                    pkg_id, result.postal_code
+                    pkg_id, backfill_postal
                 )
             if result.tracking_url and existing and not existing.get("tracking_url"):
                 await self._repository.update_package_tracking_url(

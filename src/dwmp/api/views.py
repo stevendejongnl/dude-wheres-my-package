@@ -311,6 +311,7 @@ async def edit_account_save(
     refresh_token: str = Form(default=""),
     user_agent: str = Form(default=""),
     lookback_days: int = Form(default=30),
+    postal_code: str = Form(default=""),
 ):
     account = await service.get_account(account_id)
     if account is None:
@@ -321,12 +322,14 @@ async def edit_account_save(
             await service.update_account_credentials(
                 account_id, account["carrier"], username, password,
                 lookback_days, totp_secret=totp_secret or None,
+                postal_code=postal_code.strip() or None,
             )
         else:
             await service.update_account_manual_token(
                 account_id, account["carrier"], access_token,
                 refresh_token or None, lookback_days,
                 user_agent=user_agent or None,
+                postal_code=postal_code.strip() or None,
             )
     except CarrierAuthError as exc:
         return _result_html(False, exc.message)
@@ -376,6 +379,7 @@ async def add_account_save(
     refresh_token: str = Form(default=""),
     user_agent: str = Form(default=""),
     lookback_days: int = Form(default=30),
+    postal_code: str = Form(default=""),
 ):
     template = _form_template(carrier)
     try:
@@ -383,11 +387,13 @@ async def add_account_save(
             await service.connect_account_credentials(
                 carrier, username, password, lookback_days,
                 totp_secret=totp_secret or None,
+                postal_code=postal_code.strip() or None,
             )
         else:
             await service.connect_account_manual_token(
                 carrier, access_token, refresh_token or None, lookback_days,
                 user_agent=user_agent or None,
+                postal_code=postal_code.strip() or None,
             )
     except CarrierAuthError as exc:
         return _result_html(False, exc.message)

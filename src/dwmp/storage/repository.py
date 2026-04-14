@@ -122,6 +122,17 @@ class PackageRepository:
             )
             await self.db.commit()
 
+        # v1.25: add accounts.postal_code so account-discovered packages
+        # can inherit the delivery postal code for public tracking (DPD
+        # guest verification, etc).
+        cursor = await self.db.execute("PRAGMA table_info(accounts)")
+        acct_cols = {col["name"] for col in await cursor.fetchall()}
+        if "postal_code" not in acct_cols:
+            await self.db.execute(
+                "ALTER TABLE accounts ADD COLUMN postal_code TEXT"
+            )
+            await self.db.commit()
+
     @property
     def db(self) -> aiosqlite.Connection:
         assert self._db is not None, "Repository not initialized — call init() first"
@@ -136,14 +147,18 @@ class PackageRepository:
         tokens: dict | None = None,
         username: str | None = None,
         lookback_days: int = 30,
+        postal_code: str | None = None,
     ) -> int:
         now = datetime.now(UTC).isoformat()
         tokens_json = json.dumps(tokens) if tokens else None
         try:
             cursor = await self.db.execute(
-                """INSERT INTO accounts (carrier, auth_type, tokens, username, lookback_days, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (carrier, auth_type, tokens_json, username, lookback_days, now, now),
+                """INSERT INTO accounts
+                   (carrier, auth_type, tokens, username, lookback_days,
+                    postal_code, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (carrier, auth_type, tokens_json, username, lookback_days,
+                 postal_code, now, now),
             )
             await self.db.commit()
             assert cursor.lastrowid is not None
@@ -184,16 +199,14 @@ class PackageRepository:
         tokens: dict,
         username: str | None = None,
         lookback_days: int = 30,
+        postal_code: str | None = None,
     ) -> bool:
         """Update an existing account's credentials and settings.
 
-        Overwrites tokens, username, and lookback_days; resets status to
-        'connected' and clears status_message (callers reach this method only
-        after a successful Test). Leaves carrier, auth_type, created_at, and
-        last_synced untouched. Returns True if a row was updated, False if the
-        account_id was not found. Re-raises aiosqlite.IntegrityError from the
-        UNIQUE(carrier, username) constraint as ValueError so views can render
-        a friendly error.
+        Overwrites tokens, username, lookback_days, and postal_code; resets
+        status to 'connected' and clears status_message (callers reach this
+        method only after a successful Test). Leaves carrier, auth_type,
+        created_at, and last_synced untouched.
         """
         now = datetime.now(UTC).isoformat()
         tokens_json = json.dumps(tokens)
@@ -201,10 +214,12 @@ class PackageRepository:
             cursor = await self.db.execute(
                 """UPDATE accounts
                    SET tokens = ?, username = ?, lookback_days = ?,
+                       postal_code = ?,
                        status = 'connected', status_message = NULL,
                        updated_at = ?
                    WHERE id = ?""",
-                (tokens_json, username, lookback_days, now, account_id),
+                (tokens_json, username, lookback_days, postal_code, now,
+                 account_id),
             )
             await self.db.commit()
         except aiosqlite.IntegrityError:
