@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -219,17 +220,20 @@ class Amazon(CarrierBase):
                 logger.info("Amazon cookies expired, attempting re-login")
                 html = await self._relogin(tokens)
 
-            return self._parse_orders_page(html, lookback_days)
+            results = self._parse_orders_page(html, lookback_days)
+            return await self._enrich_with_share_tracker(results)
 
         # Mode 2: Legacy raw HTML (manual capture, backwards compatible)
         if raw and raw.strip().startswith("<"):
-            return self._parse_orders_page(raw, lookback_days)
+            results = self._parse_orders_page(raw, lookback_days)
+            return await self._enrich_with_share_tracker(results)
 
         # Mode 3: No cookies yet — first sync after login() stored credentials
         if tokens.refresh_token:
             logger.info("No cached cookies, performing initial Amazon login")
             html = await self._relogin(tokens)
-            return self._parse_orders_page(html, lookback_days)
+            results = self._parse_orders_page(html, lookback_days)
+            return await self._enrich_with_share_tracker(results)
 
         raise CarrierAuthError(
             carrier=self.name,
@@ -261,6 +265,67 @@ class Amazon(CarrierBase):
             refresh_token=tokens.refresh_token,
         )
         return html
+
+    async def _enrich_with_share_tracker(
+        self, results: list[TrackingResult]
+    ) -> list[TrackingResult]:
+        """Fetch share tracker pages for active packages to get richer timelines.
+
+        The orders page only yields two events (order date + status). The public
+        share tracker exposes milestone events (ordered → shipped → out for
+        delivery → delivered). Fetching these during sync fills in the gaps.
+        """
+        _ACTIVE = (
+            TrackingStatus.IN_TRANSIT,
+            TrackingStatus.OUT_FOR_DELIVERY,
+            TrackingStatus.PRE_TRANSIT,
+        )
+        to_enrich = [
+            r for r in results
+            if r.tracking_url and r.status in _ACTIVE
+        ]
+        if not to_enrich:
+            return results
+
+        async def _fetch_one(result: TrackingResult) -> TrackingResult:
+            try:
+                enriched = await self.track(
+                    result.tracking_number, tracking_url=result.tracking_url,
+                )
+            except Exception:
+                return result
+            if enriched.status == TrackingStatus.UNKNOWN or not enriched.events:
+                return result
+            # Merge: keep order-page events (they have real timestamps) and
+            # add share-tracker events that aren't duplicates.
+            existing_descs = {e.description for e in result.events}
+            merged = list(result.events)
+            for evt in enriched.events:
+                if evt.description not in existing_descs:
+                    merged.append(evt)
+            return TrackingResult(
+                tracking_number=result.tracking_number,
+                carrier=result.carrier,
+                status=enriched.status if enriched.status != TrackingStatus.UNKNOWN else result.status,
+                estimated_delivery=enriched.estimated_delivery or result.estimated_delivery,
+                events=sorted(merged, key=lambda e: e.timestamp),
+                tracking_url=result.tracking_url,
+                postal_code=result.postal_code,
+            )
+
+        enriched_map: dict[str, TrackingResult] = {}
+        fetched = await asyncio.gather(
+            *[_fetch_one(r) for r in to_enrich],
+            return_exceptions=True,
+        )
+        for original, fetched_result in zip(to_enrich, fetched):
+            if isinstance(fetched_result, TrackingResult):
+                enriched_map[original.tracking_number] = fetched_result
+
+        return [
+            enriched_map.get(r.tracking_number, r)
+            for r in results
+        ]
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
         """Public tracking via the `share` endpoint.
@@ -345,20 +410,24 @@ class Amazon(CarrierBase):
 
         events: list[TrackingEvent] = []
         for item in soup.select(
-            ".milestone-list li, .pt-tracking-event, [data-testid='tracking-event']"
+            ".milestone-list li, .pt-tracking-event, "
+            "[data-testid='tracking-event']"
         ):
             text = item.get_text(" ", strip=True)
             if not text:
                 continue
+            evt_status = _parse_status(text)
+            evt_date = _parse_dutch_date(text)
             events.append(TrackingEvent(
-                timestamp=datetime.now(UTC),
-                status=_parse_status(text),
+                timestamp=evt_date or datetime.now(UTC),
+                status=evt_status,
                 description=text,
             ))
 
         if not events and status != TrackingStatus.UNKNOWN:
+            evt_date = _parse_dutch_date(status_text) if status_text else None
             events.append(TrackingEvent(
-                timestamp=datetime.now(UTC),
+                timestamp=evt_date or datetime.now(UTC),
                 status=status,
                 description=status_text or status.value,
             ))

@@ -367,11 +367,13 @@ async def edit_account_save(
         raise HTTPException(status_code=404, detail="Account not found")
     template = _form_template(account["carrier"])
     try:
-        # Amazon cookies fallback
+        # Amazon cookies fallback — preserve stored credentials (refresh_token)
+        # so _relogin() can still work when these cookies expire.
         if cookies_json.strip():
+            existing_tokens = account.get("tokens") or {}
             await service.update_account_manual_token(
                 account_id, account["carrier"], cookies_json.strip(),
-                None, lookback_days,
+                existing_tokens.get("refresh_token"), lookback_days,
                 postal_code=postal_code.strip() or None,
             )
         elif template == "account_form_credentials.html":
