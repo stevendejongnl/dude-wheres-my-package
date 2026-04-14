@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.31.4 (2026-04-14)
+
+### Bug Fixes
+
+- **tracking**: Persist estimated_delivery from carriers to database
+  ([`6c9cdc5`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/6c9cdc537f52ba5967d2f6b43e586acc85cc173a))
+
+### Documentation
+
+- **readme**: Comprehensive update for all session changes
+  ([`4f36258`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/4f36258636845fe43316d439d876ce71aae6234d))
+
+
 ## v1.31.3 (2026-04-14)
 
 ### Bug Fixes
