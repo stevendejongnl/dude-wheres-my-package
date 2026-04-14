@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.33.1 (2026-04-14)
+
+### Bug Fixes
+
+- **release**: Use $NEW_VERSION env var in build_command, remove broken --no-vcs-release flow
+  ([`ad6dd7b`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/ad6dd7bd1adf5fe328cc0bc36a1592b41ef01d10))
+
+
 ## v1.33.0 (2026-04-14)
 
 ### Documentation
