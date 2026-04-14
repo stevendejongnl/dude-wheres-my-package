@@ -255,10 +255,16 @@ async def add_account_test(
     access_token: str = Form(default=""),
     refresh_token: str = Form(default=""),
     user_agent: str = Form(default=""),
+    cookies_json: str = Form(default=""),
 ):
     template = _form_template(carrier)
     try:
-        if template == "account_form_credentials.html":
+        # Amazon cookies fallback: if cookies_json is provided, treat as manual token
+        if cookies_json.strip():
+            await service.validate_account_manual_token(
+                carrier, cookies_json.strip(),
+            )
+        elif template == "account_form_credentials.html":
             await service.validate_account_credentials(
                 carrier, username, password, totp_secret=totp_secret or None,
             )
@@ -312,13 +318,21 @@ async def edit_account_save(
     user_agent: str = Form(default=""),
     lookback_days: int = Form(default=30),
     postal_code: str = Form(default=""),
+    cookies_json: str = Form(default=""),
 ):
     account = await service.get_account(account_id)
     if account is None:
         raise HTTPException(status_code=404, detail="Account not found")
     template = _form_template(account["carrier"])
     try:
-        if template == "account_form_credentials.html":
+        # Amazon cookies fallback
+        if cookies_json.strip():
+            await service.update_account_manual_token(
+                account_id, account["carrier"], cookies_json.strip(),
+                None, lookback_days,
+                postal_code=postal_code.strip() or None,
+            )
+        elif template == "account_form_credentials.html":
             await service.update_account_credentials(
                 account_id, account["carrier"], username, password,
                 lookback_days, totp_secret=totp_secret or None,
@@ -380,10 +394,17 @@ async def add_account_save(
     user_agent: str = Form(default=""),
     lookback_days: int = Form(default=30),
     postal_code: str = Form(default=""),
+    cookies_json: str = Form(default=""),
 ):
     template = _form_template(carrier)
     try:
-        if template == "account_form_credentials.html":
+        # Amazon cookies fallback
+        if cookies_json.strip():
+            await service.connect_account_manual_token(
+                carrier, cookies_json.strip(), None, lookback_days,
+                postal_code=postal_code.strip() or None,
+            )
+        elif template == "account_form_credentials.html":
             await service.connect_account_credentials(
                 carrier, username, password, lookback_days,
                 totp_secret=totp_secret or None,

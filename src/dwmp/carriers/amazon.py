@@ -149,6 +149,27 @@ class Amazon(CarrierBase):
         self._updated_tokens = None
         return tokens
 
+    async def validate_token(self, tokens: AuthTokens) -> None:
+        """Validate cookies JSON without launching Playwright.
+
+        Like DPD, Amazon's bot detection can block headless login from the
+        pod's IP. When users paste cookies from their real browser, we just
+        check the format — the first sync will surface any session issues.
+        """
+        raw = tokens.access_token
+        if raw and raw.strip().startswith("["):
+            try:
+                cookies = json.loads(raw)
+                if not isinstance(cookies, list):
+                    raise ValueError("Expected a JSON array of cookies")
+            except (json.JSONDecodeError, ValueError) as exc:
+                raise CarrierAuthError(
+                    self.name, f"Invalid cookies JSON: {exc}"
+                ) from exc
+            return
+        # Not cookies — fall back to default (minimal sync, triggers login)
+        await super().validate_token(tokens)
+
     async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
         totp_secret = kwargs.get("totp_secret")
 
