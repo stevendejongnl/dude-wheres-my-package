@@ -552,8 +552,26 @@ async def notification_badge(
     count = await service.get_unread_notification_count()
     if count > 0:
         display = "99+" if count > 99 else str(count)
+        # Embed the latest notification's details so the browser push
+        # notification can show something richer than "a status changed".
+        latest = (await service.list_notifications(limit=1))
+        attrs = f'data-count="{count}"'
+        if latest:
+            n = latest[0]
+            carrier = n.get("carrier", "").replace('"', "")
+            tracking = n.get("tracking_number", "").replace('"', "")
+            new_status = _format_status(n.get("new_status", ""))
+            desc = (n.get("description") or "").replace('"', "")[:120]
+            label = (n.get("label") or "").replace('"', "")[:60]
+            attrs += (
+                f' data-carrier="{carrier}"'
+                f' data-tracking="{tracking}"'
+                f' data-new-status="{new_status}"'
+                f' data-description="{desc}"'
+                f' data-label="{label}"'
+            )
         return HTMLResponse(
-            f'<span class="notif-badge-dot" data-count="{count}">{display}</span>'
+            f'<span class="notif-badge-dot" {attrs}>{display}</span>'
         )
     return HTMLResponse('<span data-count="0"></span>')
 

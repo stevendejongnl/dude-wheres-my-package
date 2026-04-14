@@ -18,15 +18,42 @@ describe("buildPayload", () => {
     expect(buildPayload(3, -1)).toBeNull();
   });
 
-  it("returns singular message for +1", () => {
+  it("returns generic message for +1 without badge metadata", () => {
     const payload = buildPayload(1, 0);
     expect(payload).not.toBeNull();
     expect(payload!.body).toBe("A package status has changed");
     expect(payload!.title).toBe("Dude, Where's My Package?");
-    // Without <meta name="dwmp-base"> the icon URL stays absolute-from-root
-    // (k8s/direct-port deployment behavior).
     expect(payload!.icon).toBe("/static/icon-64.png");
     expect(payload!.tag).toBe("dwmp-update");
+  });
+
+  it("returns rich message for +1 with badge metadata", () => {
+    const badge = document.createElement("span");
+    badge.dataset.count = "1";
+    badge.dataset.carrier = "dhl";
+    badge.dataset.tracking = "CQ964395186DE";
+    badge.dataset.newStatus = "In Transit";
+    badge.dataset.description = "The shipment has been loaded onto the delivery vehicle";
+    badge.dataset.label = "";
+
+    const payload = buildPayload(1, 0, badge);
+    expect(payload).not.toBeNull();
+    expect(payload!.body).toContain("DHL");
+    expect(payload!.body).toContain("In Transit");
+    expect(payload!.body).toContain("loaded onto the delivery vehicle");
+  });
+
+  it("uses label over tracking number when available", () => {
+    const badge = document.createElement("span");
+    badge.dataset.count = "1";
+    badge.dataset.carrier = "postnl";
+    badge.dataset.tracking = "3STEST123";
+    badge.dataset.newStatus = "Delivered";
+    badge.dataset.label = "New headphones";
+
+    const payload = buildPayload(1, 0, badge);
+    expect(payload!.body).toContain("New headphones");
+    expect(payload!.body).not.toContain("3STEST123");
   });
 
   it("prefixes icon URL when <meta name=\"dwmp-base\"> is set (HA ingress)", () => {
@@ -230,11 +257,13 @@ describe("initNotifications", () => {
     expect(notifSpy).not.toHaveBeenCalled();
   });
 
-  it("fires singular message for count going from 0 to 1", () => {
+  it("fires notification for count going from 0 to 1", () => {
     const cleanup = initNotifications();
 
     fireSwap("notif-badge", "1");
 
+    expect(notifSpy).toHaveBeenCalledOnce();
+    // Without data-carrier on the badge, falls back to generic message
     expect(notifSpy).toHaveBeenCalledWith(
       "Dude, Where's My Package?",
       expect.objectContaining({ body: "A package status has changed" }),

@@ -24,22 +24,38 @@ function getBasePath(): string {
 }
 
 /**
- * Build the notification payload from a count delta.
+ * Build the notification payload from a count delta and badge metadata.
  * Returns `null` when no notification should be shown.
  */
 export function buildPayload(
   newCount: number,
   oldCount: number,
+  badgeEl?: Element | null,
 ): NotificationPayload | null {
   if (newCount <= oldCount || oldCount < 0) return null;
 
   const diff = newCount - oldCount;
+  const ds = badgeEl instanceof HTMLElement ? badgeEl.dataset : {};
+  const carrier = ds.carrier ?? "";
+  const tracking = ds.tracking ?? "";
+  const newStatus = ds.newStatus ?? "";
+  const description = ds.description ?? "";
+  const label = ds.label ?? "";
+
+  let body: string;
+  if (diff === 1 && carrier) {
+    const name = label || tracking;
+    body = `${carrier.toUpperCase()}: ${name} → ${newStatus}`;
+    if (description) body += `\n${description}`;
+  } else if (diff > 1) {
+    body = `${diff} package updates`;
+  } else {
+    body = "A package status has changed";
+  }
+
   return {
     title: "Dude, Where's My Package?",
-    body:
-      diff === 1
-        ? "A package status has changed"
-        : `${diff} package updates`,
+    body,
     icon: `${getBasePath()}/static/icon-64.png`,
     tag: "dwmp-update",
   };
@@ -81,7 +97,8 @@ export function initNotifications(): () => void {
     if (detail?.target?.id !== "notif-badge") return;
 
     const count = parseBadgeCount(detail.target);
-    const payload = buildPayload(count, lastCount);
+    const badgeEl = detail.target.querySelector("[data-count]");
+    const payload = buildPayload(count, lastCount, badgeEl);
 
     if (payload && Notification.permission === "granted") {
       new Notification(payload.title, {
