@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.26.0 (2026-04-14)
+
+### Features
+
+- **accounts**: Add postal_code field so account-synced packages get public tracking
+  ([`611fb2f`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/611fb2f3b954f6c57d124647820a58d298c50fec))
+
+
 ## v1.25.0 (2026-04-14)
 
 ### Features
