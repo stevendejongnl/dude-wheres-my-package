@@ -43,6 +43,9 @@ STATUS_MAP: list[tuple[str, TrackingStatus]] = [
     ("aangemeld", TrackingStatus.PRE_TRANSIT),
     ("niet afgeleverd", TrackingStatus.FAILED_ATTEMPT),
     ("retour", TrackingStatus.RETURNED),
+    # CSS class on the status-icon element (e.g. "status-icon transit").
+    # Must come after the more specific compound phrases above.
+    ("transit", TrackingStatus.IN_TRANSIT),
 ]
 
 
@@ -174,20 +177,45 @@ class DPD(CarrierBase):
         )
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
-        url = f"{DPD_TRACKING_URL}/{tracking_number}"
+        """Public tracking via postal-code verification (no login required).
 
-        async with self._get_client() as client:
-            response = await client.get(
-                url,
-                headers={
-                    "User-Agent": "Mozilla/5.0",
-                    "Accept": "text/html",
-                },
-                follow_redirects=True,
+        DPD NL lets guests view tracking details after verifying their
+        postal code.  The flow requires a browser (Cloudflare challenge)
+        but no session cookies:
+
+        1. Navigate to the parcel page as a guest.
+        2. Fill the postal-code verification form and submit.
+        3. Parse the resulting page for tracking events.
+
+        Falls back to UNKNOWN if no ``postal_code`` is available.
+        """
+        postal_code = kwargs.get("postal_code") or ""
+        if not postal_code:
+            return TrackingResult(
+                tracking_number=tracking_number,
+                carrier=self.name,
+                status=TrackingStatus.UNKNOWN,
             )
-            response.raise_for_status()
 
-        return self._parse_tracking_page(tracking_number, response.text)
+        try:
+            html = await _playwright_guest_track(tracking_number, postal_code)
+        except Exception as exc:
+            logger.warning("DPD guest track failed for %s: %s", tracking_number, exc)
+            return TrackingResult(
+                tracking_number=tracking_number,
+                carrier=self.name,
+                status=TrackingStatus.UNKNOWN,
+            )
+
+        # The guest-verified page has the same DOM as the authenticated
+        # parcels page, so reuse _parse_parcels_page (which handles both
+        # the parcel list and the inline detail section).
+        results = self._parse_parcels_page(html)
+        for r in results:
+            if r.tracking_number == tracking_number:
+                return r
+        # Fallback: try the detail-page parser (different DOM shape)
+        return self._parse_tracking_page(tracking_number, html)
 
     def _get_client(self):
         if self._client:
@@ -431,6 +459,70 @@ class DPD(CarrierBase):
             status=status,
             events=sorted(events, key=lambda e: e.timestamp),
         )
+
+
+async def _playwright_guest_track(tracking_number: str, postal_code: str) -> str:
+    """Navigate to the DPD parcel page as a guest, submit the postal-code
+    verification form, and return the resulting HTML with tracking details.
+
+    No session cookies or login needed — Cloudflare is the only gate, and
+    Playwright + stealth handles it. The verification form accepts the
+    delivery postal code as ``verificationCode``.
+    """
+    from playwright.async_api import async_playwright
+
+    from dwmp.carriers.browser import _USER_AGENT, _browser_lock, _launch_browser, _stealth
+
+    parcel_url = f"{DPD_PARCELS_URL}?parcelNumber={tracking_number}"
+
+    async with _browser_lock:
+        async with _stealth(_USER_AGENT).use_async(async_playwright()) as pw:
+            browser = await _launch_browser(pw)
+            try:
+                context = await browser.new_context(
+                    user_agent=_USER_AGENT,
+                    viewport={"width": 1280, "height": 800},
+                    locale="nl-NL",
+                    timezone_id="Europe/Amsterdam",
+                )
+                page = await context.new_page()
+
+                # Step 1: navigate to parcel page (guest mode + Cloudflare)
+                await page.goto(parcel_url, wait_until="networkidle", timeout=20_000)
+
+                # Step 2: fill postal-code verification form if present
+                verify_input = await page.query_selector(
+                    "input[name='verificationCode']"
+                )
+                if verify_input:
+                    await verify_input.fill(postal_code)
+                    submit = await page.query_selector(
+                        "button[type='submit'], input[name='validate']"
+                    )
+                    if submit:
+                        await submit.click()
+                    else:
+                        await page.keyboard.press("Enter")
+                    await page.wait_for_load_state("networkidle", timeout=15_000)
+
+                    # After verification, DPD may redirect or reload with details
+                    try:
+                        await page.wait_for_selector(
+                            ".parcelDetailsBox, .parcelStatusBox, "
+                            "a[href*='parcelNumber']",
+                            timeout=10_000,
+                        )
+                    except Exception:
+                        pass  # Capture whatever we got
+
+                html = await page.content()
+                logger.info(
+                    "DPD guest track complete for %s, %d bytes",
+                    tracking_number, len(html),
+                )
+                return html
+            finally:
+                await browser.close()
 
 
 class _noop_ctx:

@@ -83,6 +83,46 @@ async def test_dpd_rejects_oauth():
         await carrier.get_auth_url("http://callback")
 
 
+async def test_track_returns_unknown_without_postal_code():
+    """track() without postal_code → UNKNOWN (can't verify)."""
+    carrier = DPD()
+    result = await carrier.track("05222667810779")
+    assert result.status == TrackingStatus.UNKNOWN
+    assert result.events == []
+
+
+async def test_track_uses_playwright_guest_flow(monkeypatch):
+    """track() with postal_code → Playwright guest verification → parsed results."""
+    detail_html = """
+    <html><body>
+    <a href="/nl/mydpd/my-parcels/incoming?parcelNumber=05222667810779">
+        <span class="parcelAlias">Parcel from TestSender</span>
+    </a>
+    <span class="parcelNumber">05222667810779</span>
+    <div class="parcelStatusBox">
+        <div class="status-icon transit"></div>
+    </div>
+    </body></html>
+    """
+    calls: list[tuple[str, str]] = []
+
+    async def fake_guest_track(tracking_number, postal_code):
+        calls.append((tracking_number, postal_code))
+        return detail_html
+
+    monkeypatch.setattr(
+        "dwmp.carriers.dpd._playwright_guest_track", fake_guest_track
+    )
+
+    carrier = DPD()
+    result = await carrier.track("05222667810779", postal_code="1431RZ")
+    assert calls == [("05222667810779", "1431RZ")]
+    assert result.tracking_number == "05222667810779"
+    assert result.carrier == "dpd"
+    # Status parsed from .status-icon class
+    assert result.status == TrackingStatus.IN_TRANSIT
+
+
 async def test_sync_packages_cookies_mode_captures_live_html(monkeypatch):
     """Cookies JSON → Playwright re-captures the page and refreshes tokens."""
     carrier = DPD()
