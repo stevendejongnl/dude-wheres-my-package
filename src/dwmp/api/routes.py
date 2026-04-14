@@ -230,57 +230,23 @@ class BrowserPushRequest(BaseModel):
     html: str
 
 
-def _cors_headers() -> dict[str, str]:
-    return {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Authorization, Content-Type",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-    }
-
-
-@router.options("/accounts/{account_id}/browser-push")
-async def browser_push_preflight(account_id: int) -> Response:
-    return Response(status_code=204, headers=_cors_headers())
-
-
 @router.post("/accounts/{account_id}/browser-push")
 async def browser_push(
     account_id: int,
     body: BrowserPushRequest,
     service: TrackingService = Depends(get_tracking_service),
-) -> Response:
+) -> list[dict]:
     """Accept raw HTML captured by the user's browser and sync from it.
 
-    This bypasses Playwright entirely — the user's browser (which has
-    a valid session) captures the page and POSTs the HTML here. Used
-    for carriers like DPD where cookie replay from the pod is impossible.
-
-    CORS is open because the bookmarklet runs on dpdgroup.com and needs
-    to POST cross-origin. Auth is still required via Bearer token.
+    Called by the browser-push relay page (same-origin) after receiving
+    the HTML via postMessage from the bookmarklet on dpdgroup.com.
     """
-    import json as _json
-
     try:
-        result = await service.sync_account_from_html(account_id, body.html)
+        return await service.sync_account_from_html(account_id, body.html)
     except CarrierAuthError as exc:
-        return Response(
-            content=_json.dumps({"detail": exc.message}),
-            status_code=502,
-            media_type="application/json",
-            headers=_cors_headers(),
-        )
+        raise HTTPException(status_code=502, detail=exc.message)
     except ValueError as exc:
-        return Response(
-            content=_json.dumps({"detail": str(exc)}),
-            status_code=400,
-            media_type="application/json",
-            headers=_cors_headers(),
-        )
-    return Response(
-        content=_json.dumps(result),
-        media_type="application/json",
-        headers=_cors_headers(),
-    )
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # --- Package endpoints ---

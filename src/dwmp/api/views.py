@@ -520,22 +520,69 @@ async def track_package_save(
     return HTMLResponse("", headers={"HX-Refresh": "true"})
 
 
-# --- Browser-push form endpoint (bookmarklet) ---
+# --- Browser-push relay endpoint (bookmarklet) ---
+#
+# Flow: bookmarklet on dpdgroup.com opens a dwmp relay page (GET) →
+# Cloudflare challenge passes naturally → relay page uses postMessage
+# to request HTML from the opener (DPD tab) → relay page POSTs the
+# HTML to the API (same-origin, no CORS).
+
+_RELAY_PAGE = """<!DOCTYPE html>
+<html><head><title>DWMP Sync</title><meta charset="utf-8">
+<style>
+body{font-family:system-ui;background:#1a1b2e;color:#e0e0e0;
+  display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
+.card{background:#252640;padding:40px;border-radius:16px;text-align:center;max-width:420px;}
+.ok{color:#00b894;font-size:1.8rem;font-weight:600;}
+.err{color:#d63031;font-size:1.2rem;font-weight:600;}
+.spin{color:#74b9ff;font-size:1.2rem;}
+p{color:#a0a0b0;margin-top:12px;font-size:0.9rem;line-height:1.5;}
+</style></head><body><div class="card" id="card">
+<div class="spin" id="status">Waiting for page data...</div>
+<p id="detail">The bookmarklet is sending parcel data from DPD.</p>
+</div>
+<script>
+var ACCOUNT_ID = "ACCOUNT_ID_PLACEHOLDER";
+var TOKEN = "TOKEN_PLACEHOLDER";
+var BASE = "BASE_PLACEHOLDER";
+
+window.addEventListener("message", function handler(evt) {
+  if (!evt.data || evt.data.type !== "dwmp-browser-push") return;
+  window.removeEventListener("message", handler);
+  document.getElementById("status").textContent = "Syncing...";
+  fetch(BASE + "/api/v1/accounts/" + ACCOUNT_ID + "/browser-push", {
+    method: "POST",
+    headers: {"Content-Type":"application/json","Authorization":"Bearer "+TOKEN},
+    body: JSON.stringify({html: evt.data.html})
+  }).then(function(r){return r.json().then(function(d){
+    if(!r.ok) throw d.detail||r.statusText; return d;
+  })}).then(function(d){
+    document.getElementById("status").className="ok";
+    document.getElementById("status").textContent="Synced "+d.length+" package"+(d.length===1?"":"s");
+    document.getElementById("detail").textContent="You can close this tab.";
+  }).catch(function(e){
+    document.getElementById("status").className="err";
+    document.getElementById("status").textContent="Sync failed";
+    document.getElementById("detail").textContent=String(e);
+  });
+});
+
+// Tell the opener we're ready
+if (window.opener) window.opener.postMessage({type:"dwmp-relay-ready"}, "*");
+</script></body></html>"""
 
 
-@router.post("/accounts/{account_id}/browser-push", response_class=HTMLResponse)
-async def browser_push_form(
-    request: Request,
+@router.get("/accounts/{account_id}/browser-push", response_class=HTMLResponse)
+async def browser_push_relay(
     account_id: int,
-    service: TrackingService = Depends(get_tracking_service),
-    html: str = Form(default=""),
-    token: str = Form(default=""),
+    token: str = "",
 ):
-    """Accept raw HTML via form POST from a bookmarklet.
+    """Relay page for the browser-push bookmarklet.
 
-    Uses a regular form submission (not fetch) to avoid CORS issues when
-    dwmp is behind Cloudflare. Auth is via a ``token`` form field instead
-    of the Authorization header. Opens in a new tab and shows the result.
+    The bookmarklet opens this page (GET) in a new tab. Cloudflare's JS
+    challenge runs naturally. Once loaded, the page uses postMessage to
+    request the HTML from the opener (DPD tab), then POSTs it to the API
+    from dwmp's own origin (no CORS issues).
     """
     if not verify_token(token):
         return HTMLResponse(
@@ -544,38 +591,10 @@ async def browser_push_form(
             status_code=401,
         )
 
-    if not html.strip():
-        return HTMLResponse(
-            "<h2>No HTML received</h2><p>The bookmarklet didn't capture any page content.</p>",
-            status_code=400,
-        )
-
-    try:
-        result = await service.sync_account_from_html(account_id, html)
-        count = len(result)
-        return HTMLResponse(f"""<!DOCTYPE html>
-<html><head><title>DWMP Sync</title>
-<style>body{{font-family:system-ui;background:#1a1b2e;color:#e0e0e0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}}
-.card{{background:#252640;padding:40px;border-radius:16px;text-align:center;max-width:400px;}}
-.ok{{color:#00b894;font-size:2rem;}} p{{color:#a0a0b0;margin-top:12px;}}</style></head>
-<body><div class="card"><div class="ok">Synced {count} package{'s' if count != 1 else ''}</div>
-<p>You can close this tab.</p></div></body></html>""")
-    except CarrierAuthError as exc:
-        return HTMLResponse(f"""<!DOCTYPE html>
-<html><head><title>DWMP Sync</title>
-<style>body{{font-family:system-ui;background:#1a1b2e;color:#e0e0e0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}}
-.card{{background:#252640;padding:40px;border-radius:16px;text-align:center;max-width:400px;}}
-.err{{color:#d63031;font-size:1.2rem;}} p{{color:#a0a0b0;margin-top:12px;}}</style></head>
-<body><div class="card"><div class="err">Sync failed</div>
-<p>{exc.message}</p></div></body></html>""", status_code=502)
-    except ValueError as exc:
-        return HTMLResponse(f"""<!DOCTYPE html>
-<html><head><title>DWMP Sync</title>
-<style>body{{font-family:system-ui;background:#1a1b2e;color:#e0e0e0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}}
-.card{{background:#252640;padding:40px;border-radius:16px;text-align:center;max-width:400px;}}
-.err{{color:#d63031;font-size:1.2rem;}} p{{color:#a0a0b0;margin-top:12px;}}</style></head>
-<body><div class="card"><div class="err">Error</div>
-<p>{exc}</p></div></body></html>""", status_code=400)
+    page = _RELAY_PAGE.replace("ACCOUNT_ID_PLACEHOLDER", str(account_id))
+    page = page.replace("TOKEN_PLACEHOLDER", token)
+    page = page.replace("BASE_PLACEHOLDER", _PUBLIC_URL or "")
+    return HTMLResponse(page)
 
 
 # --- Package refresh view ---

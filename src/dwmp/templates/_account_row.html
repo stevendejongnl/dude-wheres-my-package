@@ -92,7 +92,7 @@
 
         <div style="text-align:center;padding:20px 0;">
           <a class="btn btn-primary" style="cursor:grab;user-select:none;font-size:0.9rem;padding:10px 24px;"
-            href="javascript:void(function(){var f=document.createElement('form');f.method='POST';f.action='{{ dwmp_origin }}{{ base_path }}/accounts/{{ account.id }}/browser-push';f.target='_blank';var h=document.createElement('textarea');h.name='html';h.value=document.documentElement.outerHTML;h.style.display='none';f.appendChild(h);var t=document.createElement('input');t.type='hidden';t.name='token';t.value='{{ api_token }}';f.appendChild(t);document.body.appendChild(f);f.submit();document.body.removeChild(f);}())">
+            href="javascript:void(function(){var html=document.documentElement.outerHTML;var w=window.open('{{ dwmp_origin }}{{ base_path }}/accounts/{{ account.id }}/browser-push?token={{ api_token }}','_blank');window.addEventListener('message',function h(e){if(e.data&&e.data.type==='dwmp-relay-ready'){window.removeEventListener('message',h);w.postMessage({type:'dwmp-browser-push',html:html},'*');}});}())">
             Sync DPD
           </a>
           <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;">
