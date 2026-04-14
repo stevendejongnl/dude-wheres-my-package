@@ -321,6 +321,12 @@
       font-size: 0.75rem; color: var(--text);
       overflow-x: auto; white-space: pre; user-select: all;
     }
+    .wizard-code.copyable {
+      cursor: pointer; position: relative;
+      transition: border-color 0.15s;
+    }
+    .wizard-code.copyable:hover { border-color: var(--accent); }
+    .wizard-code.copyable:active { background: var(--surface2); }
     .wizard-details {
       margin: 0 0 10px; border: 1px solid var(--border);
       border-radius: 6px; padding: 8px 12px;

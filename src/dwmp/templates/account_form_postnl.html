@@ -36,7 +36,8 @@
     <li>Open <a href="https://jouw.postnl.nl/account/mijn-pakketten" target="_blank" rel="noopener">jouw.postnl.nl/account/mijn-pakketten</a> and log in.</li>
     <li>Open DevTools (<kbd>F12</kbd>) → <strong>Application</strong> tab → <strong>Session Storage</strong> → <code>jouw.postnl.nl</code>.</li>
     <li>Find the key:
-      <pre class="wizard-code">akamai:1e450c3d-5bbb-4f34-9264-dd51fa9fd066:oidc-tokens</pre>
+      <pre class="wizard-code copyable" onclick="navigator.clipboard.writeText(this.textContent.trim())">akamai:1e450c3d-5bbb-4f34-9264-dd51fa9fd066:oidc-tokens</pre>
+      <small class="form-help">Click the key name to copy it.</small>
     </li>
     <li>Copy the <code>access_token</code> and <code>refresh_token</code> values from the JSON value.</li>
     <li>Paste them into the fields below and click <strong>Test connection</strong>.</li>
