@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.24.0 (2026-04-14)
+
+### Features
+
+- **ui**: Collapsible Details section and Delete button on package cards
+  ([`fb2142d`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/fb2142d6e9c541921bf2329265eefb1ae5a747ed))
+
+
 ## v1.23.0 (2026-04-14)
 
 ### Features
