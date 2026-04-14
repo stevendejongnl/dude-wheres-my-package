@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.31.3 (2026-04-14)
+
+### Bug Fixes
+
+- **dpd**: PostMessage relay for bookmarklet — survives Cloudflare on both ends
+  ([`cfb6dbb`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/cfb6dbb9797a695937e99ea3a7296fba6e8ca674))
+
+
 ## v1.31.2 (2026-04-14)
 
 ### Bug Fixes
