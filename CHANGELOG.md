@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.32.0 (2026-04-14)
+
+### Features
+
+- **browser-push**: Universal bookmarklet that auto-detects carrier site
+  ([`f663195`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/f663195651b2cd346583867ce2afcae378ce5ae5))
+
+
 ## v1.31.6 (2026-04-14)
 
 ### Bug Fixes
