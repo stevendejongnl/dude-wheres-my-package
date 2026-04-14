@@ -111,15 +111,30 @@ curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/credentials \
 curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
 ```
 
-**API:** REST at `my.dhlecommerce.nl/receiver-parcel-api/parcels` — returns incoming and outgoing parcels.
+**API:** REST at `my.dhlecommerce.nl/receiver-parcel-api/parcels` — returns incoming and outgoing parcels. The eCommerce account API typically returns only ~2 events per package.
+
+**DHL Unified Tracking API (optional):** If you set the `DHL_API_KEY` environment variable, dwmp uses the [DHL Unified Tracking API](https://developer.dhl.com) to fetch rich event timelines with 6+ events per package (pickup, sorting, customs, delivery attempts, etc.). Register for free at https://developer.dhl.com to get an API key. Without it, the app falls back to Playwright scraping of the eCommerce portal.
 
 ### DPD
 
-**Auth type:** `manual_token` (browser-captured HTML)
+**Auth type:** `manual_token` (browser-push bookmarklet recommended)
 
-DPD uses Keycloak SSO at `login.dpdgroup.com` with Cloudflare bot protection on the parcels page. No JSON API — the service parses the server-rendered HTML. Because Cloudflare blocks headless HTTP clients, the parcels page HTML must be captured from a real browser session.
+DPD uses Keycloak SSO at `login.dpdgroup.com` with Cloudflare bot protection on the parcels page. No JSON API — the service parses the server-rendered HTML. Cookie-based account sync is unreliable because Keycloak sessions don't survive cross-environment replay.
 
-**Steps:**
+**Recommended: Browser-push bookmarklet**
+
+The simplest way to sync DPD parcels is via the browser-push bookmarklet:
+
+1. Open the **Accounts** page in dwmp
+2. Drag the **Browser Sync** bookmarklet to your bookmarks bar (shown next to your DPD account)
+3. Log in to DPD at https://www.dpdgroup.com/nl/mydpd and navigate to **My parcels** > **Incoming**
+4. Click the bookmarklet — it captures the page HTML and sends it to dwmp via a postMessage relay
+
+The bookmarklet contains a JWT token (365-day expiry) embedded at render time, so no manual authentication is needed.
+
+**Fallback: Manual HTML capture**
+
+You can still capture the HTML manually:
 
 1. Log in at https://www.dpdgroup.com/nl/mydpd/login
 2. Navigate to **My parcels** > **Incoming**
@@ -143,7 +158,9 @@ curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/token \
 curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
 ```
 
-**Note:** DPD parcels are scraped from the HTML. The "token" is a snapshot of the parcels page — re-capture it when you need fresh data.
+**Public tracking:** Individual DPD packages can be refreshed via postal-code verification (no auth needed) using the per-package refresh endpoint.
+
+**Note:** DPD parcels are scraped from HTML snapshots. The bookmarklet automates what was previously a tedious copy-paste workflow.
 
 ### GLS
 
@@ -207,10 +224,12 @@ notifications), or hit the JSON API directly — see below.
 
 Dwmp ships a server-rendered HTML UI at `/`:
 
-- `/` — package list with the "Track a package" modal
-- `/accounts` — connected accounts, inline add/edit/test/sync flows
-- `/notifications` — status-change history with unread badge
+- `/` — package list with the "Track a package" modal, per-package **Refresh** and **Delete** buttons, and collapsible **Details** sections showing postal code, tracking URL, source, and timestamps
+- `/accounts` — connected accounts, inline add/edit/test/sync flows, **Browser Sync** modal for DPD accounts with draggable bookmarklet, and delivery postal code field on all carrier account forms (enables public tracking fallback when account cookies expire)
+- `/notifications` — status-change history with unread badge, rich browser push notifications showing carrier, status, and event description
 - `/login` / `/logout` — password gate (only enabled when `PASSWORD_HASH` is set)
+
+Form submissions show a loading overlay (blur + spinner) to prevent double-clicks.
 
 All UI routes sit behind the same auth middleware as the API.
 
@@ -221,8 +240,10 @@ If the `PASSWORD_HASH` environment variable is set, every route except
 and `/redoc` requires auth. If it's unset, the app is open — fine for a
 trusted LAN, not fine for the public internet.
 
-Browsers get a cookie session via `/login`. API clients exchange the password
-for a long-lived JWT:
+Browsers get a cookie session via `/login`. The browser-push bookmarklet uses a
+JWT token embedded at render time (365-day expiry) so the relay page can
+authenticate without cookies. API clients exchange the password for a long-lived
+JWT:
 
 ```bash
 curl -X POST https://dwmp.madebysteven.nl/api/v1/auth/token \
@@ -264,6 +285,8 @@ GET    /api/v1/accounts                   # List connected accounts (tokens stri
 GET    /api/v1/accounts/{id}              # Account details
 DELETE /api/v1/accounts/{id}              # Disconnect account
 POST   /api/v1/accounts/{id}/sync         # Force sync packages from account
+POST   /api/v1/accounts/{id}/browser-push # Accept raw HTML for parsing (bookmarklet)
+GET    /api/v1/accounts/{id}/browser-push?token=...  # Relay page for bookmarklet postMessage
 ```
 
 ### Packages
@@ -308,6 +331,8 @@ docker run -p 8000:8000 -v dwmp-data:/app/data dwmp
 | `JWT_SECRET` | *(random)* | HS256 signing secret for session JWTs. Defaults to a per-process random value, so sessions invalidate on every restart unless you pin it. |
 | `TZ` | `Europe/Amsterdam` | Display timezone for rendered dates/times in the web UI. |
 | `PLAYWRIGHT_BROWSER_CHANNEL` | `chrome` | Playwright browser channel used by carriers that scrape via headless browser (Amazon, DPD). Set empty to use bundled Chromium. |
+| `DHL_API_KEY` | *(unset)* | Free API key from [developer.dhl.com](https://developer.dhl.com). Enables rich event timeline for DHL packages (6+ events). Without it, falls back to Playwright scraping. |
+| `DWMP_PUBLIC_URL` | *(unset)* | Public-facing URL (e.g. `https://dwmp.madebysteven.nl`). Needed for the browser-push bookmarklet when behind a reverse proxy or Cloudflare. |
 
 ## Kubernetes
 
