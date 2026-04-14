@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.29.0 (2026-04-14)
+
+### Features
+
+- **ui**: Click-to-copy JS snippets and console cookie export
+  ([`d6bb180`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/d6bb18079ddfb5788d3e0f2b9624093202b61f73))
+
+
 ## v1.28.0 (2026-04-14)
 
 ### Features
