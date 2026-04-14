@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+  <!-- ── Setup view ────────────────────────── -->
+  <div id="setup-view" class="setup hidden">
+    <img src="../icons/icon-128.png" alt="" class="setup-icon">
+    <h2>Dude, Where's My Package?</h2>
+    <p>Connect to your DWMP instance to start syncing.</p>
+
+    <div class="form-group">
+      <label for="setup-url">Server URL</label>
+      <input type="url" id="setup-url" placeholder="https://dwmp.example.com" autocomplete="url">
+    </div>
+    <div class="form-group">
+      <label for="setup-password">Password</label>
+      <input type="password" id="setup-password" placeholder="Your DWMP password" autocomplete="current-password">
+    </div>
+    <div id="setup-error" class="form-error"></div>
+    <button id="setup-connect" class="btn btn-primary">Connect</button>
+  </div>
+
+  <!-- ── Connected view ────────────────────── -->
+  <div id="main-view" class="hidden">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <img src="../icons/icon-48.png" alt="" class="header-icon">
+        <div>
+          <div class="header-title">DWMP</div>
+          <div class="header-status">
+            <span class="status-dot connected" id="status-dot"></span>
+            <span id="status-text">Connected</span>
+          </div>
+        </div>
+      </div>
+      <span class="version-badge" id="version-badge"></span>
+    </div>
+
+    <!-- Update banner -->
+    <div id="update-banner" class="update-banner hidden">
+      <span>v<span id="update-version"></span> available</span>
+      <a id="update-link" href="#" target="_blank">Download</a>
+    </div>
+
+    <!-- Sync current page -->
+    <div class="section">
+      <div class="section-label">Current Page</div>
+      <button id="sync-page-btn" class="sync-page-btn" disabled>
+        <span id="sync-page-text">Not on a carrier site</span>
+      </button>
+    </div>
+
+    <!-- Accounts -->
+    <div class="section">
+      <div class="section-label">Accounts</div>
+      <div id="accounts-list">
+        <div class="empty">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Packages summary -->
+    <div class="section">
+      <div class="section-label">Packages</div>
+      <div class="pkg-summary">
+        <div class="pkg-stat">
+          <div class="pkg-stat-value" id="pkg-active">-</div>
+          <div class="pkg-stat-label">Active</div>
+        </div>
+        <div class="pkg-stat">
+          <div class="pkg-stat-value" id="pkg-delivered">-</div>
+          <div class="pkg-stat-label">Delivered</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="section">
+      <div class="section-label">Settings</div>
+      <div class="setting-row">
+        <span class="setting-label">Auto-sync interval</span>
+        <select id="sync-interval" class="setting-select">
+          <option value="30">30 min</option>
+          <option value="60" selected>1 hour</option>
+          <option value="120">2 hours</option>
+          <option value="360">6 hours</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <a href="#" id="open-dashboard">Open Dashboard</a>
+      <a href="#" id="disconnect">Disconnect</a>
+    </div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

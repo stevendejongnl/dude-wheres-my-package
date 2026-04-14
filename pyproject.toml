@@ -58,6 +58,6 @@ branch = "main"
 # `kubectl apply -f kubernetes/deployment.yaml` silently rolls the live
 # deployment back to whatever stale tag the file still pins — which bit us
 # when a deploy.yaml apply reverted 1.20.0 → 1.9.1 mid-debug.
-build_command = "uv lock && git add uv.lock && sed -i -E 's|(dude-wheres-my-package:)[0-9]+\\.[0-9]+\\.[0-9]+|\\1{version}|' kubernetes/deployment.yaml && git add kubernetes/deployment.yaml"
+build_command = "uv lock && git add uv.lock && sed -i -E 's|(dude-wheres-my-package:)[0-9]+\\.[0-9]+\\.[0-9]+|\\1{version}|' kubernetes/deployment.yaml && git add kubernetes/deployment.yaml && sed -i -E 's|\"version\": \"[0-9]+\\.[0-9]+\\.[0-9]+\"|\"version\": \"{version}\"|' chrome-extension/manifest.json && git add chrome-extension/manifest.json"
 commit_message = "chore(release): {version}"
 tag_format = "v{version}"

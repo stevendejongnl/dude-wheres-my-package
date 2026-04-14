@@ -1,0 +1,473 @@
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #242736;
+  --border: #2e3145;
+  --text: #e1e4ed;
+  --text-dim: #8b8fa3;
+  --accent: #6c5ce7;
+  --accent-hover: #7c6df7;
+  --green: #00b894;
+  --yellow: #fdcb6e;
+  --red: #d63031;
+  --blue: #74b9ff;
+  --radius: 10px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  width: 380px;
+  min-height: 200px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ── Header ──────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.header-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.header-status {
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.connected { background: var(--green); }
+.status-dot.error { background: var(--red); }
+
+/* ── Update banner ───────────────────────────── */
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: #00b89415;
+  border-bottom: 1px solid #00b89430;
+  font-size: 12px;
+}
+
+.update-banner a {
+  color: var(--green);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.update-banner a:hover { text-decoration: underline; }
+
+/* ── Sections ────────────────────────────────── */
+
+.section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.section-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+/* ── Sync current page button ────────────────── */
+
+.sync-page-btn {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.sync-page-btn:hover:not(:disabled) {
+  background: var(--surface2);
+  border-color: var(--accent);
+}
+
+.sync-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sync-page-btn.success {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.sync-page-btn.error {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* ── Account rows ────────────────────────────── */
+
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.account-row:last-child { border-bottom: none; }
+
+.carrier-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  text-align: center;
+  min-width: 50px;
+  flex-shrink: 0;
+}
+
+.carrier-badge.amazon { background: #ff990020; color: #ffad42; }
+.carrier-badge.postnl { background: #ff6b0020; color: #ff8a50; }
+.carrier-badge.dhl { background: #ffcc0020; color: #ffd93d; }
+.carrier-badge.dpd { background: #dc143c20; color: #ff6b81; }
+.carrier-badge.gls { background: #003e7e20; color: #4a90d9; }
+
+.account-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-name {
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.account-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ── Buttons ─────────────────────────────────── */
+
+.btn {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-primary:hover { background: var(--accent-hover); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+
+.btn-ghost:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Toggle switch ───────────────────────────── */
+
+.toggle {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 2px;
+  top: 2px;
+  background: var(--text-dim);
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.toggle input:checked + .toggle-slider {
+  background: var(--accent);
+}
+
+.toggle input:checked + .toggle-slider::before {
+  transform: translateX(16px);
+  background: white;
+}
+
+/* ── Setup form ──────────────────────────────── */
+
+.setup {
+  padding: 28px 24px;
+  text-align: center;
+}
+
+.setup-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  margin-bottom: 16px;
+}
+
+.setup h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.setup p {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+}
+
+.form-group {
+  text-align: left;
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  margin-bottom: 5px;
+  color: var(--text-dim);
+}
+
+.form-group input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.form-group input:focus {
+  border-color: var(--accent);
+}
+
+.form-group input::placeholder {
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+
+.form-error {
+  color: var(--red);
+  font-size: 12px;
+  margin-top: 6px;
+  text-align: left;
+  display: none;
+}
+
+.form-error.visible { display: block; }
+
+.setup .btn-primary {
+  width: 100%;
+  padding: 10px;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+/* ── Packages summary ────────────────────────── */
+
+.pkg-summary {
+  display: flex;
+  gap: 10px;
+}
+
+.pkg-stat {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.pkg-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.pkg-stat-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ── Footer ──────────────────────────────────── */
+
+.footer {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.footer a {
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.footer a:hover { color: var(--text); }
+
+.version-badge {
+  font-size: 10px;
+  color: var(--accent);
+  background: #6c5ce715;
+  border: 1px solid #6c5ce730;
+  padding: 1px 7px;
+  border-radius: 12px;
+}
+
+/* ── Spinner ─────────────────────────────────── */
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Settings section ────────────────────────── */
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+
+.setting-label {
+  font-size: 12px;
+}
+
+.setting-select {
+  padding: 4px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+
+.setting-select:focus { border-color: var(--accent); }
+
+/* ── Empty state ─────────────────────────────── */
+
+.empty {
+  text-align: center;
+  padding: 16px 0;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+/* ── Hidden ──────────────────────────────────── */
+
+.hidden { display: none !important; }
