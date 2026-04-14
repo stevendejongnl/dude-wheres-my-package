@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.28.0 (2026-04-14)
+
+### Features
+
+- **notifications**: Include event description in status-change notifications
+  ([`5f901cf`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/5f901cf3730234d4c04fc59c264851c9541809de))
+
+
 ## v1.27.0 (2026-04-14)
 
 ### Features
