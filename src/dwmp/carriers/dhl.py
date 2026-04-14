@@ -1,3 +1,6 @@
+import logging
+import os
+import re
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -11,11 +14,16 @@ from dwmp.carriers.base import (
     TrackingStatus,
 )
 
+logger = logging.getLogger(__name__)
+
 # DHL eCommerce NL endpoints
 DHL_BASE = "https://my.dhlecommerce.nl"
 DHL_LOGIN_URL = f"{DHL_BASE}/api/user/login"
 DHL_PARCELS_URL = f"{DHL_BASE}/receiver-parcel-api/parcels"
-DHL_TRACKING_URL = "https://www.dhl.com/shipmentTracking"
+
+# DHL Unified Tracking API (free key from developer.dhl.com)
+DHL_UNIFIED_API = "https://api-eu.dhl.com/track/shipments"
+DHL_API_KEY = os.environ.get("DHL_API_KEY", "")
 
 STATUS_MAP: list[tuple[str, TrackingStatus]] = [
     ("delivered", TrackingStatus.DELIVERED),
@@ -41,6 +49,20 @@ def _ensure_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=UTC)
     return dt
+
+
+# Direct mapping from the DHL Unified API statusCode field.
+_STATUS_CODE_MAP: dict[str, TrackingStatus] = {
+    "pre-transit": TrackingStatus.PRE_TRANSIT,
+    "transit": TrackingStatus.IN_TRANSIT,
+    "delivered": TrackingStatus.DELIVERED,
+    "failure": TrackingStatus.FAILED_ATTEMPT,
+    "unknown": TrackingStatus.UNKNOWN,
+}
+
+
+def _map_status_code(code: str) -> TrackingStatus:
+    return _STATUS_CODE_MAP.get(code.lower(), TrackingStatus.UNKNOWN)
 
 
 def _parse_status(text: str) -> TrackingStatus:
@@ -125,25 +147,80 @@ class DHL(CarrierBase):
         return results
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
-        params = {
-            "trackingNumber": tracking_number,
-            "language": "en",
-            "requesterCountryCode": "NL",
-        }
+        """Fetch full tracking timeline for a single DHL parcel.
 
+        Uses the DHL Unified Tracking API when ``DHL_API_KEY`` is set
+        (recommended — lightweight JSON, rich events). Falls back to
+        Playwright scraping of dhl.com/tracking when no key is configured.
+        """
+        if DHL_API_KEY:
+            return await self._track_via_api(tracking_number)
+        return await self._track_via_playwright(tracking_number)
+
+    async def _track_via_api(self, tracking_number: str) -> TrackingResult:
+        """DHL Unified Tracking API — returns full event timeline as JSON."""
         async with self._get_client() as client:
             response = await client.get(
-                DHL_TRACKING_URL,
-                params=params,
+                DHL_UNIFIED_API,
+                params={"trackingNumber": tracking_number},
                 headers={
-                    "User-Agent": "Mozilla/5.0",
+                    "DHL-API-Key": DHL_API_KEY,
                     "Accept": "application/json",
                 },
-                follow_redirects=True,
+                timeout=15,
             )
+            if response.status_code == 404:
+                return TrackingResult(
+                    tracking_number=tracking_number,
+                    carrier=self.name,
+                    status=TrackingStatus.UNKNOWN,
+                )
             response.raise_for_status()
 
-        return self._parse_tracking_response(tracking_number, response.json())
+        return self._parse_unified_response(tracking_number, response.json())
+
+    async def _track_via_playwright(self, tracking_number: str) -> TrackingResult:
+        """Fallback: scrape dhl.com/tracking with Playwright."""
+        from playwright.async_api import async_playwright
+
+        from dwmp.carriers.browser import _USER_AGENT, _browser_lock, _launch_browser, _stealth
+
+        url = (
+            f"https://www.dhl.com/nl-en/home/tracking/tracking-parcel.html"
+            f"?submit=1&tracking-id={tracking_number}"
+        )
+
+        async with _browser_lock:
+            async with _stealth(_USER_AGENT).use_async(async_playwright()) as pw:
+                browser = await _launch_browser(pw)
+                try:
+                    context = await browser.new_context(
+                        user_agent=_USER_AGENT,
+                        viewport={"width": 1280, "height": 800},
+                        locale="en-GB",
+                        timezone_id="Europe/Amsterdam",
+                    )
+                    page = await context.new_page()
+                    await page.goto(url, wait_until="networkidle", timeout=20_000)
+
+                    # Wait for tracking events to render
+                    try:
+                        await page.wait_for_selector(
+                            "[class*='timeline'], [class*='event'], "
+                            "[class*='tracking-step']",
+                            timeout=15_000,
+                        )
+                    except Exception:
+                        logger.warning(
+                            "DHL tracking events did not render for %s",
+                            tracking_number,
+                        )
+
+                    html = await page.content()
+                finally:
+                    await browser.close()
+
+        return self._parse_tracking_html(tracking_number, html)
 
     def _get_client(self):
         if self._client:
@@ -198,56 +275,96 @@ class DHL(CarrierBase):
             events=sorted(events, key=lambda e: e.timestamp),
         )
 
-    def _parse_tracking_response(self, tracking_number: str, data: dict) -> TrackingResult:
-        events: list[TrackingEvent] = []
-        status = TrackingStatus.UNKNOWN
-
-        shipments = data.get("results", data.get("shipments", []))
-        if isinstance(shipments, list) and shipments:
-            shipment = shipments[0]
-        elif isinstance(shipments, dict):
-            shipment = shipments
-        else:
+    def _parse_unified_response(self, tracking_number: str, data: dict) -> TrackingResult:
+        """Parse the DHL Unified Tracking API response."""
+        shipments = data.get("shipments", [])
+        if not shipments:
             return TrackingResult(
                 tracking_number=tracking_number,
                 carrier=self.name,
                 status=TrackingStatus.UNKNOWN,
             )
 
-        status_text = shipment.get("status", {}).get("description", "")
-        if status_text:
-            status = _parse_status(status_text)
+        shipment = shipments[0]
 
-        for cp in shipment.get("events", shipment.get("checkpoints", [])):
-            ts_str = cp.get("timestamp") or cp.get("date", "")
-            description = cp.get("description", cp.get("statusDescription", ""))
-            location_parts = []
-            loc = cp.get("location", {})
+        # Top-level status from statusCode (more reliable than description text)
+        status_code = shipment.get("status", {}).get("statusCode", "")
+        status = _map_status_code(status_code)
+        if status == TrackingStatus.UNKNOWN:
+            status = _parse_status(
+                shipment.get("status", {}).get("description", "")
+            )
+
+        events: list[TrackingEvent] = []
+        for ev in shipment.get("events", []):
+            ts_str = ev.get("timestamp", "")
+            description = ev.get("description", "")
+            # Strip HTML tags from descriptions (API sometimes includes <a> links)
+            description = re.sub(r"<[^>]+>", "", description).strip()
+            # Collapse whitespace left by tag removal
+            description = re.sub(r"\s{2,}", " ", description)
+
+            loc = ev.get("location", {})
+            location = None
             if isinstance(loc, dict):
-                if loc.get("address", {}).get("addressLocality"):
-                    location_parts.append(loc["address"]["addressLocality"])
-            elif isinstance(loc, str):
-                location_parts.append(loc)
+                locality = loc.get("address", {}).get("addressLocality", "")
+                if locality:
+                    location = locality
 
             try:
                 ts = _ensure_utc(datetime.fromisoformat(ts_str)) if ts_str else datetime.now(UTC)
             except ValueError:
                 ts = datetime.now(UTC)
 
-            events.append(
-                TrackingEvent(
-                    timestamp=ts,
-                    status=_parse_status(description),
-                    description=description,
-                    location=", ".join(location_parts) or None,
-                )
-            )
+            ev_status_code = ev.get("statusCode", "")
+            ev_status = _map_status_code(ev_status_code)
+            if ev_status == TrackingStatus.UNKNOWN:
+                ev_status = _parse_status(description)
+
+            events.append(TrackingEvent(
+                timestamp=ts,
+                status=ev_status,
+                description=description,
+                location=location,
+            ))
 
         return TrackingResult(
             tracking_number=tracking_number,
             carrier=self.name,
             status=status,
             events=sorted(events, key=lambda e: e.timestamp),
+        )
+
+    def _parse_tracking_html(self, tracking_number: str, html: str) -> TrackingResult:
+        """Parse the dhl.com tracking page HTML (Playwright fallback)."""
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "lxml")
+        events: list[TrackingEvent] = []
+        status = TrackingStatus.UNKNOWN
+
+        # DHL tracking page renders events in timeline steps
+        for step in soup.select(
+            "[class*='timeline-event'], [class*='tracking-step'], "
+            "[class*='c-tracking-result--event']"
+        ):
+            desc = step.get_text(separator=" ", strip=True)
+            if not desc:
+                continue
+            events.append(TrackingEvent(
+                timestamp=datetime.now(UTC),
+                status=_parse_status(desc),
+                description=desc[:200],
+            ))
+
+        if events:
+            status = events[-1].status
+
+        return TrackingResult(
+            tracking_number=tracking_number,
+            carrier=self.name,
+            status=status,
+            events=events,
         )
 
 

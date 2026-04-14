@@ -81,6 +81,91 @@ def test_parse_parcel_no_events():
     assert result.events == []
 
 
+def test_parse_unified_response():
+    """Full DHL Unified API response → rich event timeline."""
+    carrier = DHL()
+    data = {
+        "shipments": [{
+            "id": "CQ964395186DE",
+            "status": {
+                "statusCode": "transit",
+                "description": "The shipment has been loaded onto the delivery vehicle",
+            },
+            "events": [
+                {
+                    "timestamp": "2026-04-14T10:11:00",
+                    "statusCode": "transit",
+                    "description": "The shipment has been loaded onto the delivery vehicle",
+                    "location": {"address": {"addressLocality": "Netherlands"}},
+                },
+                {
+                    "timestamp": "2026-04-13T16:05:00",
+                    "statusCode": "transit",
+                    "description": "The shipment has arrived in the destination country (<a href='https://example.com'>link</a>)",
+                    "location": {"address": {"addressLocality": "Netherlands"}},
+                },
+                {
+                    "timestamp": "2026-04-10T18:23:00",
+                    "statusCode": "pre-transit",
+                    "description": "Instruction data provided by sender",
+                },
+            ],
+        }],
+    }
+    result = carrier._parse_unified_response("CQ964395186DE", data)
+    assert result.tracking_number == "CQ964395186DE"
+    assert result.status == TrackingStatus.IN_TRANSIT
+    assert len(result.events) == 3
+    # Events sorted by timestamp
+    assert result.events[0].status == TrackingStatus.PRE_TRANSIT
+    assert result.events[2].status == TrackingStatus.IN_TRANSIT
+    assert result.events[2].location == "Netherlands"
+    # HTML stripped from descriptions
+    assert "<a" not in result.events[1].description
+
+
+def test_parse_unified_response_empty():
+    carrier = DHL()
+    result = carrier._parse_unified_response("UNKNOWN", {"shipments": []})
+    assert result.status == TrackingStatus.UNKNOWN
+
+
+async def test_track_uses_api_when_key_set(monkeypatch):
+    """With DHL_API_KEY set, track() calls the Unified API."""
+    monkeypatch.setattr("dwmp.carriers.dhl.DHL_API_KEY", "test-key-123")
+
+    captured: list[dict] = []
+
+    async def fake_get(self, url, **kwargs):
+        captured.append({"url": url, "headers": kwargs.get("headers", {})})
+
+        class FakeResp:
+            status_code = 200
+            def raise_for_status(self): pass
+            def json(self):
+                return {"shipments": [{
+                    "id": "TEST123",
+                    "status": {"statusCode": "delivered", "description": "Delivered"},
+                    "events": [{
+                        "timestamp": "2026-04-14T10:00:00",
+                        "statusCode": "delivered",
+                        "description": "Delivered to mailbox",
+                        "location": {"address": {"addressLocality": "Amsterdam"}},
+                    }],
+                }]}
+        return FakeResp()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    carrier = DHL()
+    result = await carrier.track("TEST123")
+    assert len(captured) == 1
+    assert "api-eu.dhl.com" in captured[0]["url"]
+    assert captured[0]["headers"]["DHL-API-Key"] == "test-key-123"
+    assert result.status == TrackingStatus.DELIVERED
+    assert len(result.events) == 1
+
+
 async def test_dhl_rejects_oauth():
     carrier = DHL()
     with pytest.raises(NotImplementedError):
