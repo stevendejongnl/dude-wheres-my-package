@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.31.6 (2026-04-14)
+
+### Bug Fixes
+
+- **amazon**: Always emit status event even when status text has no date
+  ([`462a8fc`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/462a8fcc5062db61b402a3785868408149fccb21))
+
+
 ## v1.31.5 (2026-04-14)
 
 ### Bug Fixes
