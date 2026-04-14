@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.25.0 (2026-04-14)
+
+### Features
+
+- **dhl**: Rich event timeline via DHL Unified Tracking API with Playwright fallback
+  ([`33efabb`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/33efabb6cab75417dcc04466e111bb09c240da68))
+
+
 ## v1.24.0 (2026-04-14)
 
 ### Features
