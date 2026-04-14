@@ -2,6 +2,8 @@
 
 Package tracking service for Dutch carriers. Runs as a container with a REST API and background poller.
 
+**[Website](https://stevendejongnl.github.io/dude-wheres-my-package/)** | **[GitHub](https://github.com/stevendejongnl/dude-wheres-my-package)** | **[Chrome Extension](https://github.com/stevendejongnl/dude-wheres-my-package/releases/latest)**
+
 ## Carrier Setup
 
 ### Amazon
