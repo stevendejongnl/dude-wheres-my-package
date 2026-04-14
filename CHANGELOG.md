@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.31.2 (2026-04-14)
+
+### Bug Fixes
+
+- **dpd**: Use form POST for bookmarklet to bypass Cloudflare CORS block
+  ([`3ec429a`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/3ec429a96bac911b1bfe3282f5ea6c7f3daaf4ee))
+
+
 ## v1.31.1 (2026-04-14)
 
 ### Bug Fixes
