@@ -38,6 +38,7 @@ class TrackingService:
         tracking_number: str,
         carrier: str,
         label: str | None,
+        description: str | None = None,
     ) -> None:
         """Update package status and create a notification if it changed."""
         existing = await self._repository.get_package(pkg_id)
@@ -51,6 +52,7 @@ class TrackingService:
                 tracking_number=tracking_number,
                 carrier=carrier,
                 label=label,
+                description=description,
             )
 
     async def notify_auth_failure(self, carrier: str, message: str) -> None:
@@ -365,9 +367,12 @@ class TrackingService:
                     pkg_id, result.tracking_url
                 )
 
+            # Latest event description for the notification
+            latest_desc = result.events[-1].description if result.events else None
             await self._update_package_status(
                 pkg_id, result.status.value, result.tracking_number,
                 result.carrier, existing.get("label") if existing else None,
+                description=latest_desc,
             )
             for event in result.events:
                 await self._repository.add_event(
@@ -451,9 +456,11 @@ class TrackingService:
             )
             return await self.get_package(package_id)
 
+        latest_desc = result.events[-1].description if result.events else None
         await self._update_package_status(
             package_id, result.status.value,
             pkg["tracking_number"], pkg["carrier"], pkg.get("label"),
+            description=latest_desc,
         )
         for event in result.events:
             await self._repository.add_event(

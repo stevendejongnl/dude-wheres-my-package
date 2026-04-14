@@ -133,6 +133,15 @@ class PackageRepository:
             )
             await self.db.commit()
 
+        # v1.27: add notifications.description for richer notification messages
+        cursor = await self.db.execute("PRAGMA table_info(notifications)")
+        notif_cols = {col["name"] for col in await cursor.fetchall()}
+        if "description" not in notif_cols:
+            await self.db.execute(
+                "ALTER TABLE notifications ADD COLUMN description TEXT"
+            )
+            await self.db.commit()
+
     @property
     def db(self) -> aiosqlite.Connection:
         assert self._db is not None, "Repository not initialized — call init() first"
@@ -410,13 +419,14 @@ class PackageRepository:
         tracking_number: str,
         carrier: str,
         label: str | None = None,
+        description: str | None = None,
     ) -> int:
         now = datetime.now(UTC).isoformat()
         cursor = await self.db.execute(
             """INSERT INTO notifications
-               (package_id, old_status, new_status, tracking_number, carrier, label, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (package_id, old_status, new_status, tracking_number, carrier, label, now),
+               (package_id, old_status, new_status, tracking_number, carrier, label, description, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (package_id, old_status, new_status, tracking_number, carrier, label, description, now),
         )
         await self.db.commit()
         assert cursor.lastrowid is not None

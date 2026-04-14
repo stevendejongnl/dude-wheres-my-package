@@ -22,6 +22,9 @@
         <span class="status-arrow">&rarr;</span>
         <span class="status status-{{ n.new_status }}">{{ n.new_status_display }}</span>
       </div>
+      {% if n.description %}
+      <span class="notification-desc">{{ n.description }}</span>
+      {% endif %}
       <span class="pkg-date">{{ n.formatted_time }}</span>
     </div>
   </div>
