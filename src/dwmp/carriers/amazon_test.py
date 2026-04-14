@@ -274,7 +274,7 @@ async def test_sync_relogin_fails_without_credentials(monkeypatch):
 
     carrier = Amazon()
     tokens = AuthTokens(access_token='[{"name":"old"}]', refresh_token=None)
-    with pytest.raises(CarrierAuthError, match="no stored credentials"):
+    with pytest.raises(CarrierAuthError, match="cookies have expired"):
         await carrier.sync_packages(tokens)
 
 

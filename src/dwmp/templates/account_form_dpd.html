@@ -37,16 +37,11 @@
   <details class="wizard-details">
     <summary><strong>Recommended:</strong> cookies JSON (auto-refreshing)</summary>
     <ol class="wizard-steps">
+      <li>Install the <a href="https://cookie-editor.com/" target="_blank" rel="noopener">Cookie-Editor</a> extension — <strong>required</strong> because critical DPD session cookies are httpOnly (invisible to <code>document.cookie</code>).</li>
       <li>Log in at <a href="https://www.dpdgroup.com/nl/mydpd/login" target="_blank" rel="noopener">dpdgroup.com/nl/mydpd/login</a> and open <strong>My parcels → Incoming</strong> so the Cloudflare challenge completes.</li>
-      <li>Open DevTools (<kbd>F12</kbd>) → <strong>Console</strong> and run:
-        <pre class="wizard-code copyable" onclick="navigator.clipboard.writeText(this.textContent.trim())">copy(JSON.stringify(document.cookie.split('; ').map(c => { const [name, ...v] = c.split('='); return {name, value: v.join('='), domain: location.hostname, path: '/'}; })))</pre>
-        <small class="form-help">Click the snippet to copy it. Paste in the console and press Enter — cookies are now on your clipboard.</small>
-      </li>
+      <li>Click Cookie-Editor → <strong>Export → JSON</strong>.</li>
       <li>Paste the cookies JSON in the field below.</li>
     </ol>
-    <p class="form-hint" style="margin-top:6px;">
-      For best results use the <a href="https://cookie-editor.com/" target="_blank" rel="noopener">Cookie-Editor</a> extension instead — it also captures httpOnly cookies that the console snippet can't access.
-    </p>
   </details>
 
   <details class="wizard-details">

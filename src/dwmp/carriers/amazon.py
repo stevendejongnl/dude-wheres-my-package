@@ -244,8 +244,9 @@ class Amazon(CarrierBase):
         if not tokens.refresh_token:
             raise CarrierAuthError(
                 self.name,
-                "Session expired and no stored credentials for re-login. "
-                "Reconnect your Amazon account.",
+                "Amazon session cookies have expired. Re-export fresh cookies "
+                "from your browser (Cookie-Editor → Export → JSON) and update "
+                "the account.",
             )
 
         creds = json.loads(tokens.refresh_token)
