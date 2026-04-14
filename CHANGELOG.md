@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.30.0 (2026-04-14)
+
+### Features
+
+- **notifications**: Rich browser push with carrier, status, and description
+  ([`9a23bc3`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/9a23bc31b02dc6f231b02c7b1c9265fba4c38eda))
+
+
 ## v1.29.2 (2026-04-14)
 
 ### Bug Fixes
