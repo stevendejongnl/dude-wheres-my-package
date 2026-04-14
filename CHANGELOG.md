@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.37.0 (2026-04-14)
+
+### Features
+
+- Add GitHub Pages website links to footer, README, and extension
+  ([`fd98619`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/fd986192e3d648df798858114f3b42b1842d5134))
+
+
 ## v1.36.0 (2026-04-14)
 
 ### Features
