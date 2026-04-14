@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #242736;
+  --border: #2e3145;
+  --text: #e1e4ed;
+  --text-dim: #8b8fa3;
+  --accent: #6c5ce7;
+  --green: #00b894;
+  --yellow: #fdcb6e;
+  --blue: #74b9ff;
+  --radius: 12px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  padding: 24px 20px;
+}
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  max-width: 960px; margin: 0 auto;
+}
+.card-header {
+  padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.card-body { padding: 0 20px 20px; }
+.pkg-main { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
+.pkg-carrier {
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  padding: 4px 8px; border-radius: 6px; width: 64px; text-align: center; flex-shrink: 0;
+}
+.pkg-carrier.postnl { background: #ff6b0020; color: #ff8a50; }
+.pkg-info { flex: 1; min-width: 0; }
+.pkg-tracking { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85rem; }
+.pkg-details { display: flex; flex-direction: column; gap: 1px; margin-top: 2px; font-size: 0.8rem; color: var(--text-dim); }
+.pkg-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.pkg-date { font-size: 0.75rem; color: var(--text-dim); }
+.status {
+  font-size: 0.75rem; font-weight: 600; padding: 4px 10px;
+  border-radius: 20px; white-space: nowrap;
+}
+.status-in_transit { background: #74b9ff20; color: var(--blue); }
+.btn {
+  padding: 6px 14px; border: none; border-radius: 8px;
+  font-size: 0.8rem; font-weight: 500; cursor: pointer;
+}
+.btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+.btn-danger { background: transparent; color: #d63031; border: 1px solid var(--border); }
+.btn-sm { padding: 4px 10px; font-size: 0.75rem; }
+.card-actions {
+  display: flex; gap: 8px; padding: 12px 0 8px;
+  border-bottom: 1px solid var(--border); margin-bottom: 8px;
+}
+.pkg-metadata {
+  margin: 8px 0; border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 10px; font-size: 0.78rem;
+  background: var(--surface);
+}
+.pkg-metadata summary {
+  cursor: pointer; color: var(--text-dim); font-size: 0.75rem;
+  padding: 2px 0; list-style: revert;
+}
+.pkg-metadata[open] summary { margin-bottom: 8px; }
+.pkg-metadata-grid {
+  display: grid; grid-template-columns: auto 1fr;
+  gap: 4px 12px; align-items: baseline;
+}
+.meta-label { color: var(--text-dim); font-weight: 500; white-space: nowrap; }
+.meta-value { word-break: break-all; }
+.meta-value code {
+  font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.75rem;
+  background: var(--surface2); padding: 1px 5px; border-radius: 4px;
+}
+.meta-value a { color: var(--accent); text-decoration: none; }
+.timeline { padding: 12px 0 4px; }
+.timeline-event {
+  display: flex; gap: 14px; padding: 10px 0;
+  position: relative;
+}
+.timeline-event::before {
+  content: ''; position: absolute; left: 5px; top: 30px; bottom: -10px;
+  width: 2px; background: var(--border);
+}
+.timeline-event:last-child::before { display: none; }
+.timeline-dot {
+  width: 12px; height: 12px; border-radius: 50%; margin-top: 5px; flex-shrink: 0;
+  border: 2px solid var(--border); background: var(--surface);
+}
+.timeline-dot.active { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 8px #6c5ce740; }
+.timeline-content { flex: 1; }
+.timeline-desc { font-size: 0.875rem; }
+.timeline-details { display: flex; gap: 12px; margin-top: 2px; }
+.timeline-time { font-size: 0.75rem; color: var(--text-dim); }
+.timeline-loc { font-size: 0.75rem; color: var(--text-dim); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="card-header">
+      <div class="pkg-main">
+        <span class="pkg-carrier postnl">PostNL</span>
+        <div class="pkg-info">
+          <div class="pkg-tracking">3STEST1234567890</div>
+          <div class="pkg-details">
+            <span><strong>From:</strong> bol.com</span>
+            <span>12 Apr 2026</span>
+            <span>bol.com order #9876543</span>
+          </div>
+        </div>
+      </div>
+      <div class="pkg-meta">
+        <span class="status status-in_transit">in transit</span>
+        <span class="pkg-date">Today 14:32</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-actions">
+        <button class="btn btn-ghost btn-sm">Refresh</button>
+        <button class="btn btn-danger btn-sm">Delete</button>
+      </div>
+
+      <details class="pkg-metadata" open>
+        <summary>Details</summary>
+        <div class="pkg-metadata-grid">
+          <span class="meta-label">Source</span>
+          <span class="meta-value">account</span>
+          <span class="meta-label">Postal code</span>
+          <span class="meta-value"><code>1012AB</code></span>
+          <span class="meta-label">Tracking URL</span>
+          <span class="meta-value"><a href="#">https://jouw.postnl.nl/track-and-trace/3STEST...</a></span>
+          <span class="meta-label">Account</span>
+          <span class="meta-value">#1</span>
+          <span class="meta-label">ETA</span>
+          <span class="meta-value">2026-04-14 18:00</span>
+          <span class="meta-label">Last refreshed</span>
+          <span class="meta-value">2026-04-14 14:32</span>
+          <span class="meta-label">Created</span>
+          <span class="meta-value">2026-04-12 08:30</span>
+          <span class="meta-label">Updated</span>
+          <span class="meta-value">2026-04-14 14:32</span>
+        </div>
+      </details>
+
+      <div class="timeline">
+        <div class="timeline-event">
+          <div class="timeline-dot active"></div>
+          <div class="timeline-content">
+            <div class="timeline-desc">Package is on its way to the delivery location</div>
+            <div class="timeline-details">
+              <span class="timeline-time">14 Apr 2026, 14:32</span>
+              <span class="timeline-loc">Amsterdam</span>
+            </div>
+          </div>
+        </div>
+        <div class="timeline-event">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <div class="timeline-desc">Package is at the sorting center</div>
+            <div class="timeline-details">
+              <span class="timeline-time">13 Apr 2026, 06:45</span>
+              <span class="timeline-loc">Nieuwegein</span>
+            </div>
+          </div>
+        </div>
+        <div class="timeline-event">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <div class="timeline-desc">Package has been picked up by PostNL</div>
+            <div class="timeline-details">
+              <span class="timeline-time">12 Apr 2026, 15:12</span>
+              <span class="timeline-loc">Rotterdam</span>
+            </div>
+          </div>
+        </div>
+        <div class="timeline-event">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <div class="timeline-desc">Shipment information received</div>
+            <div class="timeline-details">
+              <span class="timeline-time">12 Apr 2026, 08:30</span>
+              <span class="timeline-loc">Rotterdam</span>
+            </div>
+          </div>
+        </div>
+        <div class="timeline-event">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <div class="timeline-desc">Shipment registered by sender</div>
+            <div class="timeline-details">
+              <span class="timeline-time">11 Apr 2026, 22:15</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

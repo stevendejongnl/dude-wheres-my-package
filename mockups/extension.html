@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #242736;
+  --border: #2e3145;
+  --text: #e1e4ed;
+  --text-dim: #8b8fa3;
+  --accent: #6c5ce7;
+  --accent-hover: #7c6df7;
+  --green: #00b894;
+  --yellow: #fdcb6e;
+  --red: #d63031;
+  --blue: #74b9ff;
+  --radius: 10px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  width: 380px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.header-left { display: flex; align-items: center; gap: 10px; }
+.header-icon { width: 28px; height: 28px; border-radius: 6px; background: var(--accent); display: flex; align-items: center; justify-content: center; }
+.header-icon svg { width: 16px; height: 16px; fill: white; }
+.header-title { font-size: 14px; font-weight: 600; }
+.header-status { font-size: 11px; display: flex; align-items: center; gap: 5px; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.status-dot.connected { background: var(--green); }
+.version-badge {
+  font-size: 10px; color: var(--accent);
+  background: #6c5ce715; border: 1px solid #6c5ce730;
+  padding: 1px 7px; border-radius: 12px;
+}
+.section { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.section-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.8px; color: var(--text-dim); margin-bottom: 10px;
+}
+.sync-page-btn {
+  width: 100%; padding: 10px; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface);
+  color: var(--text); font-size: 13px; font-weight: 500;
+  cursor: pointer; display: flex; align-items: center;
+  justify-content: center; gap: 8px;
+}
+.account-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 0; border-bottom: 1px solid var(--border);
+}
+.account-row:last-child { border-bottom: none; }
+.carrier-badge {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; padding: 3px 6px; border-radius: 5px;
+  text-align: center; min-width: 50px; flex-shrink: 0;
+}
+.carrier-badge.amazon { background: #ff990020; color: #ffad42; }
+.carrier-badge.postnl { background: #ff6b0020; color: #ff8a50; }
+.carrier-badge.dhl { background: #ffcc0020; color: #ffd93d; }
+.account-info { flex: 1; min-width: 0; }
+.account-name { font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.account-meta { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.toggle { position: relative; width: 34px; height: 18px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0; background: var(--border);
+  border-radius: 9px; cursor: pointer; transition: background 0.2s;
+}
+.toggle-slider::before {
+  content: ""; position: absolute; width: 14px; height: 14px;
+  left: 2px; top: 2px; background: var(--text-dim);
+  border-radius: 50%; transition: all 0.2s;
+}
+.toggle input:checked + .toggle-slider { background: var(--accent); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: white; }
+.btn {
+  padding: 5px 10px; border: none; border-radius: 6px;
+  cursor: pointer; font-size: 11px; font-weight: 500;
+  white-space: nowrap;
+}
+.btn-ghost {
+  background: transparent; color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+.pkg-summary { display: flex; gap: 10px; }
+.pkg-stat {
+  flex: 1; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 12px; text-align: center;
+}
+.pkg-stat-value { font-size: 20px; font-weight: 700; }
+.pkg-stat-label {
+  font-size: 10px; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between; padding: 6px 0;
+}
+.setting-label { font-size: 12px; }
+.setting-select {
+  padding: 4px 8px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-size: 12px; font-family: inherit;
+}
+.footer {
+  padding: 10px 16px; display: flex; align-items: center;
+  justify-content: space-between; font-size: 11px; color: var(--text-dim);
+}
+.footer a { color: var(--text-dim); text-decoration: none; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <div class="header-icon">
+        <svg viewBox="0 0 24 24"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+      </div>
+      <div>
+        <div class="header-title">DWMP</div>
+        <div class="header-status">
+          <span class="status-dot connected"></span>
+          dwmp.home.local
+        </div>
+      </div>
+    </div>
+    <span class="version-badge">v1.35.0</span>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Current Page</div>
+    <button class="sync-page-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 3v6h-6"/></svg>
+      Sync PostNL
+    </button>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Accounts</div>
+
+    <div class="account-row">
+      <span class="carrier-badge postnl">PostNL</span>
+      <div class="account-info">
+        <div class="account-name">
+          <span class="status-dot connected"></span>
+          steven@example.nl
+        </div>
+        <div class="account-meta">Synced 2h ago &middot; 2 packages</div>
+      </div>
+      <div class="account-actions">
+        <label class="toggle">
+          <input type="checkbox" checked>
+          <span class="toggle-slider"></span>
+        </label>
+        <button class="btn btn-ghost">Sync</button>
+      </div>
+    </div>
+
+    <div class="account-row">
+      <span class="carrier-badge amazon">Amazon</span>
+      <div class="account-info">
+        <div class="account-name">
+          <span class="status-dot connected"></span>
+          steven@example.nl
+        </div>
+        <div class="account-meta">Synced 1h ago &middot; 1 package</div>
+      </div>
+      <div class="account-actions">
+        <label class="toggle">
+          <input type="checkbox" checked>
+          <span class="toggle-slider"></span>
+        </label>
+        <button class="btn btn-ghost">Sync</button>
+      </div>
+    </div>
+
+    <div class="account-row">
+      <span class="carrier-badge dhl">DHL</span>
+      <div class="account-info">
+        <div class="account-name">
+          <span class="status-dot connected"></span>
+          steven@example.nl
+        </div>
+        <div class="account-meta">Synced 3h ago &middot; 1 package</div>
+      </div>
+      <div class="account-actions">
+        <label class="toggle">
+          <input type="checkbox">
+          <span class="toggle-slider"></span>
+        </label>
+        <button class="btn btn-ghost">Sync</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Packages</div>
+    <div class="pkg-summary">
+      <div class="pkg-stat">
+        <div class="pkg-stat-value">3</div>
+        <div class="pkg-stat-label">Active</div>
+      </div>
+      <div class="pkg-stat">
+        <div class="pkg-stat-value">7</div>
+        <div class="pkg-stat-label">Delivered</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Settings</div>
+    <div class="setting-row">
+      <span class="setting-label">Auto-sync interval</span>
+      <select class="setting-select">
+        <option>30 minutes</option>
+        <option selected>1 hour</option>
+        <option>2 hours</option>
+        <option>6 hours</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="footer">
+    <a href="#">Open Dashboard</a>
+    <a href="#">Disconnect</a>
+  </div>
+</body>
+</html>

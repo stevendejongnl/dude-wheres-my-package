@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #242736;
+  --border: #2e3145;
+  --text: #e1e4ed;
+  --text-dim: #8b8fa3;
+  --accent: #6c5ce7;
+  --accent-hover: #7c6df7;
+  --green: #00b894;
+  --yellow: #fdcb6e;
+  --orange: #e17055;
+  --red: #d63031;
+  --blue: #74b9ff;
+  --radius: 12px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+.container { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 0;
+}
+header .container { display: flex; align-items: center; justify-content: space-between; }
+header h1 { font-size: 1.2rem; font-weight: 600; display: flex; align-items: center; }
+.version-badge {
+  font-size: 0.6rem; font-weight: 500; color: var(--accent);
+  background: #6c5ce715; border: 1px solid #6c5ce730;
+  padding: 2px 8px; border-radius: 20px; margin-left: 12px;
+}
+nav { display: flex; gap: 8px; }
+nav a {
+  color: var(--text-dim); text-decoration: none; padding: 6px 12px;
+  border-radius: 8px; font-size: 0.875rem; transition: all 0.2s;
+}
+nav a:hover, nav a.active { color: var(--text); background: var(--surface2); }
+main { padding: 24px 0; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+.stat {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+}
+.stat-value { font-size: 2rem; font-weight: 700; }
+.stat-label { font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 12px; overflow: hidden;
+}
+.card-header {
+  padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer;
+}
+.card-header:hover { background: var(--surface2); }
+.card-body { padding: 0 20px 16px; }
+.card-body.collapsed { display: none; }
+.pkg-main { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
+.pkg-carrier {
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  padding: 4px 8px; border-radius: 6px; white-space: nowrap;
+  width: 64px; text-align: center; flex-shrink: 0;
+}
+.pkg-carrier.postnl { background: #ff6b0020; color: #ff8a50; }
+.pkg-carrier.dhl { background: #ffcc0020; color: #ffd93d; }
+.pkg-carrier.dpd { background: #dc143c20; color: #ff6b81; }
+.pkg-carrier.amazon { background: #ff990020; color: #ffad42; }
+.pkg-carrier.gls { background: #003e7e20; color: #4a90d9; }
+.pkg-info { flex: 1; min-width: 0; }
+.pkg-tracking { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85rem; }
+.pkg-details { display: flex; flex-direction: column; gap: 1px; margin-top: 2px; font-size: 0.8rem; color: var(--text-dim); }
+.pkg-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.pkg-date { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; }
+.status {
+  font-size: 0.75rem; font-weight: 600; padding: 4px 10px;
+  border-radius: 20px; white-space: nowrap;
+}
+.status-delivered { background: #00b89420; color: var(--green); }
+.status-in_transit { background: #74b9ff20; color: var(--blue); }
+.status-out_for_delivery { background: #fdcb6e20; color: var(--yellow); }
+.status-pre_transit { background: #636e7220; color: var(--text-dim); }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.section-header h2 { font-size: 1.1rem; font-weight: 600; }
+.btn {
+  padding: 6px 14px; border: none; border-radius: 8px; cursor: pointer;
+  font-size: 0.8rem; font-weight: 500; transition: all 0.2s;
+}
+.btn-primary { background: var(--accent); color: white; }
+.btn-sm { padding: 4px 10px; font-size: 0.75rem; }
+.nav-bell { position: relative; display: inline-flex; align-items: center; }
+.nav-bell svg { width: 18px; height: 18px; fill: currentColor; }
+.notif-badge-dot {
+  position: absolute; top: -4px; right: -8px;
+  background: var(--red); color: white;
+  font-size: 0.6rem; font-weight: 700;
+  min-width: 16px; height: 16px; line-height: 16px;
+  border-radius: 8px; text-align: center; padding: 0 4px;
+}
+footer {
+  border-top: 1px solid var(--border);
+  padding: 20px 0; margin-top: 48px;
+  text-align: center; font-size: 0.8rem; color: var(--text-dim);
+}
+footer a { color: var(--text-dim); text-decoration: none; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>
+        Dude, Where's My Package?
+        <span class="version-badge">v1.35.0</span>
+      </h1>
+      <nav>
+        <a href="#" class="active">Packages</a>
+        <a href="#">Accounts</a>
+        <a href="#" class="nav-bell">
+          <svg viewBox="0 0 24 24"><path d="M12 2C10.9 2 10 2.9 10 4C10 4.1 10 4.19 10.02 4.28C7.58 5.07 6 7.36 6 10V16L4 18V19H20V18L18 16V10C18 7.36 16.42 5.07 13.98 4.28C14 4.19 14 4.1 14 4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z"/></svg>
+          <span class="notif-badge-dot">3</span>
+        </a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="container">
+      <div class="section-header">
+        <h2>Packages</h2>
+        <button class="btn btn-primary btn-sm">Track a package</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value">3</div>
+          <div class="stat-label">Active</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">2</div>
+          <div class="stat-label">Delivered</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">4</div>
+          <div class="stat-label">Accounts</div>
+        </div>
+      </div>
+
+      <div class="section-header"><h2>Active</h2></div>
+
+      <!-- PostNL -->
+      <div class="card">
+        <div class="card-header">
+          <div class="pkg-main">
+            <span class="pkg-carrier postnl">PostNL</span>
+            <div class="pkg-info">
+              <div class="pkg-tracking">3STEST1234567890</div>
+              <div class="pkg-details">
+                <span><strong>From:</strong> bol.com</span>
+                <span>12 Apr 2026</span>
+              </div>
+            </div>
+          </div>
+          <div class="pkg-meta">
+            <span class="status status-in_transit">in transit</span>
+            <span class="pkg-date">Today 14:32</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- DHL -->
+      <div class="card">
+        <div class="card-header">
+          <div class="pkg-main">
+            <span class="pkg-carrier dhl">DHL</span>
+            <div class="pkg-info">
+              <div class="pkg-tracking">JVGL09876543210</div>
+              <div class="pkg-details">
+                <span><strong>From:</strong> Coolblue</span>
+                <span>13 Apr 2026</span>
+              </div>
+            </div>
+          </div>
+          <div class="pkg-meta">
+            <span class="status status-out_for_delivery">out for delivery</span>
+            <span class="pkg-date">Today 09:15</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- DPD -->
+      <div class="card">
+        <div class="card-header">
+          <div class="pkg-main">
+            <span class="pkg-carrier dpd">DPD</span>
+            <div class="pkg-info">
+              <div class="pkg-tracking">01234567890123</div>
+              <div class="pkg-details">
+                <span><strong>From:</strong> Zalando</span>
+                <span>13 Apr 2026</span>
+              </div>
+            </div>
+          </div>
+          <div class="pkg-meta">
+            <span class="status status-in_transit">in transit</span>
+            <span class="pkg-date">Today 11:48</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header" style="margin-top:32px;"><h2>Delivered</h2></div>
+
+      <!-- Amazon -->
+      <div class="card">
+        <div class="card-header">
+          <div class="pkg-main">
+            <span class="pkg-carrier amazon">Amazon</span>
+            <div class="pkg-info">
+              <div class="pkg-tracking">123-4567890-1234567</div>
+              <div class="pkg-details">
+                <span><strong>From:</strong> Amazon.nl</span>
+                <span>10 Apr 2026</span>
+              </div>
+            </div>
+          </div>
+          <div class="pkg-meta">
+            <span class="status status-delivered">delivered</span>
+            <span class="pkg-date">Yesterday 16:20</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- GLS -->
+      <div class="card">
+        <div class="card-header">
+          <div class="pkg-main">
+            <span class="pkg-carrier gls">GLS</span>
+            <div class="pkg-info">
+              <div class="pkg-tracking">12345678901</div>
+              <div class="pkg-details">
+                <span><strong>From:</strong> MediaMarkt</span>
+                <span>08 Apr 2026</span>
+              </div>
+            </div>
+          </div>
+          <div class="pkg-meta">
+            <span class="status status-delivered">delivered</span>
+            <span class="pkg-date">12 Apr 15:30</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <footer>
+    <div class="container">
+      Dude, Where's My Package? &middot; MadeBySteven &middot; API
+    </div>
+  </footer>
+</body>
+</html>

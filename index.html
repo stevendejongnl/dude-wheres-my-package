@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dude, Where's My Package? — Self-hosted package tracking for Dutch carriers</title>
+  <meta name="description" content="Track packages from Amazon, PostNL, DHL, DPD, and GLS with a REST API, web dashboard, Chrome extension, and Home Assistant integration. Self-hosted, private, open source.">
+  <meta property="og:title" content="Dude, Where's My Package?">
+  <meta property="og:description" content="Self-hosted package tracking for Dutch carriers. Track Amazon, PostNL, DHL, DPD, and GLS packages.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://stevendejongnl.github.io/dude-wheres-my-package/">
+  <meta name="twitter:card" content="summary">
+  <meta name="theme-color" content="#0f1117">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── Navigation ──────────────────────────── -->
+  <nav class="site-nav">
+    <div class="container">
+      <a href="#" class="nav-brand">
+        <img src="assets/icon-128.png" alt="DWMP icon">
+        <span>DWMP</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#screenshots">Screenshots</a></li>
+        <li><a href="#carriers">Carriers</a></li>
+        <li><a href="#install">Install</a></li>
+        <li><a href="#extension">Extension</a></li>
+        <li>
+          <a href="https://github.com/stevendejongnl/dude-wheres-my-package" class="nav-github" target="_blank" rel="noopener">
+            <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" fill="currentColor"/></svg>
+            GitHub
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ── Hero ────────────────────────────────── -->
+  <section class="hero">
+    <div class="hero-content">
+      <img src="assets/icon-128.png" alt="DWMP" class="hero-icon">
+      <h1>Dude, Where's My <span class="highlight">Package</span>?</h1>
+      <p class="hero-tagline">Self-hosted package tracking for Dutch carriers</p>
+      <p class="hero-desc">
+        Track packages from Amazon, PostNL, DHL, DPD, and GLS with a REST API,
+        web dashboard, Chrome extension, and Home Assistant integration.
+      </p>
+      <div class="hero-carriers">
+        <span class="carrier-pill amazon">Amazon</span>
+        <span class="carrier-pill postnl">PostNL</span>
+        <span class="carrier-pill dhl">DHL</span>
+        <span class="carrier-pill dpd">DPD</span>
+        <span class="carrier-pill gls">GLS</span>
+      </div>
+      <div class="hero-ctas">
+        <a href="#install" class="btn btn-primary">Get Started</a>
+        <a href="https://github.com/stevendejongnl/dude-wheres-my-package" class="btn btn-outline" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" fill="currentColor"/></svg>
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Features ────────────────────────────── -->
+  <section id="features" class="section features-section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <p class="section-label">Features</p>
+        <h2 class="section-title">Everything you need to track your packages</h2>
+        <p class="section-desc">A complete self-hosted solution for package tracking with multiple sync methods, real-time notifications, and smart integrations.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card fade-in">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+          </div>
+          <h3>Multi-Carrier Tracking</h3>
+          <p>Connect accounts from Amazon, PostNL, DHL, DPD, and GLS. Automatic background polling keeps your package status up to date every 30 minutes.</p>
+        </div>
+
+        <div class="feature-card fade-in">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+          </div>
+          <h3>Chrome Extension</h3>
+          <p>Auto-sync captures packages directly from carrier websites. Detects carrier tabs, one-click sync, configurable intervals, and auto-login support.</p>
+        </div>
+
+        <div class="feature-card fade-in">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <h3>Home Assistant</h3>
+          <p>Run as an HA addon with a sidebar tile. Exposes sensor entities with package attributes, a Lovelace card, and automation events on status changes.</p>
+        </div>
+
+        <div class="feature-card fade-in">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          </div>
+          <h3>Real-time Notifications</h3>
+          <p>Browser push notifications on status changes. Notification center with unread badges and full status transition history across all carriers.</p>
+        </div>
+
+        <div class="feature-card fade-in">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <h3>REST API</h3>
+          <p>Full JSON API with OpenAPI/Swagger docs. Manage accounts, packages, and notifications programmatically. JWT Bearer token authentication.</p>
+        </div>
+
+        <div class="feature-card fade-in">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          </div>
+          <h3>Self-Hosted &amp; Private</h3>
+          <p>Runs in Docker or Kubernetes. SQLite database, no cloud dependency. Your tracking data stays on your own hardware. Optional password protection.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Screenshots ─────────────────────────── -->
+  <section id="screenshots" class="section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <p class="section-label">Screenshots</p>
+        <h2 class="section-title">See it in action</h2>
+        <p class="section-desc">A dark-themed dashboard built for quick scanning of all your package statuses at a glance.</p>
+      </div>
+
+      <div class="fade-in">
+        <div class="mockup-tabs">
+          <button class="mockup-tab active" data-target="mockup-dashboard" data-url="dwmp.home.local">Dashboard</button>
+          <button class="mockup-tab" data-target="mockup-extension" data-url="Chrome Extension">Extension</button>
+          <button class="mockup-tab" data-target="mockup-notifications" data-url="dwmp.home.local/notifications">Notifications</button>
+          <button class="mockup-tab" data-target="mockup-timeline" data-url="dwmp.home.local — Package Details">Timeline</button>
+        </div>
+
+        <div class="mockup-frame">
+          <div class="mockup-titlebar">
+            <span class="mockup-dot red"></span>
+            <span class="mockup-dot yellow"></span>
+            <span class="mockup-dot green"></span>
+            <span class="mockup-url">dwmp.home.local</span>
+          </div>
+          <div id="mockup-dashboard" class="mockup-viewport active">
+            <iframe src="mockups/dashboard.html" height="680" loading="lazy"></iframe>
+          </div>
+          <div id="mockup-extension" class="mockup-viewport">
+            <iframe src="mockups/extension.html" height="520" loading="lazy"></iframe>
+          </div>
+          <div id="mockup-notifications" class="mockup-viewport">
+            <iframe src="mockups/notifications.html" height="620" loading="lazy"></iframe>
+          </div>
+          <div id="mockup-timeline" class="mockup-viewport">
+            <iframe src="mockups/timeline.html" height="600" loading="lazy"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Carriers ────────────────────────────── -->
+  <section id="carriers" class="section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <p class="section-label">Supported Carriers</p>
+        <h2 class="section-title">Dutch carrier coverage</h2>
+        <p class="section-desc">All major Dutch parcel carriers supported with automatic or manual sync options.</p>
+      </div>
+
+      <div class="carriers-grid fade-in">
+        <div class="carrier-card">
+          <span class="carrier-pill amazon">Amazon</span>
+          <h4>Amazon</h4>
+          <div class="carrier-auth">Email &amp; password</div>
+          <div class="carrier-desc">Account sync with TOTP support. Headless browser login with share-token capture.</div>
+        </div>
+        <div class="carrier-card">
+          <span class="carrier-pill postnl">PostNL</span>
+          <h4>PostNL</h4>
+          <div class="carrier-auth">Manual token</div>
+          <div class="carrier-desc">GraphQL API with automatic token refresh. Postal code discovery for public tracking.</div>
+        </div>
+        <div class="carrier-card">
+          <span class="carrier-pill dhl">DHL</span>
+          <h4>DHL</h4>
+          <div class="carrier-auth">Email &amp; password</div>
+          <div class="carrier-desc">eCommerce API with optional DHL Unified Tracking for rich event timelines.</div>
+        </div>
+        <div class="carrier-card">
+          <span class="carrier-pill dpd">DPD</span>
+          <h4>DPD</h4>
+          <div class="carrier-auth">Credentials + browser push</div>
+          <div class="carrier-desc">Keycloak SSO auto-login. Chrome extension auto-fill or browser-push bookmarklet.</div>
+        </div>
+        <div class="carrier-card">
+          <span class="carrier-pill gls">GLS</span>
+          <h4>GLS</h4>
+          <div class="carrier-auth">Public API</div>
+          <div class="carrier-desc">No account needed. Public tracking with tracking number and postal code.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Installation ────────────────────────── -->
+  <section id="install" class="section install-section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <p class="section-label">Get Started</p>
+        <h2 class="section-title">Up and running in minutes</h2>
+        <p class="section-desc">Deploy with Docker, Kubernetes, or as a Home Assistant addon.</p>
+      </div>
+
+      <div class="fade-in">
+        <div class="install-tabs">
+          <button class="install-tab active" data-target="install-docker">Docker</button>
+          <button class="install-tab" data-target="install-k8s">Kubernetes</button>
+          <button class="install-tab" data-target="install-ha">Home Assistant</button>
+        </div>
+
+        <div id="install-docker" class="install-panel active">
+          <div class="code-block">
+            <div class="code-header">
+              <span>terminal</span>
+              <button class="copy-btn">Copy</button>
+            </div>
+            <pre><span class="comment"># Pull and run the latest image</span>
+docker run -d \
+  --name dwmp \
+  -p 8000:8000 \
+  -v dwmp-data:/app/data \
+  -e TZ=Europe/Amsterdam \
+  -e POLL_INTERVAL_MINUTES=30 \
+  ghcr.io/stevendejongnl/dude-wheres-my-package:latest</pre>
+          </div>
+        </div>
+
+        <div id="install-k8s" class="install-panel">
+          <div class="code-block">
+            <div class="code-header">
+              <span>terminal</span>
+              <button class="copy-btn">Copy</button>
+            </div>
+            <pre><span class="comment"># Clone and apply the manifests</span>
+git clone https://github.com/stevendejongnl/dude-wheres-my-package.git
+cd dude-wheres-my-package
+
+<span class="comment"># Edit kubernetes/configmap.yaml with your settings</span>
+kubectl apply -f kubernetes/</pre>
+          </div>
+        </div>
+
+        <div id="install-ha" class="install-panel">
+          <div class="install-steps">
+            <div class="install-step">
+              <span class="step-num">1</span>
+              <div class="step-text">
+                Add the <strong>MadeBySteven HA Addons</strong> repository to your Home Assistant addon store.
+              </div>
+            </div>
+            <div class="install-step">
+              <span class="step-num">2</span>
+              <div class="step-text">
+                Install <strong>Dude, Where's My Package?</strong> from the addon store and start it. The web UI appears as a sidebar tile.
+              </div>
+            </div>
+            <div class="install-step">
+              <span class="step-num">3</span>
+              <div class="step-text">
+                For sensor entities and automations, install the <strong>DWMP integration</strong> via HACS from <code>stevens-home-assistant-integrations</code>.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Chrome Extension ────────────────────── -->
+  <section id="extension" class="section">
+    <div class="container">
+      <div class="extension-cta fade-in">
+        <div class="extension-info">
+          <p class="section-label">Chrome Extension</p>
+          <h3>Sync packages from your browser</h3>
+          <ul class="extension-features">
+            <li>Auto-sync on a configurable schedule (30 min to 6 hours)</li>
+            <li>Detects carrier websites and syncs the current page</li>
+            <li>Auto-login for DPD with stored credentials</li>
+            <li>Cloudflare challenge detection — stops and alerts you</li>
+            <li>Self-updating from your own server</li>
+          </ul>
+          <a href="https://github.com/stevendejongnl/dude-wheres-my-package/releases/latest" class="btn btn-primary" target="_blank" rel="noopener">
+            Download Latest Release
+          </a>
+          <p class="extension-note">
+            Load as an unpacked extension via <code>chrome://extensions</code> in developer mode, or install the signed .crx file.
+          </p>
+        </div>
+        <div class="extension-preview">
+          <div class="extension-mini-frame">
+            <div class="mockup-titlebar">
+              <span class="mockup-dot red"></span>
+              <span class="mockup-dot yellow"></span>
+              <span class="mockup-dot green"></span>
+            </div>
+            <iframe src="mockups/extension.html" height="520" loading="lazy"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ──────────────────────────────── -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-content">
+        <a href="https://github.com/stevendejongnl/dude-wheres-my-package" target="_blank" rel="noopener">GitHub</a>
+        <span class="footer-sep">&middot;</span>
+        <a href="https://www.madebysteven.nl" target="_blank" rel="noopener">MadeBySteven</a>
+        <span class="footer-sep">&middot;</span>
+        <span class="version-badge">v1.35.0</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
