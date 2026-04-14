@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.31.0 (2026-04-14)
+
+### Features
+
+- **dpd**: Browser-push sync via bookmarklet — bypasses Cloudflare entirely
+  ([`487d7a0`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/487d7a00c3e27e00a4bf0cc2b5b577f0ea36974d))
+
+
 ## v1.30.1 (2026-04-14)
 
 ### Bug Fixes
