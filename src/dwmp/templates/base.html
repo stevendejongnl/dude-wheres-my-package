@@ -191,17 +191,17 @@
     }
     /* Any in-flight HTMX button inside the form triggers the overlay and
        blurs the form body. :has() is supported in all modern browsers. */
-    .add-form:has(button.htmx-request) .form-body {
+    .add-form.htmx-request .form-body {
       filter: blur(3px); pointer-events: none; user-select: none;
     }
-    .add-form:has(button.htmx-request) .form-loading-overlay {
+    .add-form.htmx-request .form-loading-overlay {
       display: flex;
     }
     /* Modal-hosted forms sit inside .modal, which clips the overlay —
        match its rounded corners. */
     .modal .add-form { border-radius: var(--radius); }
     /* Account row: subtle dim while sync/refresh is in flight. */
-    .account:has(button.htmx-request) {
+    .account:has(.htmx-request) {
       opacity: 0.6; pointer-events: none;
       transition: opacity 0.15s ease-out;
     }
