@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.34.0 (2026-04-14)
+
+### Bug Fixes
+
+- Regenerate lockfile with node 22 for crx3 emnapi deps
+  ([`5a843ba`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/5a843ba44476d8ff68c851f95ec7c7282469747e))
+
+- Regenerate package-lock.json for crx3 dependency
+  ([`2e75978`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/2e75978e179f939d6aa6f01caae09558496259e8))
+
+### Features
+
+- **chrome-extension**: Add .crx build to release pipeline
+  ([`96a7d87`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/96a7d87252b7512fb7e920b43a2435711b48f1d7))
+
+
 ## v1.33.1 (2026-04-14)
 
 ### Bug Fixes
