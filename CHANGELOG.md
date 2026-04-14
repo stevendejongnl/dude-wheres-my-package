@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.21.2 (2026-04-14)
+
+### Bug Fixes
+
+- **dpd**: Detect expired Keycloak session that degrades to guest mode
+  ([`9989390`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/9989390a5dadbbe115d26e541b6e6b5109472f87))
+
+
 ## v1.21.1 (2026-04-13)
 
 ### Bug Fixes
