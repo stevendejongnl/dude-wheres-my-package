@@ -66,18 +66,32 @@ def _enrich_package(pkg: dict) -> dict:
     """Add computed fields for display."""
     events = pkg.get("events", [])
 
-    # Sender: first pre_transit event that looks like a name, not a date or status text
+    # Sender: first pre_transit event whose description looks like a name rather
+    # than a tracking status sentence. Carrier APIs mix both in pre_transit events
+    # — e.g. DHL Unified returns "The instruction data for this shipment have been
+    # provided by the sender to DHL electronically" alongside the eCommerce API's
+    # "Brandpreventiewinkel". We filter out the status text and keep the name.
     sender = None
-    _skip_phrases = ("exchanging data", "data received", "aangekondigd", "aangemeld")
+    _skip_phrases = (
+        "exchanging data", "data received", "aangekondigd", "aangemeld",
+        "instruction data", "shipment", "processed", "registered",
+        "provided by", "parcels", "bezorgd", "verzonden",
+    )
+    _skip_prefixes = ("the ", "de ", "het ", "your ", "je ", "uw ", "a ")
     for e in events:
         if e.get("status") == "pre_transit" and e.get("description"):
             desc = e["description"].strip()
-            # Skip date-like descriptions (e.g., Amazon's "12 april 2026")
-            if desc and desc[0].isdigit():
+            if not desc:
                 continue
-            # Skip tracking status descriptions (e.g., DPD's "Exchanging data internally")
+            # Skip date-like descriptions (e.g., Amazon's "12 april 2026")
+            if desc[0].isdigit():
+                continue
             lower = desc.lower()
+            # Skip tracking status sentences (contain carrier-specific phrases)
             if any(kw in lower for kw in _skip_phrases):
+                continue
+            # Skip sentence-style descriptions (start with articles/pronouns)
+            if any(lower.startswith(p) for p in _skip_prefixes):
                 continue
             sender = desc
             break
