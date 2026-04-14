@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.29.1 (2026-04-14)
+
+### Bug Fixes
+
+- **ui**: Skip DHL tracking descriptions when extracting sender name
+  ([`98f65ae`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/98f65aea0b5eabf5ed6a7393bd162f23d796f50f))
+
+
 ## v1.29.0 (2026-04-14)
 
 ### Features
