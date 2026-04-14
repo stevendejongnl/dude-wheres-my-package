@@ -8,23 +8,17 @@ Package tracking service for Dutch carriers. Runs as a container with a REST API
 
 **Auth type:** `credentials` (email + password + optional TOTP)
 
-Amazon.nl uses client-side JavaScript rendering — Playwright automates a headless Chromium to log in and capture the orders page. Cookies are cached between syncs; re-login happens automatically when they expire.
+**Recommended: Browser-push bookmarklet** — Amazon's bot detection blocks headless browser login from server environments. Use the universal **Sync Packages** bookmarklet instead:
 
-**Steps:**
+1. Connect your Amazon account (credentials or cookie JSON) via the web UI
+2. Open the **Accounts** page and click **Browser Sync** on your Amazon account
+3. Drag the **Sync Packages** bookmarklet to your bookmarks bar
+4. Go to https://www.amazon.nl/your-orders/orders and log in
+5. Click the bookmarklet — packages sync instantly
 
-1. Connect with your Amazon credentials:
+The same bookmarklet also works on DPD and other supported carrier sites.
 
-```bash
-curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/credentials \
-  -H "Content-Type: application/json" \
-  -d '{
-    "carrier": "amazon",
-    "username": "<your Amazon email>",
-    "password": "<your Amazon password>"
-  }'
-```
-
-2. **If you have TOTP MFA enabled** (authenticator app), add your TOTP secret:
+**Fallback: Playwright sync** — if you prefer automated sync, connect with credentials:
 
 ```bash
 curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/credentials \
@@ -33,21 +27,11 @@ curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/credentials \
     "carrier": "amazon",
     "username": "<your Amazon email>",
     "password": "<your Amazon password>",
-    "totp_secret": "<your TOTP setup key>"
+    "totp_secret": "<optional TOTP setup key>"
   }'
 ```
 
-The TOTP secret is the base32 key you received when setting up your authenticator app (e.g. `JBSWY3DPEHPK3PXP`).
-
-3. Sync your packages:
-
-```bash
-curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
-```
-
-**How it works:** Playwright launches headless Chromium, logs in with your credentials, navigates to the orders page, waits for JavaScript to render, and captures the HTML. The HTML is parsed for order status, dates, and tracking info. Cookies are saved so subsequent syncs skip the login step.
-
-**Recommended: Browser-push bookmarklet** — Amazon's bot detection often blocks headless login. The browser-push bookmarklet (available on the Accounts page) lets your real browser capture the orders page and send it to dwmp — no cookies leave your browser. Works with the universal **Sync Packages** bookmarklet alongside DPD.
+Playwright launches headless Chromium, logs in, and captures the orders page. Cookies are cached between syncs. This works when Amazon doesn't present a CAPTCHA or push-MFA challenge, but may fail from server IPs.
 
 **MFA:** TOTP (authenticator app) is supported. Push notification MFA is not — switch to TOTP in your Amazon security settings if you use push-based approval.
 
@@ -227,7 +211,7 @@ notifications), or hit the JSON API directly — see below.
 Dwmp ships a server-rendered HTML UI at `/`:
 
 - `/` — package list with the "Track a package" modal, per-package **Refresh** and **Delete** buttons, and collapsible **Details** sections showing postal code, tracking URL, estimated delivery, source, and timestamps
-- `/accounts` — connected accounts, inline add/edit/test/sync flows, **Browser Sync** modal for DPD accounts with draggable bookmarklet, and delivery postal code field on all carrier account forms (enables public tracking fallback when account cookies expire)
+- `/accounts` — connected accounts, inline add/edit/test/sync flows, **Browser Sync** modal with universal **Sync Packages** bookmarklet (works on Amazon, DPD, and more), and delivery postal code field on all carrier account forms (enables public tracking fallback when account cookies expire)
 - `/notifications` — status-change history with unread badge, rich browser push notifications showing carrier, status, and event description
 - `/login` / `/logout` — password gate (only enabled when `PASSWORD_HASH` is set)
 
