@@ -556,15 +556,18 @@ class Amazon(CarrierBase):
                     description=order_date_text,
                 ))
 
-        # Delivery/expected date from status text
-        if status_text:
+        # Delivery/expected date from status text.
+        # Always add a status event when we have a known status — even without
+        # a parseable date. Amazon often shows "Onderweg" or "Verwacht donderdag"
+        # with no machine-readable date; without a fallback timestamp the
+        # timeline would only contain the order date.
+        if status_text and status != TrackingStatus.UNKNOWN:
             event_date = _parse_dutch_date(status_text)
-            if event_date:
-                events.append(TrackingEvent(
-                    timestamp=event_date,
-                    status=status,
-                    description=status_text,
-                ))
+            events.append(TrackingEvent(
+                timestamp=event_date or datetime.now(UTC),
+                status=status,
+                description=status_text,
+            ))
 
         estimated = None
         if status in (TrackingStatus.IN_TRANSIT, TrackingStatus.OUT_FOR_DELIVERY):
