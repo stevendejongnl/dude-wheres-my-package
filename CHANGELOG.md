@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.37.1 (2026-04-14)
+
+### Bug Fixes
+
+- **ci**: Preserve gh-pages content when updating extension manifest
+  ([`b36aa33`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/b36aa336e375e2ea18865827952d7df78c1d4089))
+
+
 ## v1.37.0 (2026-04-14)
 
 ### Features
