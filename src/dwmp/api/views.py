@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from dwmp.api.auth import create_token, login_response, logout_response, verify_password
+from dwmp.api.auth import create_token, login_response, logout_response, verify_password, verify_token
 from dwmp.api.dependencies import get_tracking_service
 from dwmp.carriers.base import CarrierAuthError
 from dwmp.services.tracking import TrackingService
@@ -518,6 +518,64 @@ async def track_package_save(
     except ValueError:
         return _result_html(False, "That tracking number is already being tracked.")
     return HTMLResponse("", headers={"HX-Refresh": "true"})
+
+
+# --- Browser-push form endpoint (bookmarklet) ---
+
+
+@router.post("/accounts/{account_id}/browser-push", response_class=HTMLResponse)
+async def browser_push_form(
+    request: Request,
+    account_id: int,
+    service: TrackingService = Depends(get_tracking_service),
+    html: str = Form(default=""),
+    token: str = Form(default=""),
+):
+    """Accept raw HTML via form POST from a bookmarklet.
+
+    Uses a regular form submission (not fetch) to avoid CORS issues when
+    dwmp is behind Cloudflare. Auth is via a ``token`` form field instead
+    of the Authorization header. Opens in a new tab and shows the result.
+    """
+    if not verify_token(token):
+        return HTMLResponse(
+            "<h2>Auth failed</h2><p>The bookmarklet token has expired. "
+            "Open the Browser Sync modal in dwmp to get a fresh one.</p>",
+            status_code=401,
+        )
+
+    if not html.strip():
+        return HTMLResponse(
+            "<h2>No HTML received</h2><p>The bookmarklet didn't capture any page content.</p>",
+            status_code=400,
+        )
+
+    try:
+        result = await service.sync_account_from_html(account_id, html)
+        count = len(result)
+        return HTMLResponse(f"""<!DOCTYPE html>
+<html><head><title>DWMP Sync</title>
+<style>body{{font-family:system-ui;background:#1a1b2e;color:#e0e0e0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}}
+.card{{background:#252640;padding:40px;border-radius:16px;text-align:center;max-width:400px;}}
+.ok{{color:#00b894;font-size:2rem;}} p{{color:#a0a0b0;margin-top:12px;}}</style></head>
+<body><div class="card"><div class="ok">Synced {count} package{'s' if count != 1 else ''}</div>
+<p>You can close this tab.</p></div></body></html>""")
+    except CarrierAuthError as exc:
+        return HTMLResponse(f"""<!DOCTYPE html>
+<html><head><title>DWMP Sync</title>
+<style>body{{font-family:system-ui;background:#1a1b2e;color:#e0e0e0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}}
+.card{{background:#252640;padding:40px;border-radius:16px;text-align:center;max-width:400px;}}
+.err{{color:#d63031;font-size:1.2rem;}} p{{color:#a0a0b0;margin-top:12px;}}</style></head>
+<body><div class="card"><div class="err">Sync failed</div>
+<p>{exc.message}</p></div></body></html>""", status_code=502)
+    except ValueError as exc:
+        return HTMLResponse(f"""<!DOCTYPE html>
+<html><head><title>DWMP Sync</title>
+<style>body{{font-family:system-ui;background:#1a1b2e;color:#e0e0e0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}}
+.card{{background:#252640;padding:40px;border-radius:16px;text-align:center;max-width:400px;}}
+.err{{color:#d63031;font-size:1.2rem;}} p{{color:#a0a0b0;margin-top:12px;}}</style></head>
+<body><div class="card"><div class="err">Error</div>
+<p>{exc}</p></div></body></html>""", status_code=400)
 
 
 # --- Package refresh view ---

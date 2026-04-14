@@ -72,6 +72,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         if any(path == p or path.startswith(p + "/") for p in OPEN_PATHS):
             return await call_next(request)
+        # Browser-push bookmarklet: form POST with token auth (not cookie)
+        if "/browser-push" in path:
+            return await call_next(request)
         if is_authenticated(request):
             return await call_next(request)
         # API requests get 401, browser requests get redirect
