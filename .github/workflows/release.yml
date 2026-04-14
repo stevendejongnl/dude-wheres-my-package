@@ -54,13 +54,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if semantic-release version --no-vcs-release; then
-            VERSION=$(semantic-release version --print)
+          VERSION=$(semantic-release version --print 2>/dev/null || echo "")
+          if [ -n "$VERSION" ]; then
+            semantic-release version
             echo "released=true" >> "$GITHUB_OUTPUT"
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-            git push
-            git push --tags
-            semantic-release publish
           else
             echo "released=false" >> "$GITHUB_OUTPUT"
           fi
