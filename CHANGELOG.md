@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.36.0 (2026-04-14)
+
+### Features
+
+- **dpd**: Add credentials endpoint for Chrome extension auto-login
+  ([`2e96374`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/2e96374175de149ecab56e6ed9cc5bd57cf3af6d))
+
+
 ## v1.35.0 (2026-04-14)
 
 ### Bug Fixes
