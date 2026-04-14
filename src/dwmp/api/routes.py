@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Response
+from importlib.metadata import version as pkg_version
+from urllib.parse import parse_qs
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import Response as RawResponse
 from pydantic import BaseModel
 
 from dwmp.api.auth import create_token, verify_password
@@ -7,6 +11,8 @@ from dwmp.carriers.base import CarrierAuthError
 from dwmp.services.tracking import TrackingService
 
 router = APIRouter(prefix="/api/v1")
+
+GITHUB_REPO = "stevendejongnl/dude-wheres-my-package"
 
 
 # --- Request models ---
@@ -404,3 +410,38 @@ async def mark_all_read(
 ) -> dict:
     count = await service.mark_all_notifications_read()
     return {"marked": count}
+
+
+# --- Chrome extension auto-update endpoint ---
+
+
+@router.get("/extension/updates.xml")
+async def extension_update_xml(request: Request) -> RawResponse:
+    """Chrome extension auto-update manifest.
+
+    Chrome sends ``?x=id%3D<ext_id>%26v%3D<version>%26...``.
+    We echo the extension ID back and always advertise the current
+    server version — Chrome decides whether to install it.
+    """
+    version = pkg_version("dude-wheres-my-package")
+    crx_url = (
+        f"https://github.com/{GITHUB_REPO}/releases/download/"
+        f"v{version}/dwmp-chrome-extension-{version}.crx"
+    )
+
+    # Parse extension ID from Chrome's query string
+    appid = "extension"
+    x_param = request.query_params.get("x", "")
+    if x_param:
+        parsed = parse_qs(x_param)
+        appid = parsed.get("id", [appid])[0]
+
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<gupdate xmlns="http://www.google.com/update2/response" protocol="2.0">\n'
+        f'  <app appid="{appid}">\n'
+        f'    <updatecheck crbversion="*" version="{version}" src="{crx_url}"/>\n'
+        "  </app>\n"
+        "</gupdate>\n"
+    )
+    return RawResponse(content=xml, media_type="application/xml")

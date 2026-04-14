@@ -41,13 +41,16 @@ class StubPostNL(CarrierBase):
 
 class StubDPD(CarrierBase):
     name = "dpd"
-    auth_type = AuthType.MANUAL_TOKEN
+    auth_type = AuthType.CREDENTIALS
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
         return TrackingResult(tracking_number=tracking_number, carrier=self.name, status=TrackingStatus.UNKNOWN)
 
     async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
         return []
+
+    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+        return AuthTokens(access_token="dpd-cookies")
 
 
 class StubGLS(CarrierBase):
@@ -125,12 +128,16 @@ async def test_add_form_postnl_shows_session_storage_wizard(client: AsyncClient)
     assert 'name="refresh_token"' in body
 
 
-async def test_add_form_dpd_shows_console_snippet(client: AsyncClient):
+async def test_add_form_dpd_shows_credentials_and_cookies_fallback(client: AsyncClient):
     response = await client.get("/accounts/add/dpd")
     assert response.status_code == 200
     body = response.text
-    assert "copy(document.documentElement.outerHTML)" in body
-    assert 'name="access_token"' in body
+    # Primary: credentials
+    assert 'name="username"' in body
+    assert 'name="password"' in body
+    # Fallback: cookies
+    assert 'name="cookies_json"' in body
+    assert "Cookie-Editor" in body
 
 
 async def test_add_form_gls_returns_404(client: AsyncClient):
@@ -193,6 +200,28 @@ async def test_save_token_triggers_hx_refresh(client: AsyncClient, repo):
     assert len(accounts) == 1
     assert accounts[0]["carrier"] == "postnl"
     assert accounts[0]["lookback_days"] == 14
+
+
+async def test_save_dpd_credentials_triggers_hx_refresh(client: AsyncClient, repo):
+    response = await client.post(
+        "/accounts/add/dpd/save",
+        data={"username": "dpd@test.com", "password": "secret", "lookback_days": "30"},
+    )
+    assert response.status_code == 200
+    assert response.headers.get("HX-Refresh") == "true"
+
+    accounts = await repo.list_accounts()
+    assert len(accounts) == 1
+    assert accounts[0]["carrier"] == "dpd"
+
+
+async def test_test_dpd_credentials_returns_ok(client: AsyncClient):
+    response = await client.post(
+        "/accounts/add/dpd/test",
+        data={"username": "dpd@test.com", "password": "secret"},
+    )
+    assert response.status_code == 200
+    assert "test-result ok" in response.text
 
 
 async def test_sync_account_view_returns_refreshed_row(client: AsyncClient, repo):

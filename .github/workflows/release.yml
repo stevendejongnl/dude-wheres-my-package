@@ -102,6 +102,36 @@ jobs:
               --clobber
           fi
 
+      - name: Publish extension update manifest to GitHub Pages
+        if: steps.release.outputs.released == 'true' && env.EXTENSION_KEY != ''
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          EXTENSION_KEY: ${{ secrets.EXTENSION_SIGNING_KEY }}
+        run: |
+          echo "$EXTENSION_KEY" > extension-key.pem
+          EXTENSION_ID=$(node scripts/extension-id.mjs)
+          rm extension-key.pem
+          CRX_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/dwmp-chrome-extension-${VERSION}.crx"
+
+          mkdir -p _gh-pages
+          cat > _gh-pages/updates.xml << XMLEOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <gupdate xmlns="http://www.google.com/update2/response" protocol="2.0">
+            <app appid="${EXTENSION_ID}">
+              <updatecheck crbversion="*" version="${VERSION}" src="${CRX_URL}"/>
+            </app>
+          </gupdate>
+          XMLEOF
+
+          cd _gh-pages
+          git init
+          git checkout -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add updates.xml
+          git commit -m "Update extension manifest to v${VERSION}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
+
       # Build and push Docker image in the same job — no checkout race
       - name: Docker login
         if: steps.release.outputs.released == 'true'

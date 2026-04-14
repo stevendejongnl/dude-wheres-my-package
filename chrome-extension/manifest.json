@@ -3,6 +3,7 @@
   "name": "Dude, Where's My Package?",
   "version": "1.34.0",
   "description": "Browser-push sync for DWMP package tracker",
+  "update_url": "https://stevendejongnl.github.io/dude-wheres-my-package/updates.xml",
   "permissions": [
     "storage",
     "alarms",

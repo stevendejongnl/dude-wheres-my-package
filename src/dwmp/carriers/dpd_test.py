@@ -4,8 +4,8 @@ from dwmp.carriers.base import AuthTokens, AuthType, CarrierAuthError, TrackingS
 from dwmp.carriers.dpd import DPD, _is_guest_page, _parse_status
 
 
-def test_dpd_is_manual_token():
-    assert DPD().auth_type == AuthType.MANUAL_TOKEN
+def test_dpd_is_credentials():
+    assert DPD().auth_type == AuthType.CREDENTIALS
 
 
 def test_parse_status_delivered():
@@ -181,7 +181,8 @@ async def test_sync_packages_legacy_html_still_works():
 
 
 async def test_sync_detects_guest_mode(monkeypatch):
-    """Expired Keycloak session → DPD renders guest page → CarrierAuthError."""
+    """Expired Keycloak session → guest page → re-login attempted
+    → no stored credentials → CarrierAuthError."""
     guest_html = """
     <html><body>
     <div>Gast Particuliere klanten Nederlands English Mijn pakketten</div>
@@ -199,6 +200,7 @@ async def test_sync_detects_guest_mode(monkeypatch):
     monkeypatch.setattr("dwmp.carriers.browser.capture_page_html", fake_capture)
 
     carrier = DPD()
+    # No refresh_token → re-login will fail, surfacing the guest-mode error
     tokens = AuthTokens(
         access_token='[{"name":"cf_clearance","value":"old"}]',
         user_agent="Mozilla/5.0",
@@ -208,6 +210,83 @@ async def test_sync_detects_guest_mode(monkeypatch):
 
     # Tokens should NOT be updated on auth failure.
     assert carrier.get_updated_tokens() is None
+
+
+async def test_sync_relogin_on_guest_mode(monkeypatch):
+    """Expired session + stored credentials → automatic re-login succeeds."""
+    guest_html = """
+    <html><body>
+    <div>Inloggen/Registreren</div>
+    <div>Guest User Login</div>
+    </body></html>
+    """
+
+    async def fake_capture(**kwargs):
+        return guest_html, '[{"name":"cf_clearance","value":"still-valid"}]'
+
+    relogin_html = """
+    <html><body>
+    <a href="/nl/mydpd/my-parcels/incoming?parcelNumber=RELOGIN123">
+        <span class="parcelAlias">Parcel from Fresh Login</span>
+    </a>
+    </body></html>
+    """
+    login_calls: list[dict] = []
+
+    async def fake_keycloak_login(**kwargs):
+        login_calls.append(kwargs)
+        return relogin_html, '[{"name":"session","value":"fresh"}]'
+
+    monkeypatch.setattr("dwmp.carriers.browser.capture_page_html", fake_capture)
+    monkeypatch.setattr("dwmp.carriers.dpd._playwright_keycloak_login", fake_keycloak_login)
+
+    import json
+    carrier = DPD()
+    tokens = AuthTokens(
+        access_token='[{"name":"cf_clearance","value":"old"}]',
+        refresh_token=json.dumps({"email": "user@test.com", "password": "pass123"}),
+    )
+    results = await carrier.sync_packages(tokens)
+    assert len(results) == 1
+    assert results[0].tracking_number == "RELOGIN123"
+    assert len(login_calls) == 1
+    assert login_calls[0]["email"] == "user@test.com"
+
+    refreshed = carrier.get_updated_tokens()
+    assert refreshed is not None
+    assert "fresh" in refreshed.access_token
+
+
+async def test_sync_initial_login_with_credentials(monkeypatch):
+    """No cached cookies + stored credentials → initial Keycloak login."""
+    login_html = """
+    <html><body>
+    <a href="/nl/mydpd/my-parcels/incoming?parcelNumber=INITIAL456">
+        <span class="parcelAlias">Parcel from First Login</span>
+    </a>
+    </body></html>
+    """
+    login_calls: list[dict] = []
+
+    async def fake_keycloak_login(**kwargs):
+        login_calls.append(kwargs)
+        return login_html, '[{"name":"session","value":"new"}]'
+
+    monkeypatch.setattr("dwmp.carriers.dpd._playwright_keycloak_login", fake_keycloak_login)
+
+    import json
+    carrier = DPD()
+    tokens = AuthTokens(
+        access_token="",  # No cached cookies
+        refresh_token=json.dumps({"email": "user@test.com", "password": "pass123"}),
+    )
+    results = await carrier.sync_packages(tokens)
+    assert len(results) == 1
+    assert results[0].tracking_number == "INITIAL456"
+    assert len(login_calls) == 1
+
+    refreshed = carrier.get_updated_tokens()
+    assert refreshed is not None
 
 
 def test_is_guest_page_positive():

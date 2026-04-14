@@ -4,8 +4,7 @@
   Context:
     carrier   — "dpd"
     account   — optional; when present, form is in Edit mode and pre-fills
-                access_token (cookies JSON or HTML snapshot), user_agent,
-                and lookback_days.
+                known values (username, lookback_days, postal_code).
     base_path — reverse-proxy prefix
 #}
 {% set form_id = ("edit-" ~ account.id) if account else carrier %}
@@ -15,7 +14,7 @@
 {% set title_verb = "Edit" if account else "Connect" %}
 {% set tokens = account.tokens if account else {} %}
 <form class="add-form" id="add-form-{{ form_id }}-form">
-  {% with loading_label = "Launching headless browser to test DPD session…" %}
+  {% with loading_label = "Logging in to DPD via Keycloak…" %}
   {% include "_form_loader.html" %}
   {% endwith %}
   <div class="form-body">
@@ -28,59 +27,43 @@
   </div>
 
   <p class="form-hint">
-    DPD's parcels page is behind Cloudflare — there's no JSON API. Paste your
-    browser cookies as JSON and DWMP will launch a headless browser on every
-    sync, reusing your session to fetch live data. Falls back to a frozen HTML
-    snapshot if you prefer.
+    Enter your DPD account credentials for automatic login, <strong>or</strong> paste
+    browser cookies if the automated login is blocked by Cloudflare.
   </p>
 
-  <details class="wizard-details">
-    <summary><strong>Recommended:</strong> cookies JSON (auto-refreshing)</summary>
+  <div class="form-group">
+    <label for="username-{{ form_id }}">Email</label>
+    <input type="email" id="username-{{ form_id }}" name="username" autocomplete="username"
+      value="{{ account.username if account else '' }}">
+  </div>
+
+  <div class="form-group">
+    <label for="password-{{ form_id }}">Password</label>
+    <input type="password" id="password-{{ form_id }}" name="password" autocomplete="current-password">
+  </div>
+
+  <details class="wizard-details" {% if account and tokens and tokens.access_token and tokens.access_token.strip().startswith('[') and not account.username %}open{% endif %}>
+    <summary><strong>Alternative:</strong> Browser cookies (if login is blocked by Cloudflare)</summary>
     <ol class="wizard-steps">
       <li>Install the <a href="https://cookie-editor.com/" target="_blank" rel="noopener">Cookie-Editor</a> extension — <strong>required</strong> because critical DPD session cookies are httpOnly (invisible to <code>document.cookie</code>).</li>
       <li>Log in at <a href="https://www.dpdgroup.com/nl/mydpd/login" target="_blank" rel="noopener">dpdgroup.com/nl/mydpd/login</a> and open <strong>My parcels → Incoming</strong> so the Cloudflare challenge completes.</li>
       <li>Click Cookie-Editor → <strong>Export → JSON</strong>.</li>
-      <li>Paste the cookies JSON in the field below.</li>
+      <li>Paste the cookies JSON below.</li>
     </ol>
+    <div class="form-group">
+      <label for="cookies-{{ form_id }}">Cookies JSON</label>
+      <textarea id="cookies-{{ form_id }}" name="cookies_json" rows="4"
+        spellcheck="false" autocomplete="off"
+        placeholder='[{"name":"cf_clearance", ...}]'>{{ tokens.access_token if tokens and tokens.access_token and tokens.access_token.strip().startswith('[') and not account else '' }}</textarea>
+    </div>
   </details>
-
-  <details class="wizard-details">
-    <summary>Fallback: HTML snapshot (one-shot, won't auto-refresh)</summary>
-    <ol class="wizard-steps">
-      <li>Log in and open <strong>My parcels → Incoming</strong>.</li>
-      <li>Open DevTools (<kbd>F12</kbd>) → <strong>Console</strong> and run:
-        <pre class="wizard-code copyable" onclick="navigator.clipboard.writeText(this.textContent.trim())">copy(document.documentElement.outerHTML)</pre>
-      </li>
-      <li>Paste it below. You'll need to re-paste whenever you want new data.</li>
-    </ol>
-  </details>
-
-  <div class="form-group">
-    <label for="access-token-{{ form_id }}">Cookies JSON or page HTML</label>
-    <textarea id="access-token-{{ form_id }}" name="access_token" rows="8"
-      required spellcheck="false" autocomplete="off"
-      placeholder='[{"name":"cf_clearance", ...}]  or  <!DOCTYPE html>...'>{{ tokens.access_token or '' }}</textarea>
-    <small class="form-help">DWMP detects the format automatically: starts with <code>[</code> = cookies, starts with <code>&lt;</code> = HTML.</small>
-  </div>
-
-  <div class="form-group">
-    <label for="user-agent-{{ form_id }}">Browser user-agent <span class="form-optional">(recommended for cookies mode)</span></label>
-    <input type="text" id="user-agent-{{ form_id }}" name="user_agent"
-      spellcheck="false" autocomplete="off"
-      placeholder="Mozilla/5.0 ..."
-      value="{{ tokens.user_agent or '' }}">
-    <small class="form-help">
-      In DevTools Console: <code>copy(navigator.userAgent)</code>.
-      Cloudflare binds <code>cf_clearance</code> to the UA that received it — a mismatch invalidates the cookie.
-    </small>
-  </div>
 
   <div class="form-group">
     <label for="postal-{{ form_id }}">Delivery postal code</label>
     <input type="text" id="postal-{{ form_id }}" name="postal_code"
       value="{{ account.postal_code if account else '' }}"
       placeholder="1234AB" autocomplete="postal-code">
-    <small class="form-help">Required for public tracking when DPD cookies expire. Applied to all packages from this account.</small>
+    <small class="form-help">Required for public tracking when DPD session expires. Applied to all packages from this account.</small>
   </div>
 
   <div class="form-group">

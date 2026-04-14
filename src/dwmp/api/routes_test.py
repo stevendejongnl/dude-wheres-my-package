@@ -425,3 +425,34 @@ async def test_test_token_unknown_carrier_returns_400(client: AsyncClient):
         json={"carrier": "nope", "access_token": "tok"},
     )
     assert response.status_code == 400
+
+
+# --- Extension auto-update endpoint ---
+
+
+async def test_extension_updates_xml(client: AsyncClient):
+    response = await client.get("/api/v1/extension/updates.xml")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/xml"
+    body = response.text
+    assert '<?xml version="1.0"' in body
+    assert "gupdate" in body
+    assert "updatecheck" in body
+    assert ".crx" in body
+
+
+async def test_extension_updates_xml_echoes_appid(client: AsyncClient):
+    """Chrome sends the extension ID in the x query param."""
+    response = await client.get(
+        "/api/v1/extension/updates.xml",
+        params={"x": "id=abcdefghijklmnop&v=1.0.0"},
+    )
+    assert response.status_code == 200
+    assert 'appid="abcdefghijklmnop"' in response.text
+
+
+async def test_extension_updates_xml_default_appid(client: AsyncClient):
+    """Without the x param, uses a default appid."""
+    response = await client.get("/api/v1/extension/updates.xml")
+    assert response.status_code == 200
+    assert 'appid="extension"' in response.text

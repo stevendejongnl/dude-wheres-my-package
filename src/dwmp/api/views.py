@@ -299,14 +299,14 @@ async def add_account_test(
     user_agent: str = Form(default=""),
     cookies_json: str = Form(default=""),
 ):
-    template = _form_template(carrier)
+    _form_template(carrier)  # validates carrier has a form
     try:
-        # Amazon cookies fallback: if cookies_json is provided, treat as manual token
+        # Cookies fallback (Amazon, DPD): if cookies_json is provided, treat as manual token
         if cookies_json.strip():
             await service.validate_account_manual_token(
                 carrier, cookies_json.strip(),
             )
-        elif template == "account_form_credentials.html":
+        elif username.strip() and password.strip():
             await service.validate_account_credentials(
                 carrier, username, password, totp_secret=totp_secret or None,
             )
@@ -365,9 +365,8 @@ async def edit_account_save(
     account = await service.get_account(account_id)
     if account is None:
         raise HTTPException(status_code=404, detail="Account not found")
-    template = _form_template(account["carrier"])
     try:
-        # Amazon cookies fallback — preserve stored credentials (refresh_token)
+        # Cookies fallback — preserve stored credentials (refresh_token)
         # so _relogin() can still work when these cookies expire.
         if cookies_json.strip():
             existing_tokens = account.get("tokens") or {}
@@ -376,7 +375,7 @@ async def edit_account_save(
                 existing_tokens.get("refresh_token"), lookback_days,
                 postal_code=postal_code.strip() or None,
             )
-        elif template == "account_form_credentials.html":
+        elif username.strip() and password.strip():
             await service.update_account_credentials(
                 account_id, account["carrier"], username, password,
                 lookback_days, totp_secret=totp_secret or None,
@@ -442,15 +441,15 @@ async def add_account_save(
     postal_code: str = Form(default=""),
     cookies_json: str = Form(default=""),
 ):
-    template = _form_template(carrier)
+    _form_template(carrier)  # validates carrier has a form
     try:
-        # Amazon cookies fallback
+        # Cookies fallback (Amazon, DPD)
         if cookies_json.strip():
             await service.connect_account_manual_token(
                 carrier, cookies_json.strip(), None, lookback_days,
                 postal_code=postal_code.strip() or None,
             )
-        elif template == "account_form_credentials.html":
+        elif username.strip() and password.strip():
             await service.connect_account_credentials(
                 carrier, username, password, lookback_days,
                 totp_secret=totp_secret or None,

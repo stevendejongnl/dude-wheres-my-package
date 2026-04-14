@@ -77,6 +77,18 @@ async def test_ingress_header_strips_trailing_slash(monkeypatch):
     assert response.headers["location"] == "/proxy/abc/login"
 
 
+async def test_extension_updates_xml_is_public(monkeypatch):
+    """The extension update endpoint must be accessible without authentication."""
+    monkeypatch.setattr(auth_module, "PASSWORD_HASH", auth_module.set_password("x"))
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/api/v1/extension/updates.xml")
+
+    assert response.status_code == 200
+    assert "gupdate" in response.text
+
+
 async def test_static_files_serve_under_ingress_header():
     """Regression: setting scope['root_path'] breaks Starlette's StaticFiles mount
     because the mount slices the request path by len(root_path). The middleware

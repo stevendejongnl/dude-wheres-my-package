@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from datetime import UTC, datetime
@@ -80,7 +81,7 @@ def _is_guest_page(html: str) -> bool:
 
 class DPD(CarrierBase):
     name = "dpd"
-    auth_type = AuthType.MANUAL_TOKEN
+    auth_type = AuthType.CREDENTIALS
 
     def __init__(self, http_client: httpx.AsyncClient | None = None) -> None:
         self._client = http_client
@@ -92,18 +93,36 @@ class DPD(CarrierBase):
         self._updated_tokens = None
         return tokens
 
-    async def validate_token(self, tokens: AuthTokens) -> None:
-        """DPD cookies can't be validated via headless replay — Cloudflare
-        binds cf_clearance to the TLS fingerprint of the issuing browser,
-        so replaying in our headless Chrome always degrades to guest mode.
+    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+        """Log in to DPD via Keycloak SSO using Playwright.
 
-        Instead, just verify the token format is sane. The first real sync
-        will surface auth issues via the guest-mode detection.
+        Returns session cookies. Credentials are stored in refresh_token
+        so sync_packages can re-login automatically when cookies expire.
+        """
+        _html, cookies_json = await _playwright_keycloak_login(
+            email=username,
+            password=password,
+            parcels_url=DPD_PARCELS_URL,
+        )
+
+        creds = json.dumps({"email": username, "password": password})
+
+        return AuthTokens(
+            access_token=cookies_json,
+            refresh_token=creds,
+        )
+
+    async def validate_token(self, tokens: AuthTokens) -> None:
+        """Validate token format for cookies-based connections.
+
+        Credentials-based connections go through login() which validates live.
+        This handles the cookies fallback path — Cloudflare binds cf_clearance
+        to the TLS fingerprint of the issuing browser, so headless replay for
+        validation is unreliable. Format check only; the first real sync
+        surfaces auth issues via guest-mode detection.
         """
         raw = tokens.access_token
         if raw and raw.lstrip().startswith("["):
-            import json
-
             try:
                 cookies = json.loads(raw)
                 if not isinstance(cookies, list):
@@ -115,6 +134,9 @@ class DPD(CarrierBase):
             return
         if raw and raw.lstrip().startswith("<"):
             return  # Legacy HTML snapshot — always accepted.
+        # Empty token is OK for credentials-based accounts (login() not yet called).
+        if not raw or not raw.strip():
+            return
         raise CarrierAuthError(
             self.name,
             "Unrecognised token format. Paste a cookies JSON array "
@@ -125,36 +147,48 @@ class DPD(CarrierBase):
         self, tokens: AuthTokens, lookback_days: int = 30
     ) -> list[TrackingResult]:
         # DPD has Cloudflare bot protection — plain HTTP can't bypass the JS
-        # challenge. Two supported modes:
+        # challenge. Three supported modes:
         #   1. Cookies JSON → Playwright re-captures live HTML every sync and
-        #      persists refreshed cookies (including cf_clearance).
+        #      persists refreshed cookies. Falls back to re-login with stored
+        #      credentials when the session expires.
         #   2. Legacy HTML paste → parsed as a frozen snapshot (no refresh).
+        #   3. Credentials only (no cached cookies) → full Keycloak login.
         raw = tokens.access_token
         self._updated_tokens = None
 
         if raw and raw.lstrip().startswith("["):
             from dwmp.carriers.browser import capture_page_html
 
-            html, updated_cookies = await capture_page_html(
-                url=DPD_PARCELS_URL,
-                cookies_json=raw,
-                carrier_name=self.name,
-                login_indicators=["auth/realms", "login.dpdgroup", "signin"],
-                wait_selector="a[href*='parcelNumber']",
-                user_agent=tokens.user_agent,
-            )
+            try:
+                html, updated_cookies = await capture_page_html(
+                    url=DPD_PARCELS_URL,
+                    cookies_json=raw,
+                    carrier_name=self.name,
+                    login_indicators=["auth/realms", "login.dpdgroup", "signin"],
+                    wait_selector="a[href*='parcelNumber']",
+                    user_agent=tokens.user_agent,
+                )
+            except CarrierAuthError:
+                # Cookies expired — try re-login with stored credentials
+                logger.info("DPD cookies expired, attempting re-login")
+                html = await self._relogin(tokens)
+                return self._parse_parcels_page(html, lookback_days)
 
             # DPD doesn't redirect to a login URL when the Keycloak session
             # expires — it silently degrades to guest mode on the same URL,
-            # showing 0 parcels and a "log in" prompt.  Detect that here so
-            # the account gets flagged AUTH_FAILED instead of appearing
-            # healthy with an empty parcel list.
+            # showing 0 parcels and a "log in" prompt.  Detect that here and
+            # attempt re-login with stored credentials before giving up.
             if _is_guest_page(html):
-                raise CarrierAuthError(
-                    self.name,
-                    "DPD session expired — the page loaded in guest mode. "
-                    "Re-export your cookies from a logged-in browser session.",
-                )
+                logger.info("DPD session degraded to guest mode, attempting re-login")
+                try:
+                    html = await self._relogin(tokens)
+                    return self._parse_parcels_page(html, lookback_days)
+                except CarrierAuthError:
+                    raise CarrierAuthError(
+                        self.name,
+                        "DPD session expired — the page loaded in guest mode. "
+                        "Re-export your cookies or reconnect with credentials.",
+                    )
 
             self._updated_tokens = AuthTokens(
                 access_token=updated_cookies,
@@ -167,14 +201,41 @@ class DPD(CarrierBase):
         if raw and raw.lstrip().startswith("<"):
             return self._parse_parcels_page(raw, lookback_days)
 
+        # No cached cookies — login with stored credentials
+        if tokens.refresh_token:
+            logger.info("No cached DPD cookies, performing initial login")
+            html = await self._relogin(tokens)
+            return self._parse_parcels_page(html, lookback_days)
+
         raise CarrierAuthError(
             carrier=self.name,
             message=(
-                "DPD account not configured. Paste a cookies JSON (auto-refreshes "
-                "on every sync) or a one-time HTML snapshot. See the add-account "
-                "form for instructions."
+                "DPD account not configured. Enter your DPD credentials "
+                "or paste a cookies JSON. See the add-account form for "
+                "instructions."
             ),
         )
+
+    async def _relogin(self, tokens: AuthTokens) -> str:
+        """Re-login using stored credentials. Returns parcels page HTML."""
+        if not tokens.refresh_token:
+            raise CarrierAuthError(
+                self.name,
+                "DPD session expired and no credentials stored. "
+                "Re-export cookies from your browser or reconnect with credentials.",
+            )
+
+        creds = json.loads(tokens.refresh_token)
+        html, updated_cookies = await _playwright_keycloak_login(
+            email=creds["email"],
+            password=creds["password"],
+            parcels_url=DPD_PARCELS_URL,
+        )
+        self._updated_tokens = AuthTokens(
+            access_token=updated_cookies,
+            refresh_token=tokens.refresh_token,
+        )
+        return html
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
         """Public tracking via postal-code verification (no login required).
@@ -458,6 +519,135 @@ class DPD(CarrierBase):
             carrier=self.name,
             status=status,
             events=sorted(events, key=lambda e: e.timestamp),
+        )
+
+
+async def _playwright_keycloak_login(
+    email: str,
+    password: str,
+    parcels_url: str,
+) -> tuple[str, str]:
+    """Log in to DPD via Keycloak SSO and capture the parcels page.
+
+    Navigates to the parcels URL (DPD redirects to Keycloak if not
+    authenticated), fills in the login form, and captures the rendered
+    HTML after login.
+
+    Returns ``(parcels_html, cookies_json)``.
+    """
+    from playwright.async_api import async_playwright
+
+    from dwmp.carriers.browser import _USER_AGENT, _browser_lock, _launch_browser, _stealth
+
+    async with _browser_lock:
+        async with _stealth(_USER_AGENT).use_async(async_playwright()) as pw:
+            browser = await _launch_browser(pw)
+            try:
+                context = await browser.new_context(
+                    user_agent=_USER_AGENT,
+                    viewport={"width": 1280, "height": 800},
+                    locale="nl-NL",
+                    timezone_id="Europe/Amsterdam",
+                )
+                page = await context.new_page()
+
+                # Navigate to parcels — DPD redirects to Keycloak if not logged in
+                await page.goto(parcels_url, wait_until="networkidle", timeout=30_000)
+
+                # Detect if we landed on Keycloak login
+                on_login = (
+                    "login.dpdgroup" in page.url.lower()
+                    or "auth/realms" in page.url.lower()
+                    or await page.query_selector("#username")
+                    or await page.query_selector("#password")
+                )
+
+                if on_login:
+                    await _do_keycloak_login(page, email, password)
+
+                # Wait for parcels to render
+                try:
+                    await page.wait_for_selector(
+                        "a[href*='parcelNumber']",
+                        timeout=15_000,
+                    )
+                except Exception:
+                    logger.warning("DPD parcel links not found — capturing page as-is")
+
+                html = await page.content()
+
+                if _is_guest_page(html):
+                    raise CarrierAuthError(
+                        "dpd",
+                        "Login appeared to succeed but DPD loaded in guest mode. "
+                        "Check your credentials or try again later.",
+                    )
+
+                cookies = await context.cookies()
+                cookies_json = json.dumps(cookies)
+
+                logger.info(
+                    "DPD Keycloak login+capture complete, %d bytes, %d cookies",
+                    len(html), len(cookies),
+                )
+                return html, cookies_json
+            finally:
+                await browser.close()
+
+
+async def _do_keycloak_login(page: object, email: str, password: str) -> None:
+    """Fill in Keycloak's login form and submit."""
+    try:
+        await page.wait_for_selector(  # type: ignore[union-attr]
+            "#username, #password, input[name='username']",
+            timeout=10_000,
+            state="visible",
+        )
+    except Exception as exc:
+        raise CarrierAuthError(
+            "dpd",
+            f"DPD/Keycloak login form did not appear (url={getattr(page, 'url', '<unknown>')}). "
+            "The login flow may have changed or Cloudflare blocked access.",
+        ) from exc
+
+    username_input = (
+        await page.query_selector("#username")  # type: ignore[union-attr]
+        or await page.query_selector("input[name='username']")  # type: ignore[union-attr]
+    )
+    if username_input:
+        await username_input.fill(email)
+
+    password_input = (
+        await page.query_selector("#password")  # type: ignore[union-attr]
+        or await page.query_selector("input[name='password']")  # type: ignore[union-attr]
+    )
+    if password_input:
+        await password_input.fill(password)
+
+    submit = (
+        await page.query_selector("#kc-login")  # type: ignore[union-attr]
+        or await page.query_selector("input[type='submit']")  # type: ignore[union-attr]
+        or await page.query_selector("button[type='submit']")  # type: ignore[union-attr]
+    )
+    if submit:
+        await submit.click()  # type: ignore[union-attr]
+    else:
+        await page.keyboard.press("Enter")  # type: ignore[union-attr]
+
+    await page.wait_for_load_state("networkidle", timeout=20_000)  # type: ignore[union-attr]
+
+    # Check if still on login page (wrong credentials)
+    current_url = getattr(page, "url", "")
+    if "login.dpdgroup" in current_url.lower() or "auth/realms" in current_url.lower():
+        error_el = await page.query_selector(  # type: ignore[union-attr]
+            ".alert-error, #input-error, .kc-feedback-text"
+        )
+        error_text = ""
+        if error_el:
+            error_text = await error_el.inner_text()  # type: ignore[union-attr]
+        raise CarrierAuthError(
+            "dpd",
+            f"DPD login failed — check your email and password. {error_text}".strip(),
         )
 
 
