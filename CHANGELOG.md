@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.23.0 (2026-04-14)
+
+### Features
+
+- **dpd**: Public tracking via postal-code verification (no login needed)
+  ([`e784b51`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/e784b518c35b11b20acdb8d9fbee24fc2d4c3399))
+
+
 ## v1.22.0 (2026-04-14)
 
 ### Features
