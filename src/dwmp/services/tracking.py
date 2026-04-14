@@ -389,6 +389,83 @@ class TrackingService:
 
         return synced
 
+    async def sync_account_from_html(
+        self, account_id: int, html: str
+    ) -> list[dict]:
+        """Sync an account using raw HTML captured by the user's browser.
+
+        Bypasses Playwright entirely — the user's browser has the valid
+        session and captures the page HTML via a bookmarklet. We just
+        parse it the same way sync_packages would.
+        """
+        account = await self._repository.get_account(account_id)
+        if account is None:
+            raise ValueError(f"Account {account_id} not found")
+
+        carrier = self._carriers.get(account["carrier"])
+        if carrier is None:
+            raise ValueError(f"Unknown carrier: {account['carrier']}")
+
+        if not hasattr(carrier, "_parse_parcels_page"):
+            raise ValueError(
+                f"{account['carrier']} does not support browser-push sync"
+            )
+
+        results = carrier._parse_parcels_page(html, account["lookback_days"])
+
+        # Mark account healthy
+        await self._repository.update_account_status(
+            account_id, AccountStatus.CONNECTED
+        )
+        await self._repository.update_account_last_synced(account_id)
+
+        acct_postal = account.get("postal_code") or ""
+
+        synced: list[dict] = []
+        for result in results:
+            pkg_postal = result.postal_code or acct_postal or None
+
+            existing = await self._repository.find_package(
+                result.tracking_number, result.carrier
+            )
+            if existing:
+                pkg_id = existing["id"]
+            else:
+                pkg_id = await self._repository.add_package(
+                    tracking_number=result.tracking_number,
+                    carrier=result.carrier,
+                    postal_code=pkg_postal,
+                    account_id=account_id,
+                    source="account",
+                    tracking_url=result.tracking_url,
+                )
+
+            if pkg_postal and existing and not existing.get("postal_code"):
+                await self._repository.update_package_postal_code(
+                    pkg_id, pkg_postal
+                )
+
+            latest_desc = result.events[-1].description if result.events else None
+            await self._update_package_status(
+                pkg_id, result.status.value, result.tracking_number,
+                result.carrier, existing.get("label") if existing else None,
+                description=latest_desc,
+            )
+            for event in result.events:
+                await self._repository.add_event(
+                    package_id=pkg_id,
+                    timestamp=event.timestamp,
+                    status=event.status.value,
+                    description=event.description,
+                    location=event.location,
+                )
+
+            pkg = await self.get_package(pkg_id)
+            if pkg:
+                synced.append(pkg)
+
+        return synced
+
     # --- Package management ---
 
     async def add_package(

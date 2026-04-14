@@ -39,6 +39,24 @@
       </div>
     </div>
     <div class="account-actions">
+      {% if account.carrier == "dpd" %}
+      <button class="btn btn-ghost btn-sm"
+        onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+        Browser Sync
+      </button>
+      <div style="display:none" class="browser-sync-info">
+        <p style="font-size:0.75rem;color:var(--text-dim);margin:4px 0 6px;">
+          Drag this to your bookmarks bar. Then open DPD's
+          <a href="https://www.dpdgroup.com/nl/mydpd/my-parcels/incoming" target="_blank">parcels page</a>
+          (make sure you're logged in) and click the bookmarklet:
+        </p>
+        <a class="btn btn-primary btn-sm" style="cursor:grab;user-select:none;"
+          href="javascript:void(fetch('{{ dwmp_origin }}{{ base_path }}/api/v1/accounts/{{ account.id }}/browser-push',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer {{ api_token }}'},body:JSON.stringify({html:document.documentElement.outerHTML})}).then(function(r){return r.ok?r.json():r.json().then(function(e){throw e.detail||r.statusText})}).then(function(d){alert('Synced '+d.length+' package(s) from DPD')}).catch(function(e){alert('Sync failed: '+e)}))">
+          Sync DPD
+        </a>
+        <small class="form-help" style="display:block;margin-top:4px;">Drag the button above to your bookmarks bar.</small>
+      </div>
+      {% else %}
       <button class="btn btn-ghost btn-sm"
         hx-post="{{ base_path }}/accounts/{{ account.id }}/sync"
         hx-target="#account-{{ account.id }}"
@@ -47,6 +65,7 @@
         Sync
         <span class="htmx-indicator" id="sync-spinner-{{ account.id }}"><span class="spinner"></span></span>
       </button>
+      {% endif %}
       <button class="btn btn-ghost btn-sm"
         hx-get="{{ base_path }}/accounts/{{ account.id }}/edit"
         hx-target="#edit-form-{{ account.id }}"

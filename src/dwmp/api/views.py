@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from dwmp.api.auth import login_response, logout_response, verify_password
+from dwmp.api.auth import create_token, login_response, logout_response, verify_password
 from dwmp.api.dependencies import get_tracking_service
 from dwmp.carriers.base import CarrierAuthError
 from dwmp.services.tracking import TrackingService
@@ -210,6 +210,8 @@ async def accounts_page(
         "active_nav": "accounts", "active": "accounts",
         "accounts": accounts, "carriers": carriers, "version": VERSION,
         "base_path": _base_path(request),
+        "api_token": create_token(),
+        "dwmp_origin": str(request.base_url).rstrip("/"),
     }
     return templates.TemplateResponse(request, "accounts.html", ctx)
 
@@ -391,6 +393,8 @@ async def sync_account_view(
         "account": account,
         "base_path": _base_path(request),
         "sync_result": sync_result,
+        "api_token": create_token(),
+        "dwmp_origin": str(request.base_url).rstrip("/"),
     }
     return templates.TemplateResponse(request, "_account_row.html", ctx)
 
