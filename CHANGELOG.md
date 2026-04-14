@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.22.0 (2026-04-14)
+
+### Features
+
+- **dpd,ui**: Skip Playwright validation for DPD and add per-package refresh button
+  ([`57a6bed`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/57a6bed921f11e46e3001d070998666cd920c1b9))
+
+
 ## v1.21.3 (2026-04-14)
 
 ### Bug Fixes
