@@ -15,6 +15,32 @@ from dwmp.services.tracking import TrackingService
 
 VERSION = pkg_version("dude-wheres-my-package")
 
+# Explicitly configured public URL; falls back to request headers.
+_PUBLIC_URL = os.environ.get("DWMP_PUBLIC_URL", "")
+
+
+def _public_origin(request: Request) -> str:
+    """Derive the public-facing origin URL for cross-origin bookmarklets.
+
+    Behind a reverse proxy / k8s ingress, ``request.base_url`` returns the
+    pod's internal address. We prefer (in order):
+
+    1. ``DWMP_PUBLIC_URL`` env var (explicit, always correct)
+    2. ``X-Forwarded-Host`` + ``X-Forwarded-Proto`` (set by most ingress controllers)
+    3. ``Host`` header with assumed https
+    4. ``request.base_url`` as last resort
+    """
+    if _PUBLIC_URL:
+        return _PUBLIC_URL.rstrip("/")
+    fwd_host = request.headers.get("x-forwarded-host")
+    if fwd_host:
+        proto = request.headers.get("x-forwarded-proto", "https")
+        return f"{proto}://{fwd_host}".rstrip("/")
+    host = request.headers.get("host")
+    if host and not host.startswith("10.") and not host.startswith("127."):
+        return f"https://{host}".rstrip("/")
+    return str(request.base_url).rstrip("/")
+
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
@@ -211,7 +237,7 @@ async def accounts_page(
         "accounts": accounts, "carriers": carriers, "version": VERSION,
         "base_path": _base_path(request),
         "api_token": create_token(),
-        "dwmp_origin": str(request.base_url).rstrip("/"),
+        "dwmp_origin": _public_origin(request),
     }
     return templates.TemplateResponse(request, "accounts.html", ctx)
 
@@ -394,7 +420,7 @@ async def sync_account_view(
         "base_path": _base_path(request),
         "sync_result": sync_result,
         "api_token": create_token(),
-        "dwmp_origin": str(request.base_url).rstrip("/"),
+        "dwmp_origin": _public_origin(request),
     }
     return templates.TemplateResponse(request, "_account_row.html", ctx)
 

@@ -41,22 +41,10 @@
     <div class="account-actions">
       {% if account.carrier == "dpd" %}
       <button class="btn btn-ghost btn-sm"
-        onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+        onclick="document.getElementById('browser-sync-modal-{{ account.id }}').style.display='flex'">
         Browser Sync
       </button>
-      <div style="display:none" class="browser-sync-info">
-        <p style="font-size:0.75rem;color:var(--text-dim);margin:4px 0 6px;">
-          Drag this to your bookmarks bar. Then open DPD's
-          <a href="https://www.dpdgroup.com/nl/mydpd/my-parcels/incoming" target="_blank">parcels page</a>
-          (make sure you're logged in) and click the bookmarklet:
-        </p>
-        <a class="btn btn-primary btn-sm" style="cursor:grab;user-select:none;"
-          href="javascript:void(fetch('{{ dwmp_origin }}{{ base_path }}/api/v1/accounts/{{ account.id }}/browser-push',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer {{ api_token }}'},body:JSON.stringify({html:document.documentElement.outerHTML})}).then(function(r){return r.ok?r.json():r.json().then(function(e){throw e.detail||r.statusText})}).then(function(d){alert('Synced '+d.length+' package(s) from DPD')}).catch(function(e){alert('Sync failed: '+e)}))">
-          Sync DPD
-        </a>
-        <small class="form-help" style="display:block;margin-top:4px;">Drag the button above to your bookmarks bar.</small>
-      </div>
-      {% else %}
+      {% endif %}
       <button class="btn btn-ghost btn-sm"
         hx-post="{{ base_path }}/accounts/{{ account.id }}/sync"
         hx-target="#account-{{ account.id }}"
@@ -65,7 +53,6 @@
         Sync
         <span class="htmx-indicator" id="sync-spinner-{{ account.id }}"><span class="spinner"></span></span>
       </button>
-      {% endif %}
       <button class="btn btn-ghost btn-sm"
         hx-get="{{ base_path }}/accounts/{{ account.id }}/edit"
         hx-target="#edit-form-{{ account.id }}"
@@ -82,4 +69,38 @@
     </div>
   </div>
   <div id="edit-form-{{ account.id }}" class="add-form-slot"></div>
+
+  {% if account.carrier == "dpd" %}
+  <div class="modal-overlay" id="browser-sync-modal-{{ account.id }}" style="display:none;"
+    onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="add-form" style="border-top:none;">
+        <div class="form-header">
+          <h3>Browser Sync for DPD</h3>
+          <button type="button" class="btn btn-ghost btn-sm"
+            onclick="this.closest('.modal-overlay').style.display='none'">Close</button>
+        </div>
+        <p class="form-hint">
+          DPD's session cookies can't be replayed from the server. Instead, your
+          browser captures the page and sends the HTML directly to DWMP.
+        </p>
+        <div class="wizard-steps">
+          <li>Drag the button below to your <strong>bookmarks bar</strong>.</li>
+          <li>Open <a href="https://www.dpdgroup.com/nl/mydpd/my-parcels/incoming" target="_blank" rel="noopener">DPD My Parcels → Incoming</a> and make sure you're logged in.</li>
+          <li>Click the <strong>Sync DPD</strong> bookmark. Your packages sync instantly.</li>
+        </div>
+
+        <div style="text-align:center;padding:20px 0;">
+          <a class="btn btn-primary" style="cursor:grab;user-select:none;font-size:0.9rem;padding:10px 24px;"
+            href="javascript:void(fetch('{{ dwmp_origin }}{{ base_path }}/api/v1/accounts/{{ account.id }}/browser-push',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer {{ api_token }}'},body:JSON.stringify({html:document.documentElement.outerHTML})}).then(function(r){return r.ok?r.json():r.json().then(function(e){throw e.detail||r.statusText})}).then(function(d){alert('Synced '+d.length+' package(s) from DPD')}).catch(function(e){alert('Sync failed: '+e)}))">
+            Sync DPD
+          </a>
+          <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;">
+            Drag this button to your bookmarks bar
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 </div>
