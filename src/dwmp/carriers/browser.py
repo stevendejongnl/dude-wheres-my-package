@@ -153,6 +153,19 @@ async def capture_page_html(
     effective_ua = user_agent or _USER_AGENT
     locale, tz = _locale_from_ua(effective_ua)
 
+    # Split cookies: Cloudflare cookies (cf_*) vs session cookies (everything
+    # else).  Cloudflare binds cf_clearance to the TLS fingerprint of the
+    # browser that earned it, so replaying someone else's cf_clearance from a
+    # different browser always fails.  Instead, we navigate WITHOUT any cookies
+    # first so *our* headless browser earns its own cf_clearance, then inject
+    # the session-only cookies and reload.
+    _cf_prefixes = ("cf_clearance", "__cf_bm", "__cflb", "_cfuvid")
+    session_cookies = [
+        c for c in cookies
+        if not any(c.get("name", "").startswith(p) for p in _cf_prefixes)
+    ]
+    has_cf = len(session_cookies) < len(cookies)
+
     async with _browser_lock:
         async with _stealth(effective_ua).use_async(async_playwright()) as pw:
             browser = await _launch_browser(pw)
@@ -163,12 +176,31 @@ async def capture_page_html(
                     locale=locale,
                     timezone_id=tz,
                 )
-                await context.add_cookies(cookies)
 
                 page = await context.new_page()
-                await page.goto(
-                    url, wait_until="networkidle", timeout=wait_timeout_ms
-                )
+
+                if has_cf:
+                    # Pass 1: navigate bare → earn our own cf_clearance
+                    try:
+                        await page.goto(
+                            url, wait_until="networkidle",
+                            timeout=wait_timeout_ms,
+                        )
+                    except Exception:
+                        pass  # Timeout is OK — challenge may be slow
+                    # Pass 2: inject session cookies and reload
+                    await context.add_cookies(session_cookies)
+                    await page.goto(
+                        url, wait_until="networkidle",
+                        timeout=wait_timeout_ms,
+                    )
+                else:
+                    # No CF cookies in the export — load everything at once
+                    await context.add_cookies(cookies)
+                    await page.goto(
+                        url, wait_until="networkidle",
+                        timeout=wait_timeout_ms,
+                    )
 
                 # Detect login redirect
                 current_url = page.url.lower()
