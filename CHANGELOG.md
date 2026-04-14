@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.27.0 (2026-04-14)
+
+### Features
+
+- **amazon**: Cookies fallback when bot detection blocks Playwright login
+  ([`6dec688`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/6dec688ba461b851311ee0003c1b48e5cf05a43c))
+
+
 ## v1.26.0 (2026-04-14)
 
 ### Features
