@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.29.2 (2026-04-14)
+
+### Bug Fixes
+
+- **amazon,dpd,ui**: Require Cookie-Editor for httpOnly cookies, fix meta tag
+  ([`ec1d57b`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/ec1d57b56fd96a758781a4058167ff04b3ff1246))
+
+
 ## v1.29.1 (2026-04-14)
 
 ### Bug Fixes
