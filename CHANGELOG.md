@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.33.0 (2026-04-14)
+
+### Documentation
+
+- **readme**: Rewrite Amazon section around browser-push, update universal bookmarklet references
+  ([`473d5c9`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/473d5c938609ec1e2e83b5d0f395fae72577306c))
+
+### Features
+
+- **chrome-extension**: Add Chrome extension for browser-push sync and auto-sync
+  ([`0a066d2`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/0a066d263f564951bd4b5cd1da9d71b220f40698))
+
+
 ## v1.32.0 (2026-04-14)
 
 ### Features
