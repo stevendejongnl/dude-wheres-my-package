@@ -1,7 +1,7 @@
 import pytest
 
 from dwmp.carriers.base import AuthTokens, AuthType, CarrierAuthError, TrackingStatus
-from dwmp.carriers.dpd import DPD, _parse_status
+from dwmp.carriers.dpd import DPD, _is_guest_page, _parse_status
 
 
 def test_dpd_is_manual_token():
@@ -138,6 +138,47 @@ async def test_sync_packages_legacy_html_still_works():
     assert results[0].tracking_number == "LEGACY999"
     # Legacy mode never sets updated tokens.
     assert carrier.get_updated_tokens() is None
+
+
+async def test_sync_detects_guest_mode(monkeypatch):
+    """Expired Keycloak session → DPD renders guest page → CarrierAuthError."""
+    guest_html = """
+    <html><body>
+    <div>Gast Particuliere klanten Nederlands English Mijn pakketten</div>
+    <div>Inloggen/Registreren</div>
+    <div>1 × Guest User Login</div>
+    <div>Binnenkomend 0 Versturen en retourneren 0</div>
+    <p>Maak een account aan of log in om al je pakketten op één plek
+       op te slaan en te volgen.</p>
+    </body></html>
+    """
+
+    async def fake_capture(**kwargs):
+        return guest_html, '[{"name":"cf_clearance","value":"still-valid"}]'
+
+    monkeypatch.setattr("dwmp.carriers.browser.capture_page_html", fake_capture)
+
+    carrier = DPD()
+    tokens = AuthTokens(
+        access_token='[{"name":"cf_clearance","value":"old"}]',
+        user_agent="Mozilla/5.0",
+    )
+    with pytest.raises(CarrierAuthError, match="guest mode"):
+        await carrier.sync_packages(tokens)
+
+    # Tokens should NOT be updated on auth failure.
+    assert carrier.get_updated_tokens() is None
+
+
+def test_is_guest_page_positive():
+    assert _is_guest_page("<html>Guest User Login</html>")
+    assert _is_guest_page("<div>Inloggen/Registreren</div>")
+    assert _is_guest_page("Maak een account aan of log in om je pakketten")
+
+
+def test_is_guest_page_negative():
+    assert not _is_guest_page("<html><a href='?parcelNumber=123'>Parcel</a></html>")
+    assert not _is_guest_page("")
 
 
 async def test_sync_packages_empty_token_raises_auth_error():

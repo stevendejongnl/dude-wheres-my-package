@@ -60,6 +60,21 @@ def _parse_status(text: str) -> TrackingStatus:
     return TrackingStatus.UNKNOWN
 
 
+# Strings DPD renders when the Keycloak session has expired and the page
+# degrades to guest mode. Checked case-insensitively against the raw HTML.
+_GUEST_INDICATORS = (
+    "guest user login",
+    "inloggen/registreren",
+    "maak een account aan of log in",
+)
+
+
+def _is_guest_page(html: str) -> bool:
+    """Return True if the HTML looks like DPD's logged-out guest mode."""
+    lower = html.lower()
+    return any(indicator in lower for indicator in _GUEST_INDICATORS)
+
+
 class DPD(CarrierBase):
     name = "dpd"
     auth_type = AuthType.MANUAL_TOKEN
@@ -96,6 +111,19 @@ class DPD(CarrierBase):
                 wait_selector="a[href*='parcelNumber']",
                 user_agent=tokens.user_agent,
             )
+
+            # DPD doesn't redirect to a login URL when the Keycloak session
+            # expires — it silently degrades to guest mode on the same URL,
+            # showing 0 parcels and a "log in" prompt.  Detect that here so
+            # the account gets flagged AUTH_FAILED instead of appearing
+            # healthy with an empty parcel list.
+            if _is_guest_page(html):
+                raise CarrierAuthError(
+                    self.name,
+                    "DPD session expired — the page loaded in guest mode. "
+                    "Re-export your cookies from a logged-in browser session.",
+                )
+
             self._updated_tokens = AuthTokens(
                 access_token=updated_cookies,
                 refresh_token=tokens.refresh_token,
