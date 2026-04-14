@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.31.1 (2026-04-14)
+
+### Bug Fixes
+
+- **dpd**: Modal for browser-sync bookmarklet + fix bookmarklet origin URL
+  ([`6e438f6`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/6e438f6033d185ea25c49a9125c2533f0e982710))
+
+
 ## v1.31.0 (2026-04-14)
 
 ### Features
