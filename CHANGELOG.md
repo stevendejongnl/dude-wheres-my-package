@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.21.3 (2026-04-14)
+
+### Bug Fixes
+
+- **ui**: Target form with hx-indicator so overlay actually triggers
+  ([`86b690b`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/86b690b88ffb9af1a1c6f63bf2eeec22a9e6c35a))
+
+
 ## v1.21.2 (2026-04-14)
 
 ### Bug Fixes
