@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.30.1 (2026-04-14)
+
+### Bug Fixes
+
+- **browser**: Two-pass cookie replay — earn own cf_clearance, then inject session
+  ([`a49b1c3`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/a49b1c394beab212a6658e3f7ce4271c7eb5bd0e))
+
+
 ## v1.30.0 (2026-04-14)
 
 ### Features
