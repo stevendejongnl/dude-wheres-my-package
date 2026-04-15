@@ -1,354 +1,1105 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-:root {
-  --bg: #0f1117;
-  --surface: #1a1d27;
-  --surface2: #242736;
-  --border: #2e3145;
-  --text: #e1e4ed;
-  --text-dim: #8b8fa3;
-  --accent: #6c5ce7;
-  --green: #00b894;
-  --yellow: #fdcb6e;
-  --orange: #e17055;
-  --red: #d63031;
-  --blue: #74b9ff;
-  --radius: 12px;
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body {
-  overflow: hidden;
-  scrollbar-width: none;
-}
-html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.6;
-}
-.container { max-width: 960px; margin: 0 auto; padding: 0 20px; }
-header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 16px 0;
-}
-header .container { display: flex; align-items: center; justify-content: space-between; }
-header h1 { font-size: 1.2rem; font-weight: 600; display: flex; align-items: center; }
-.version-badge {
-  font-size: 0.6rem; font-weight: 500; color: var(--accent);
-  background: #6c5ce715; border: 1px solid #6c5ce730;
-  padding: 2px 8px; border-radius: 20px; margin-left: 12px;
-}
-nav { display: flex; gap: 8px; }
-nav a {
-  color: var(--text-dim); text-decoration: none; padding: 6px 12px;
-  border-radius: 8px; font-size: 0.875rem;
-}
-nav a.active { color: var(--text); background: var(--surface2); }
-main { padding: 24px 0; }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
-.stat {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 16px;
-}
-.stat-value { font-size: 2rem; font-weight: 700; }
-.stat-label { font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
-.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.section-header h2 { font-size: 1.1rem; font-weight: 600; }
-.btn {
-  padding: 6px 14px; border: none; border-radius: 8px;
-  font-size: 0.8rem; font-weight: 500; cursor: pointer;
-  text-decoration: none; display: inline-block;
-}
-.btn-primary { background: var(--accent); color: white; }
-.btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
-.btn-sm { padding: 4px 10px; font-size: 0.75rem; }
-.card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); margin-bottom: 12px; overflow: hidden;
-}
-.pkg-main { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
-.pkg-carrier {
-  font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
-  padding: 4px 8px; border-radius: 6px; white-space: nowrap;
-  width: 64px; text-align: center; flex-shrink: 0;
-}
-.pkg-carrier.postnl { background: #ff6b0020; color: #ff8a50; }
-.pkg-carrier.dhl { background: #ffcc0020; color: #ffd93d; }
-.pkg-carrier.dpd { background: #dc143c20; color: #ff6b81; }
-.pkg-carrier.amazon { background: #ff990020; color: #ffad42; }
-.pkg-carrier.gls { background: #003e7e20; color: #4a90d9; }
-.pkg-info { flex: 1; min-width: 0; }
-.pkg-tracking { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85rem; }
-.pkg-details { display: flex; flex-direction: column; gap: 1px; margin-top: 2px; font-size: 0.8rem; color: var(--text-dim); }
-.pkg-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.pkg-date { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; }
-.status {
-  font-size: 0.75rem; font-weight: 600; padding: 4px 10px;
-  border-radius: 20px; white-space: nowrap;
-}
-.status-delivered { background: #00b89420; color: var(--green); }
-.status-in_transit { background: #74b9ff20; color: var(--blue); }
-.status-out_for_delivery { background: #fdcb6e20; color: var(--yellow); }
-.status-pre_transit { background: #636e7220; color: var(--text-dim); }
-.status-failed_attempt { background: #e1705520; color: var(--orange); }
-.nav-bell { position: relative; display: inline-flex; align-items: center; }
-.nav-bell svg { width: 18px; height: 18px; fill: currentColor; }
-.notif-badge-dot {
-  position: absolute; top: -4px; right: -8px;
-  background: var(--red); color: white;
-  font-size: 0.6rem; font-weight: 700;
-  min-width: 16px; height: 16px; line-height: 16px;
-  border-radius: 8px; text-align: center; padding: 0 4px;
-}
-.card-header {
-  padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;
-}
-footer {
-  border-top: 1px solid var(--border);
-  padding: 20px 0; margin-top: 48px;
-  text-align: center; font-size: 0.8rem; color: var(--text-dim);
-}
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DWMP">
+  <meta name="theme-color" content="#0f1117">
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png">
+  <meta name="dwmp-base" content="">
+  <title>Packages — DWMP</title>
+  
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #242736;
+      --border: #2e3145;
+      --text: #e1e4ed;
+      --text-dim: #8b8fa3;
+      --accent: #6c5ce7;
+      --accent-hover: #7c6df7;
+      --green: #00b894;
+      --yellow: #fdcb6e;
+      --orange: #e17055;
+      --red: #d63031;
+      --blue: #74b9ff;
+      --radius: 12px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 0 20px; }
 
-/* Drawer */
-.drawer-overlay {
-  position: fixed; inset: 0; z-index: 100;
-  background: rgba(0, 0, 0, 0.5);
-}
-.drawer {
-  position: fixed; top: 0; right: 0; bottom: 0; z-index: 101;
-  width: 420px; max-width: 100vw;
-  background: var(--bg); border-left: 1px solid var(--border);
-  box-shadow: -8px 0 30px rgba(0, 0, 0, 0.3);
-  display: flex; flex-direction: column;
-}
-.drawer-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px; border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.drawer-header h3 { font-size: 1rem; font-weight: 600; margin: 0; }
-.drawer-close {
-  background: none; border: none; color: var(--text-dim); cursor: pointer;
-  font-size: 1.2rem; padding: 4px 8px; border-radius: 4px;
-}
-.drawer-body {
-  flex: 1; overflow-y: auto; padding: 8px 0;
-  scrollbar-width: none;
-}
-.drawer-body::-webkit-scrollbar { display: none; }
+    /* Header */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 0;
+      position: sticky; top: 0; z-index: 10;
+    }
+    header .container { display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 1.2rem; font-weight: 600; display: flex; align-items: center; }
+    .version-badge {
+      font-size: 0.6rem; font-weight: 500; color: var(--accent);
+      background: #6c5ce715; border: 1px solid #6c5ce730;
+      padding: 2px 8px; border-radius: 20px; margin-left: 12px;
+      letter-spacing: 0.3px;
+    }
+    nav { display: flex; gap: 8px; }
+    nav a {
+      color: var(--text-dim); text-decoration: none; padding: 6px 12px;
+      border-radius: 8px; font-size: 0.875rem; transition: all 0.2s;
+    }
+    nav a:hover, nav a.active { color: var(--text); background: var(--surface2); }
 
-/* Notification cards — redesigned (matches /notifications production template) */
-.notification-card {
-  display: block;
-  padding: 14px 18px;
-  color: var(--text);
-  text-decoration: none;
-  transition: background 0.15s;
-  border-radius: 0;
-  border-left: none;
-  border-right: none;
-}
-a.notification-card:hover { background: var(--surface2); }
-.notification-card.unread { background: var(--surface2); border-left: 3px solid var(--accent); }
-.notification-card--alert { border-left: 3px solid var(--red); }
-.notification-card__header {
-  display: flex; align-items: center; gap: 12px;
-}
-.notification-card__headline {
-  flex: 1; min-width: 0;
-  display: flex; flex-direction: column; gap: 2px;
-}
-.notification-card--alert .notification-card__headline {
-  flex-direction: row; align-items: center; gap: 8px;
-}
-.notification-card__title {
-  font-size: 0.9rem; line-height: 1.3;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.notification-card__label {
-  font-size: 0.78rem; color: var(--text-dim);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.notification-card__icon {
-  color: var(--red); font-size: 1rem; flex-shrink: 0;
-}
-.notification-card__action { flex-shrink: 0; }
-.notification-card__desc {
-  font-size: 0.82rem; color: var(--text); line-height: 1.45;
-  margin: 8px 0 0 76px; word-break: break-word;
-}
-.notification-card__meta {
-  font-size: 0.72rem; color: var(--text-dim);
-  margin: 6px 0 0 76px;
-  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
-}
-</style>
+    /* Main */
+    main { padding: 24px 0; }
+
+    /* Stats */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .stat {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+    }
+    .stat-value { font-size: 2rem; font-weight: 700; }
+    .stat-label { font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Cards */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 12px; overflow: hidden;
+    }
+    .card-header {
+      padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; user-select: none;
+    }
+    .card-header:hover { background: var(--surface2); }
+    .card-body { padding: 0 20px 16px; }
+    .card-body.collapsed { display: none; }
+
+    /* Package */
+    .pkg-main { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
+    .pkg-carrier {
+      font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+      padding: 4px 8px; border-radius: 6px; white-space: nowrap;
+      width: 64px; text-align: center; flex-shrink: 0;
+    }
+    .pkg-carrier.postnl { background: #ff6b0020; color: #ff8a50; }
+    .pkg-carrier.dhl { background: #ffcc0020; color: #ffd93d; }
+    .pkg-carrier.dpd { background: #dc143c20; color: #ff6b81; }
+    .pkg-carrier.amazon { background: #ff990020; color: #ffad42; }
+    .pkg-carrier.gls { background: #003e7e20; color: #4a90d9; }
+    .pkg-info { flex: 1; min-width: 0; }
+    .pkg-tracking { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85rem; }
+    .pkg-details { display: flex; flex-direction: column; gap: 1px; margin-top: 2px; font-size: 0.8rem; color: var(--text-dim); }
+    .pkg-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pkg-sender { }
+    .pkg-first-event { }
+    .pkg-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .pkg-date { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; }
+
+    /* Status badges */
+    .status {
+      font-size: 0.75rem; font-weight: 600; padding: 4px 10px;
+      border-radius: 20px; white-space: nowrap;
+    }
+    .status-delivered { background: #00b89420; color: var(--green); }
+    .status-in_transit { background: #74b9ff20; color: var(--blue); }
+    .status-out_for_delivery { background: #fdcb6e20; color: var(--yellow); }
+    .status-pre_transit { background: #636e7220; color: var(--text-dim); }
+    .status-failed_attempt { background: #e1705520; color: var(--orange); }
+    .status-returned { background: #d6303120; color: var(--red); }
+    .status-unknown { background: #636e7220; color: var(--text-dim); }
+
+    /* Package card actions */
+    .card-actions {
+      display: flex; gap: 8px; padding: 4px 0 8px;
+      border-bottom: 1px solid var(--border); margin-bottom: 8px;
+    }
+    .card:has(.htmx-request) {
+      opacity: 0.6; pointer-events: none;
+      transition: opacity 0.15s ease-out;
+    }
+
+    /* Package metadata */
+    .pkg-metadata {
+      margin: 8px 0; border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px 10px; font-size: 0.78rem;
+    }
+    .pkg-metadata summary {
+      cursor: pointer; color: var(--text-dim); font-size: 0.75rem;
+      padding: 2px 0; list-style: revert;
+    }
+    .pkg-metadata[open] summary { margin-bottom: 8px; }
+    .pkg-metadata-grid {
+      display: grid; grid-template-columns: auto 1fr;
+      gap: 4px 12px; align-items: baseline;
+    }
+    .meta-label { color: var(--text-dim); font-weight: 500; white-space: nowrap; }
+    .meta-value { word-break: break-all; }
+    .meta-value code {
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.75rem;
+      background: var(--surface); padding: 1px 5px; border-radius: 4px;
+    }
+    .meta-value a { color: var(--accent); text-decoration: none; }
+    .meta-value a:hover { text-decoration: underline; }
+    .meta-missing { color: var(--text-dim); font-style: italic; }
+
+    /* Timeline */
+    .timeline { padding: 12px 0 4px; }
+    .timeline-event {
+      display: flex; gap: 14px; padding: 10px 0;
+      position: relative;
+    }
+    .timeline-event::before {
+      content: ''; position: absolute; left: 5px; top: 30px; bottom: -10px;
+      width: 2px; background: var(--border);
+    }
+    .timeline-event:last-child::before { display: none; }
+    .timeline-dot {
+      width: 12px; height: 12px; border-radius: 50%; margin-top: 5px; flex-shrink: 0;
+      border: 2px solid var(--border); background: var(--surface);
+    }
+    .timeline-dot.active { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 8px #6c5ce740; }
+    .timeline-content { flex: 1; }
+    .timeline-desc { font-size: 0.875rem; }
+    .timeline-details { display: flex; gap: 12px; margin-top: 2px; }
+    .timeline-time { font-size: 0.75rem; color: var(--text-dim); }
+    .timeline-loc { font-size: 0.75rem; color: var(--text-dim); }
+
+    /* Accounts */
+    .account {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px; border-bottom: 1px solid var(--border);
+    }
+    .account:last-child { border-bottom: none; }
+    .account-info { display: flex; align-items: center; gap: 12px; }
+    .account-status { font-size: 0.75rem; }
+    .account-status.connected { color: var(--green); }
+    .account-status.auth_failed { color: var(--red); }
+    .account-actions { display: flex; gap: 8px; }
+
+    /* Buttons */
+    .btn {
+      padding: 6px 14px; border: none; border-radius: 8px; cursor: pointer;
+      font-size: 0.8rem; font-weight: 500; transition: all 0.2s;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--text); border-color: var(--text-dim); }
+    .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--border); }
+    .btn-danger:hover { background: #d6303120; }
+    .btn-sync-off { color: var(--text-dim); opacity: 0.7; }
+    .btn-sm { padding: 4px 10px; font-size: 0.75rem; }
+
+    /* Add-account form */
+    .add-form-slot:empty { display: none; }
+    .add-form {
+      padding: 18px 20px; border-top: 1px solid var(--border);
+      background: var(--surface2);
+      position: relative;
+    }
+    .form-body { transition: filter 0.15s ease-out; }
+    .form-loading-overlay {
+      position: absolute; inset: 0; display: none;
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 10px;
+      background: color-mix(in srgb, var(--surface2) 55%, transparent);
+      backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+      border-radius: inherit; z-index: 5;
+    }
+    .form-loading-overlay .spinner-lg {
+      width: 38px; height: 38px; border-width: 3px;
+    }
+    .form-loading-overlay .form-loading-label {
+      font-size: 0.8rem; color: var(--text-dim);
+    }
+    /* Any in-flight HTMX button inside the form triggers the overlay and
+       blurs the form body. :has() is supported in all modern browsers. */
+    .add-form.htmx-request .form-body {
+      filter: blur(3px); pointer-events: none; user-select: none;
+    }
+    .add-form.htmx-request .form-loading-overlay {
+      display: flex;
+    }
+    /* Modal-hosted forms sit inside .modal, which clips the overlay —
+       match its rounded corners. */
+    .modal .add-form { border-radius: var(--radius); }
+    /* Account row: subtle dim while sync/refresh is in flight. */
+    .account:has(.htmx-request) {
+      opacity: 0.6; pointer-events: none;
+      transition: opacity 0.15s ease-out;
+    }
+    .form-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .form-header h3 { font-size: 1rem; font-weight: 600; }
+    .form-hint {
+      font-size: 0.85rem; color: var(--text-dim); margin-bottom: 14px;
+      line-height: 1.5;
+    }
+    .form-hint a { color: var(--accent); text-decoration: none; }
+    .form-hint a:hover { text-decoration: underline; }
+    .form-hint code {
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem;
+      background: var(--surface); padding: 1px 6px; border-radius: 4px;
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+      display: block; font-size: 0.8rem; font-weight: 500;
+      margin-bottom: 6px; color: var(--text);
+    }
+    .form-optional {
+      font-weight: 400; color: var(--text-dim); font-size: 0.75rem;
+    }
+    .form-group input, .form-group textarea {
+      width: 100%; padding: 8px 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 0.875rem;
+      font-family: inherit;
+    }
+    .form-group textarea {
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.75rem;
+      resize: vertical; min-height: 60px;
+    }
+    .form-group input:focus, .form-group textarea:focus {
+      outline: none; border-color: var(--accent);
+    }
+    .form-help {
+      display: block; font-size: 0.72rem; color: var(--text-dim);
+      margin-top: 4px;
+    }
+    .form-actions {
+      display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;
+    }
+    .save-btn:disabled {
+      opacity: 0.5; cursor: not-allowed;
+    }
+    .save-btn:disabled:hover { background: var(--accent); }
+
+    /* Wizard steps */
+    .wizard-steps {
+      list-style: none; counter-reset: step; padding: 0;
+      margin: 0 0 16px;
+    }
+    .wizard-steps li {
+      counter-increment: step; position: relative;
+      padding: 6px 0 6px 32px; font-size: 0.85rem; line-height: 1.6;
+    }
+    .wizard-steps li::before {
+      content: counter(step); position: absolute; left: 0; top: 6px;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--accent); color: white;
+      font-size: 0.7rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .wizard-steps a { color: var(--accent); text-decoration: none; }
+    .wizard-steps a:hover { text-decoration: underline; }
+    .wizard-steps code {
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem;
+      background: var(--surface); padding: 1px 6px; border-radius: 4px;
+    }
+    .wizard-steps kbd {
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.72rem;
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 1px 6px; border-radius: 4px; box-shadow: 0 1px 0 var(--border);
+    }
+    .wizard-code {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; padding: 8px 10px; margin: 6px 0;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.75rem; color: var(--text);
+      overflow-x: auto; white-space: pre; user-select: all;
+    }
+    .wizard-code.copyable {
+      cursor: pointer; position: relative;
+      transition: border-color 0.15s;
+    }
+    .wizard-code.copyable:hover { border-color: var(--accent); }
+    .wizard-code.copyable:active { background: var(--surface2); }
+    .wizard-details {
+      margin: 0 0 10px; border: 1px solid var(--border);
+      border-radius: 6px; padding: 8px 12px;
+    }
+    .wizard-details[open] { background: var(--surface); }
+    .wizard-details summary {
+      cursor: pointer; font-size: 0.85rem; padding: 2px 0;
+      list-style: revert;
+    }
+    .wizard-details[open] summary { margin-bottom: 8px; }
+
+    /* Test result */
+    .test-result {
+      margin: 14px 0 0; padding: 10px 14px; border-radius: 8px;
+      font-size: 0.85rem; display: flex; align-items: flex-start; gap: 8px;
+      line-height: 1.4;
+    }
+    .test-result.ok {
+      background: #00b89415; color: var(--green);
+      border: 1px solid #00b89440;
+    }
+    .test-result.error {
+      background: #d6303115; color: var(--red);
+      border: 1px solid #d6303140;
+    }
+    .test-icon { font-weight: 700; flex-shrink: 0; }
+
+    /* Modal */
+    .modal-slot:empty { display: none; }
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      animation: fade-in 0.15s ease-out;
+    }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); width: 100%; max-width: 480px;
+      max-height: calc(100vh - 40px); overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      animation: slide-up 0.2s ease-out;
+    }
+    .modal .add-form {
+      border-top: none; background: var(--surface);
+      padding: 24px;
+    }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slide-up {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slide-in-right {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+
+    /* Notification drawer */
+    .notif-drawer-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0, 0, 0, 0.5);
+      animation: fade-in 0.15s ease-out;
+    }
+    .notif-drawer {
+      position: fixed; top: 0; right: 0; bottom: 0; z-index: 101;
+      width: 420px; max-width: 100vw;
+      background: var(--bg); border-left: 1px solid var(--border);
+      box-shadow: -8px 0 30px rgba(0, 0, 0, 0.3);
+      display: flex; flex-direction: column;
+      animation: slide-in-right 0.2s ease-out;
+    }
+    .notif-drawer-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .notif-drawer-header h3 { font-size: 1rem; font-weight: 600; margin: 0; }
+    .notif-drawer-close {
+      background: none; border: none; color: var(--text-dim); cursor: pointer;
+      font-size: 1.2rem; padding: 4px 8px; border-radius: 4px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .notif-drawer-close:hover { color: var(--text); background: var(--surface2); }
+    .notif-drawer-body {
+      flex: 1; overflow-y: auto; padding: 8px 0;
+    }
+    .notif-drawer-body .notification-card { border-radius: 0; border-right: none; }
+    .notif-drawer-body .notification-card--update { border-left: none; }
+    .notif-drawer-body .empty { padding: 40px 20px; }
+    @media (max-width: 640px) {
+      .notif-drawer { width: 100vw; }
+    }
+    .form-group select {
+      width: 100%; padding: 8px 12px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 0.875rem;
+      font-family: inherit;
+    }
+    .form-group select:focus {
+      outline: none; border-color: var(--accent);
+    }
+
+    /* Indicators */
+    .htmx-indicator { display: none; }
+    .htmx-request .htmx-indicator { display: inline; }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Empty state */
+    .empty { text-align: center; padding: 48px 20px; color: var(--text-dim); }
+    .empty p { margin-top: 8px; font-size: 0.9rem; }
+
+    /* Notification bell & badge */
+    .nav-bell { position: relative; display: inline-flex; align-items: center; }
+    .nav-bell svg { width: 18px; height: 18px; fill: currentColor; }
+    .notif-badge-dot {
+      position: absolute; top: -4px; right: -8px;
+      background: var(--red); color: white;
+      font-size: 0.6rem; font-weight: 700;
+      min-width: 16px; height: 16px; line-height: 16px;
+      border-radius: 8px; text-align: center;
+      padding: 0 4px; pointer-events: none;
+    }
+
+    /* Notifications */
+    .notification-card {
+      display: block;
+      padding: 14px 18px;
+      color: var(--text);
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    a.notification-card:hover { background: var(--surface2); }
+    .notification-card.unread { background: var(--surface2); border-left: 3px solid var(--accent); }
+    .notification-card--alert { border-left: 3px solid var(--red); }
+    .notification-card__header {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .notification-card__headline {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .notification-card--alert .notification-card__headline {
+      flex-direction: row; align-items: center; gap: 8px;
+    }
+    .notification-card__title {
+      font-size: 0.9rem; line-height: 1.3;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .notification-card__label {
+      font-size: 0.78rem; color: var(--text-dim);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .notification-card__icon {
+      color: var(--red); font-size: 1rem; flex-shrink: 0;
+    }
+    .notification-card__action { flex-shrink: 0; }
+    .notification-card__desc {
+      font-size: 0.82rem; color: var(--text); line-height: 1.45;
+      margin: 8px 0 0 76px; word-break: break-word;
+    }
+    .notification-card__meta {
+      font-size: 0.72rem; color: var(--text-dim);
+      margin: 6px 0 0 76px;
+      display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+    }
+    .notif-unread-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent); flex-shrink: 0;
+    }
+    .notif-page-count {
+      font-size: 0.8rem; font-weight: 500; color: var(--accent);
+      background: #6c5ce715; padding: 2px 10px; border-radius: 20px;
+      margin-left: 8px;
+    }
+
+    /* Section header */
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .section-header h2 { font-size: 1.1rem; font-weight: 600; }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 20px 0;
+      margin-top: 48px;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+    footer a { color: var(--text-dim); text-decoration: none; transition: color 0.2s; }
+    footer a:hover { color: var(--text); }
+
+    /* Mobile */
+    @media (max-width: 640px) {
+      header .container { flex-direction: column; gap: 10px; }
+      header h1 { font-size: 1rem; }
+      header h1 .app-title { display: none; }
+      header h1 .app-title-short { display: inline; }
+      .version-badge { margin-left: 8px; }
+      nav { width: 100%; justify-content: center; }
+      .stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .stat { padding: 12px; }
+      .stat-value { font-size: 1.5rem; }
+      .pkg-main { gap: 10px; }
+      .pkg-tracking { font-size: 0.75rem; word-break: break-all; }
+      .pkg-carrier { width: 56px; }
+      .pkg-meta { align-items: flex-end; min-width: 90px; }
+      .pkg-date { font-size: 0.7rem; }
+      .card-header { padding: 12px 14px; }
+      .card-body { padding: 0 14px 12px; }
+      .account { flex-direction: column; gap: 10px; align-items: flex-start; }
+      .account-actions { align-self: flex-end; }
+      .notification-card__header { flex-wrap: wrap; }
+    }
+    @media (min-width: 641px) {
+      .app-title-short { display: none; }
+    }
+  </style>
 </head>
 <body>
   <header>
     <div class="container">
       <h1>
-        Dude, Where's My Package?
-        <span class="version-badge">v1.40.1</span>
+        <img src="../assets/icon-128.png" alt="" style="width:48px;height:48px;vertical-align:middle;margin-right:12px;border-radius:10px;">
+        <span class="app-title">Dude, Where's My Package?</span>
+        <span class="app-title-short">DWMP</span>
+        <span class="version-badge">v1.40.0</span>
       </h1>
+      
       <nav>
-        <a href="#" class="active">Packages</a>
-        <a href="#">Accounts</a>
-        <a href="#" class="nav-bell">
-          <svg viewBox="0 0 24 24"><path d="M12 2C10.9 2 10 2.9 10 4C10 4.1 10 4.19 10.02 4.28C7.58 5.07 6 7.36 6 10V16L4 18V19H20V18L18 16V10C18 7.36 16.42 5.07 13.98 4.28C14 4.19 14 4.1 14 4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z"/></svg>
-          <span class="notif-badge-dot">3</span>
+        <a href="/" class="active">Packages</a>
+        <a href="/accounts" class="">Accounts</a>
+        <a href="#" class="nav-bell" onclick="event.preventDefault();document.getElementById('notif-drawer-overlay').style.display='block';document.getElementById('notif-drawer').style.display='flex';htmx.ajax('GET','/notifications/drawer','#notif-drawer-body');">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C10.9 2 10 2.9 10 4C10 4.1 10 4.19 10.02 4.28C7.58 5.07 6 7.36 6 10V16L4 18V19H20V18L18 16V10C18 7.36 16.42 5.07 13.98 4.28C14 4.19 14 4.1 14 4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z"/></svg>
+          <span id="notif-badge" hx-get="/notifications/badge" hx-swap="innerHTML"></span>
         </a>
       </nav>
+      
     </div>
   </header>
   <main>
     <div class="container">
-      <div class="section-header">
-        <h2>Packages</h2>
-        <button class="btn btn-primary btn-sm">Track a package</button>
-      </div>
-      <div class="stats">
-        <div class="stat"><div class="stat-value">3</div><div class="stat-label">Active</div></div>
-        <div class="stat"><div class="stat-value">2</div><div class="stat-label">Delivered</div></div>
-        <div class="stat"><div class="stat-value">4</div><div class="stat-label">Accounts</div></div>
-      </div>
-      <div class="section-header"><h2>Active</h2></div>
-      <div class="card">
-        <div class="card-header">
-          <div class="pkg-main">
-            <span class="pkg-carrier postnl">PostNL</span>
-            <div class="pkg-info">
-              <div class="pkg-tracking">3STEST1234567890</div>
-              <div class="pkg-details"><span><strong>From:</strong> bol.com</span></div>
-            </div>
-          </div>
-          <div class="pkg-meta">
-            <span class="status status-in_transit">in transit</span>
-            <span class="pkg-date">Today 14:32</span>
-          </div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header">
-          <div class="pkg-main">
-            <span class="pkg-carrier dhl">DHL</span>
-            <div class="pkg-info">
-              <div class="pkg-tracking">JVGL09876543210</div>
-              <div class="pkg-details"><span><strong>From:</strong> Coolblue</span></div>
-            </div>
-          </div>
-          <div class="pkg-meta">
-            <span class="status status-out_for_delivery">out for delivery</span>
-            <span class="pkg-date">Today 09:15</span>
-          </div>
+      
+
+<div class="section-header">
+  <h2>Packages</h2>
+  <button class="btn btn-primary btn-sm"
+    hx-get="/packages/add"
+    hx-target="#track-modal"
+    hx-swap="innerHTML">
+    Track a package
+  </button>
+</div>
+<div id="track-modal" class="modal-slot"></div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-value">4</div>
+    <div class="stat-label">Active</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">0</div>
+    <div class="stat-label">Delivered</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">3</div>
+    <div class="stat-label">Accounts</div>
+  </div>
+</div>
+
+
+<div class="section-header">
+  <h2>Active</h2>
+</div>
+
+
+<div class="card" id="pkg-2">
+  <div class="card-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+    <div class="pkg-main">
+      <span class="pkg-carrier postnl">postnl</span>
+      <div class="pkg-info">
+        <div class="pkg-tracking">3SKABA000000001</div>
+        <div class="pkg-details">
+          
+          <span class="pkg-sender"><strong>From:</strong> Accepted at sorting centre</span>
+          
+          
+          <span class="pkg-first-event">Sunday 12:58</span>
+          
+          
+          <span class="pkg-label">Book</span>
+          
         </div>
       </div>
     </div>
-  </main>
-
-  <!-- Notification drawer overlay -->
-  <div class="drawer-overlay"></div>
-  <div class="drawer">
-    <div class="drawer-header">
-      <h3>Notifications</h3>
-      <button class="drawer-close">&times;</button>
-    </div>
-    <div class="drawer-body">
-
-      <!-- Alert variant: carrier sync / auth failure -->
-      <div class="notification-card notification-card--alert">
-        <div class="notification-card__header">
-          <span class="pkg-carrier dpd">dpd</span>
-          <div class="notification-card__headline">
-            <span class="notification-card__icon" aria-hidden="true">⚠</span>
-            <span class="notification-card__title">DPD account sync failed</span>
-          </div>
-          <a class="btn btn-ghost btn-sm notification-card__action" href="#">Reconnect &rarr;</a>
-        </div>
-        <p class="notification-card__desc">Sync failed for dpd. The carrier's API or login flow may have changed. Try re-authenticating your account.</p>
-        <div class="notification-card__meta">
-          <span class="notification-card__time">Today 06:11</span>
-        </div>
-      </div>
-
-      <!-- Update variant: package status change (PostNL) -->
-      <a class="notification-card notification-card--update" href="#">
-        <div class="notification-card__header">
-          <span class="pkg-carrier postnl">postnl</span>
-          <div class="notification-card__headline">
-            <span class="notification-card__title pkg-tracking">3STEST1234567890</span>
-            <span class="notification-card__label">bol.com order</span>
-          </div>
-          <span class="status status-in_transit">In Transit</span>
-        </div>
-        <p class="notification-card__desc">Arrived at sorting center — Nieuwegein</p>
-        <div class="notification-card__meta">
-          <span class="notification-card__was">was Pre Transit</span>
-          <span aria-hidden="true">·</span>
-          <span class="notification-card__time">2 hours ago</span>
-        </div>
-      </a>
-
-      <!-- Update variant: Out For Delivery (DHL) -->
-      <a class="notification-card notification-card--update" href="#">
-        <div class="notification-card__header">
-          <span class="pkg-carrier dhl">dhl</span>
-          <div class="notification-card__headline">
-            <span class="notification-card__title pkg-tracking">JVGL09876543210</span>
-            <span class="notification-card__label">Coolblue order</span>
-          </div>
-          <span class="status status-out_for_delivery">Out For Delivery</span>
-        </div>
-        <p class="notification-card__desc">Package is out for delivery and will arrive today.</p>
-        <div class="notification-card__meta">
-          <span class="notification-card__was">was In Transit</span>
-          <span aria-hidden="true">·</span>
-          <span class="notification-card__time">4 hours ago</span>
-        </div>
-      </a>
-
-      <!-- Update variant: Delivered (Amazon) -->
-      <a class="notification-card notification-card--update" href="#">
-        <div class="notification-card__header">
-          <span class="pkg-carrier amazon">amazon</span>
-          <div class="notification-card__headline">
-            <span class="notification-card__title pkg-tracking">403-2026068-5498762</span>
-            <span class="notification-card__label">Amazon package</span>
-          </div>
-          <span class="status status-delivered">Delivered</span>
-        </div>
-        <p class="notification-card__desc">Package was delivered at the front door.</p>
-        <div class="notification-card__meta">
-          <span class="notification-card__was">was Out For Delivery</span>
-          <span aria-hidden="true">·</span>
-          <span class="notification-card__time">Yesterday 16:20</span>
-        </div>
-      </a>
-
-      <!-- Update variant: Delivered (GLS) -->
-      <a class="notification-card notification-card--update" href="#">
-        <div class="notification-card__header">
-          <span class="pkg-carrier gls">gls</span>
-          <div class="notification-card__headline">
-            <span class="notification-card__title pkg-tracking">12345678901</span>
-          </div>
-          <span class="status status-delivered">Delivered</span>
-        </div>
-        <p class="notification-card__desc">Delivered to recipient</p>
-        <div class="notification-card__meta">
-          <span class="notification-card__was">was In Transit</span>
-          <span aria-hidden="true">·</span>
-          <span class="notification-card__time">3 days ago</span>
-        </div>
-      </a>
-
+    <div class="pkg-meta">
+      <span class="status status-out_for_delivery">out for delivery</span>
+      <span class="pkg-date">Today 12:58</span>
     </div>
   </div>
+  <div class="card-body collapsed">
+    <div class="card-actions">
+      <button class="btn btn-ghost btn-sm"
+        hx-post="/packages/2/refresh"
+        hx-target="#pkg-2"
+        hx-swap="outerHTML"
+        hx-indicator="closest .card">
+        Refresh
+        <span class="htmx-indicator"><span class="spinner"></span></span>
+      </button>
+      <button class="btn btn-danger btn-sm"
+        hx-delete="/api/v1/packages/2"
+        hx-target="#pkg-2"
+        hx-swap="outerHTML"
+        hx-confirm="Stop tracking this package?">
+        Delete
+      </button>
+    </div>
+
+    <details class="pkg-metadata">
+      <summary>Details</summary>
+      <div class="pkg-metadata-grid">
+        <span class="meta-label">Source</span>
+        <span class="meta-value">manual</span>
+        
+        <span class="meta-label">Postal code</span>
+        <span class="meta-value"><code>1234AB</code></span>
+        
+        
+        
+        
+        <span class="meta-label">Last refreshed</span>
+        <span class="meta-value">2026-04-15 10:58</span>
+        <span class="meta-label">Created</span>
+        <span class="meta-value">2026-04-15 10:58</span>
+        <span class="meta-label">Updated</span>
+        <span class="meta-value">2026-04-15 10:58</span>
+      </div>
+    </details>
+
+    
+    <div class="timeline">
+      
+      <div class="timeline-event">
+        <div class="timeline-dot active"></div>
+        <div class="timeline-content">
+          <div class="timeline-desc">Courier is on the way</div>
+          <div class="timeline-details">
+            <span class="timeline-time">Today 12:58</span>
+            
+            <span class="timeline-loc">Amsterdam 1012</span>
+            
+          </div>
+        </div>
+      </div>
+      
+      <div class="timeline-event">
+        <div class="timeline-dot "></div>
+        <div class="timeline-content">
+          <div class="timeline-desc">Arrived at distribution centre</div>
+          <div class="timeline-details">
+            <span class="timeline-time">Today 08:58</span>
+            
+            <span class="timeline-loc">PostNL Amsterdam</span>
+            
+          </div>
+        </div>
+      </div>
+      
+      <div class="timeline-event">
+        <div class="timeline-dot "></div>
+        <div class="timeline-content">
+          <div class="timeline-desc">Sorted — on its way</div>
+          <div class="timeline-details">
+            <span class="timeline-time">Yesterday 08:58</span>
+            
+            <span class="timeline-loc">PostNL Nieuwegein</span>
+            
+          </div>
+        </div>
+      </div>
+      
+      <div class="timeline-event">
+        <div class="timeline-dot "></div>
+        <div class="timeline-content">
+          <div class="timeline-desc">Accepted at sorting centre</div>
+          <div class="timeline-details">
+            <span class="timeline-time">Monday 08:58</span>
+            
+            <span class="timeline-loc">PostNL Gilze-Rijen</span>
+            
+          </div>
+        </div>
+      </div>
+      
+      <div class="timeline-event">
+        <div class="timeline-dot "></div>
+        <div class="timeline-content">
+          <div class="timeline-desc">Shipment announced to PostNL</div>
+          <div class="timeline-details">
+            <span class="timeline-time">Sunday 12:58</span>
+            
+            <span class="timeline-loc">bol.com — Waalwijk</span>
+            
+          </div>
+        </div>
+      </div>
+      
+    </div>
+    
+  </div>
+</div>
+
+
+<div class="card" id="pkg-4">
+  <div class="card-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+    <div class="pkg-main">
+      <span class="pkg-carrier dpd">dpd</span>
+      <div class="pkg-info">
+        <div class="pkg-tracking">05096789012345</div>
+        <div class="pkg-details">
+          
+          
+          
+          <span class="pkg-label">Stroopwafels</span>
+          
+        </div>
+      </div>
+    </div>
+    <div class="pkg-meta">
+      <span class="status status-unknown">unknown</span>
+      <span class="pkg-date">Today 12:58</span>
+    </div>
+  </div>
+  <div class="card-body collapsed">
+    <div class="card-actions">
+      <button class="btn btn-ghost btn-sm"
+        hx-post="/packages/4/refresh"
+        hx-target="#pkg-4"
+        hx-swap="outerHTML"
+        hx-indicator="closest .card">
+        Refresh
+        <span class="htmx-indicator"><span class="spinner"></span></span>
+      </button>
+      <button class="btn btn-danger btn-sm"
+        hx-delete="/api/v1/packages/4"
+        hx-target="#pkg-4"
+        hx-swap="outerHTML"
+        hx-confirm="Stop tracking this package?">
+        Delete
+      </button>
+    </div>
+
+    <details class="pkg-metadata">
+      <summary>Details</summary>
+      <div class="pkg-metadata-grid">
+        <span class="meta-label">Source</span>
+        <span class="meta-value">manual</span>
+        
+        <span class="meta-label">Postal code</span>
+        <span class="meta-value"><code>1234AB</code></span>
+        
+        
+        
+        
+        <span class="meta-label">Last refreshed</span>
+        <span class="meta-value">never</span>
+        <span class="meta-label">Created</span>
+        <span class="meta-value">2026-04-15 10:58</span>
+        <span class="meta-label">Updated</span>
+        <span class="meta-value">2026-04-15 10:58</span>
+      </div>
+    </details>
+
+    
+    <p style="color:var(--text-dim);font-size:0.85rem;">No tracking events yet.</p>
+    
+  </div>
+</div>
+
+
+<div class="card" id="pkg-3">
+  <div class="card-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+    <div class="pkg-main">
+      <span class="pkg-carrier dhl">dhl</span>
+      <div class="pkg-info">
+        <div class="pkg-tracking">00340123450000000012</div>
+        <div class="pkg-details">
+          
+          
+          
+          <span class="pkg-label">Keyboard</span>
+          
+        </div>
+      </div>
+    </div>
+    <div class="pkg-meta">
+      <span class="status status-unknown">unknown</span>
+      <span class="pkg-date">Today 12:58</span>
+    </div>
+  </div>
+  <div class="card-body collapsed">
+    <div class="card-actions">
+      <button class="btn btn-ghost btn-sm"
+        hx-post="/packages/3/refresh"
+        hx-target="#pkg-3"
+        hx-swap="outerHTML"
+        hx-indicator="closest .card">
+        Refresh
+        <span class="htmx-indicator"><span class="spinner"></span></span>
+      </button>
+      <button class="btn btn-danger btn-sm"
+        hx-delete="/api/v1/packages/3"
+        hx-target="#pkg-3"
+        hx-swap="outerHTML"
+        hx-confirm="Stop tracking this package?">
+        Delete
+      </button>
+    </div>
+
+    <details class="pkg-metadata">
+      <summary>Details</summary>
+      <div class="pkg-metadata-grid">
+        <span class="meta-label">Source</span>
+        <span class="meta-value">manual</span>
+        
+        <span class="meta-label">Postal code</span>
+        <span class="meta-value"><code>1234AB</code></span>
+        
+        
+        
+        
+        <span class="meta-label">Last refreshed</span>
+        <span class="meta-value">never</span>
+        <span class="meta-label">Created</span>
+        <span class="meta-value">2026-04-15 10:58</span>
+        <span class="meta-label">Updated</span>
+        <span class="meta-value">2026-04-15 10:58</span>
+      </div>
+    </details>
+
+    
+    <p style="color:var(--text-dim);font-size:0.85rem;">No tracking events yet.</p>
+    
+  </div>
+</div>
+
+
+<div class="card" id="pkg-1">
+  <div class="card-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+    <div class="pkg-main">
+      <span class="pkg-carrier amazon">amazon</span>
+      <div class="pkg-info">
+        <div class="pkg-tracking">403-2026068-5498762</div>
+        <div class="pkg-details">
+          
+          
+          
+          <span class="pkg-label">Amazon package</span>
+          
+        </div>
+      </div>
+    </div>
+    <div class="pkg-meta">
+      <span class="status status-unknown">unknown</span>
+      <span class="pkg-date">Today 12:58</span>
+    </div>
+  </div>
+  <div class="card-body collapsed">
+    <div class="card-actions">
+      <button class="btn btn-ghost btn-sm"
+        hx-post="/packages/1/refresh"
+        hx-target="#pkg-1"
+        hx-swap="outerHTML"
+        hx-indicator="closest .card">
+        Refresh
+        <span class="htmx-indicator"><span class="spinner"></span></span>
+      </button>
+      <button class="btn btn-danger btn-sm"
+        hx-delete="/api/v1/packages/1"
+        hx-target="#pkg-1"
+        hx-swap="outerHTML"
+        hx-confirm="Stop tracking this package?">
+        Delete
+      </button>
+    </div>
+
+    <details class="pkg-metadata">
+      <summary>Details</summary>
+      <div class="pkg-metadata-grid">
+        <span class="meta-label">Source</span>
+        <span class="meta-value">manual</span>
+        
+        <span class="meta-label">Postal code</span>
+        <span class="meta-value"><code>1234AB</code></span>
+        
+        
+        
+        
+        <span class="meta-label">Last refreshed</span>
+        <span class="meta-value">never</span>
+        <span class="meta-label">Created</span>
+        <span class="meta-value">2026-04-15 10:58</span>
+        <span class="meta-label">Updated</span>
+        <span class="meta-value">2026-04-15 10:58</span>
+      </div>
+    </details>
+
+    
+    <p style="color:var(--text-dim);font-size:0.85rem;">No tracking events yet.</p>
+    
+  </div>
+</div>
+
+
+
+
+
+
+
+
+    </div>
+  </main>
+  <footer>
+    <div class="container">
+      <a href="https://github.com/stevendejongnl/dude-wheres-my-package" target="_blank">Dude, Where's My Package?</a>
+      &middot;
+      <a href="https://stevendejongnl.github.io/dude-wheres-my-package/" target="_blank">Website</a>
+      &middot;
+      <a href="https://www.madebysteven.nl" target="_blank">MadeBySteven</a>
+      &middot;
+      <a href="/docs" target="_blank">API</a>
+    </div>
+  </footer>
+  
+  <!-- Notification drawer -->
+  <div id="notif-drawer-overlay" class="notif-drawer-overlay" style="display:block"
+       onclick="this.style.display='none';document.getElementById('notif-drawer').style.display='none';"></div>
+  <div id="notif-drawer" class="notif-drawer" style="display:flex">
+    <div class="notif-drawer-header">
+      <h3>Notifications</h3>
+      <button class="notif-drawer-close"
+              onclick="document.getElementById('notif-drawer-overlay').style.display='none';document.getElementById('notif-drawer').style.display='none';">&times;</button>
+    </div>
+    <div id="notif-drawer-body" class="notif-drawer-body">
+
+
+
+<div class="card notification-card notification-card--alert" id="notif-5">
+  <div class="notification-card__header">
+    <span class="pkg-carrier dpd">dpd</span>
+    <div class="notification-card__headline">
+      <span class="notification-card__icon" aria-hidden="true">⚠</span>
+      <span class="notification-card__title">DPD account sync failed</span>
+    </div>
+    <a class="btn btn-ghost btn-sm notification-card__action"
+       href="/accounts#account-carrier-dpd">
+      Reconnect &rarr;
+    </a>
+  </div>
+  
+  <p class="notification-card__desc">Sync failed for dpd. The carrier&#39;s API or login flow may have changed. Try re-authenticating your account.</p>
+  
+  <div class="notification-card__meta">
+    <span class="notification-card__time">Today 12:58</span>
+  </div>
+</div>
+
+
+
+
+<a class="card notification-card notification-card--update" id="notif-4"
+   href="/packages">
+  <div class="notification-card__header">
+    <span class="pkg-carrier dpd">dpd</span>
+    <div class="notification-card__headline">
+      <span class="notification-card__title pkg-tracking">05096789012345</span>
+      <span class="notification-card__label">Stroopwafels</span>
+    </div>
+    <span class="status status-failed_attempt">Failed Attempt</span>
+  </div>
+  
+  <p class="notification-card__desc">Delivery attempted but nobody was home. Re-attempt tomorrow.</p>
+  
+  <div class="notification-card__meta">
+    
+    <span class="notification-card__was">was In Transit</span>
+    <span class="notification-card__meta-sep" aria-hidden="true">·</span>
+    
+    <span class="notification-card__time">Today 12:58</span>
+  </div>
+</a>
+
+
+
+
+<a class="card notification-card notification-card--update" id="notif-3"
+   href="/packages">
+  <div class="notification-card__header">
+    <span class="pkg-carrier dhl">dhl</span>
+    <div class="notification-card__headline">
+      <span class="notification-card__title pkg-tracking">00340123450000000012</span>
+      <span class="notification-card__label">Keyboard</span>
+    </div>
+    <span class="status status-in_transit">In Transit</span>
+  </div>
+  
+  <p class="notification-card__desc">Accepted by carrier — in transit to sorting facility.</p>
+  
+  <div class="notification-card__meta">
+    
+    <span class="notification-card__was">was Pre Transit</span>
+    <span class="notification-card__meta-sep" aria-hidden="true">·</span>
+    
+    <span class="notification-card__time">Today 12:58</span>
+  </div>
+</a>
+
+
+
+
+<a class="card notification-card notification-card--update" id="notif-2"
+   href="/packages">
+  <div class="notification-card__header">
+    <span class="pkg-carrier postnl">postnl</span>
+    <div class="notification-card__headline">
+      <span class="notification-card__title pkg-tracking">3SKABA000000001</span>
+      <span class="notification-card__label">Book</span>
+    </div>
+    <span class="status status-delivered">Delivered</span>
+  </div>
+  
+  <p class="notification-card__desc">Delivered at the front door.</p>
+  
+  <div class="notification-card__meta">
+    
+    <span class="notification-card__was">was Out For Delivery</span>
+    <span class="notification-card__meta-sep" aria-hidden="true">·</span>
+    
+    <span class="notification-card__time">Today 12:58</span>
+  </div>
+</a>
+
+
+
+
+<a class="card notification-card notification-card--update" id="notif-1"
+   href="/packages">
+  <div class="notification-card__header">
+    <span class="pkg-carrier amazon">amazon</span>
+    <div class="notification-card__headline">
+      <span class="notification-card__title pkg-tracking">403-2026068-5498762</span>
+      <span class="notification-card__label">Amazon package</span>
+    </div>
+    <span class="status status-out_for_delivery">Out For Delivery</span>
+  </div>
+  
+  <p class="notification-card__desc">Wordt naar schatting op 16 april bezorgd</p>
+  
+  <div class="notification-card__meta">
+    
+    <span class="notification-card__was">was In Transit</span>
+    <span class="notification-card__meta-sep" aria-hidden="true">·</span>
+    
+    <span class="notification-card__time">Today 12:58</span>
+  </div>
+</a>
+
+
+</div>
+  </div>
+  
+  
 </body>
 </html>
