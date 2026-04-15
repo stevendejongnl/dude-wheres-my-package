@@ -63,8 +63,10 @@ main { padding: 24px 0; }
 .btn {
   padding: 6px 14px; border: none; border-radius: 8px;
   font-size: 0.8rem; font-weight: 500; cursor: pointer;
+  text-decoration: none; display: inline-block;
 }
 .btn-primary { background: var(--accent); color: white; }
+.btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
 .btn-sm { padding: 4px 10px; font-size: 0.75rem; }
 .card {
   background: var(--surface); border: 1px solid var(--border);
@@ -86,7 +88,6 @@ main { padding: 24px 0; }
 .pkg-details { display: flex; flex-direction: column; gap: 1px; margin-top: 2px; font-size: 0.8rem; color: var(--text-dim); }
 .pkg-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .pkg-date { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; }
-.pkg-label { font-size: 0.8rem; color: var(--text-dim); }
 .status {
   font-size: 0.75rem; font-weight: 600; padding: 4px 10px;
   border-radius: 20px; white-space: nowrap;
@@ -95,9 +96,7 @@ main { padding: 24px 0; }
 .status-in_transit { background: #74b9ff20; color: var(--blue); }
 .status-out_for_delivery { background: #fdcb6e20; color: var(--yellow); }
 .status-pre_transit { background: #636e7220; color: var(--text-dim); }
-.status-auth_failed { background: #d6303120; color: var(--red); }
-.status-connected { background: #00b89420; color: var(--green); }
-.status-arrow { color: var(--text-dim); font-size: 0.8rem; }
+.status-failed_attempt { background: #e1705520; color: var(--orange); }
 .nav-bell { position: relative; display: inline-flex; align-items: center; }
 .nav-bell svg { width: 18px; height: 18px; fill: currentColor; }
 .notif-badge-dot {
@@ -143,17 +142,52 @@ footer {
   scrollbar-width: none;
 }
 .drawer-body::-webkit-scrollbar { display: none; }
-.drawer-body .card { border-radius: 0; border-left: none; border-right: none; }
-.notification-card.unread { background: var(--surface2); border-left: 3px solid var(--accent); }
-.notification-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px; gap: 12px;
+
+/* Notification cards — redesigned (matches /notifications production template) */
+.notification-card {
+  display: block;
+  padding: 14px 18px;
+  color: var(--text);
+  text-decoration: none;
+  transition: background 0.15s;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
 }
-.notification-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
-.notification-info { display: flex; flex-direction: column; min-width: 0; }
-.notification-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
-.notification-transition { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-.notification-desc { font-size: 0.78rem; color: var(--text-dim); line-height: 1.4; text-align: right; word-break: break-word; }
+a.notification-card:hover { background: var(--surface2); }
+.notification-card.unread { background: var(--surface2); border-left: 3px solid var(--accent); }
+.notification-card--alert { border-left: 3px solid var(--red); }
+.notification-card__header {
+  display: flex; align-items: center; gap: 12px;
+}
+.notification-card__headline {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.notification-card--alert .notification-card__headline {
+  flex-direction: row; align-items: center; gap: 8px;
+}
+.notification-card__title {
+  font-size: 0.9rem; line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.notification-card__label {
+  font-size: 0.78rem; color: var(--text-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.notification-card__icon {
+  color: var(--red); font-size: 1rem; flex-shrink: 0;
+}
+.notification-card__action { flex-shrink: 0; }
+.notification-card__desc {
+  font-size: 0.82rem; color: var(--text); line-height: 1.45;
+  margin: 8px 0 0 76px; word-break: break-word;
+}
+.notification-card__meta {
+  font-size: 0.72rem; color: var(--text-dim);
+  margin: 6px 0 0 76px;
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+}
 </style>
 </head>
 <body>
@@ -168,7 +202,7 @@ footer {
         <a href="#">Accounts</a>
         <a href="#" class="nav-bell">
           <svg viewBox="0 0 24 24"><path d="M12 2C10.9 2 10 2.9 10 4C10 4.1 10 4.19 10.02 4.28C7.58 5.07 6 7.36 6 10V16L4 18V19H20V18L18 16V10C18 7.36 16.42 5.07 13.98 4.28C14 4.19 14 4.1 14 4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z"/></svg>
-          <span class="notif-badge-dot">2</span>
+          <span class="notif-badge-dot">3</span>
         </a>
       </nav>
     </div>
@@ -226,112 +260,94 @@ footer {
       <button class="drawer-close">&times;</button>
     </div>
     <div class="drawer-body">
-      <!-- Unread 1 -->
-      <div class="card notification-card unread">
-        <div class="notification-row">
-          <div class="notification-left">
-            <span class="pkg-carrier postnl">PostNL</span>
-            <div class="notification-info">
-              <span class="pkg-tracking">3STEST1234567890</span>
-              <span class="pkg-label">bol.com order</span>
-            </div>
+
+      <!-- Alert variant: carrier sync / auth failure -->
+      <div class="notification-card notification-card--alert">
+        <div class="notification-card__header">
+          <span class="pkg-carrier dpd">dpd</span>
+          <div class="notification-card__headline">
+            <span class="notification-card__icon" aria-hidden="true">⚠</span>
+            <span class="notification-card__title">DPD account sync failed</span>
           </div>
-          <div class="notification-right">
-            <div class="notification-transition">
-              <span class="status status-pre_transit">Pre Transit</span>
-              <span class="status-arrow">&rarr;</span>
-              <span class="status status-in_transit">In Transit</span>
-            </div>
-            <span class="notification-desc">Arrived at sorting center — Nieuwegein</span>
-            <span class="pkg-date">2 hours ago</span>
-          </div>
+          <a class="btn btn-ghost btn-sm notification-card__action" href="#">Reconnect &rarr;</a>
+        </div>
+        <p class="notification-card__desc">Sync failed for dpd. The carrier's API or login flow may have changed. Try re-authenticating your account.</p>
+        <div class="notification-card__meta">
+          <span class="notification-card__time">Today 06:11</span>
         </div>
       </div>
 
-      <!-- Unread 2 -->
-      <div class="card notification-card unread">
-        <div class="notification-row">
-          <div class="notification-left">
-            <span class="pkg-carrier dhl">DHL</span>
-            <div class="notification-info">
-              <span class="pkg-tracking">JVGL09876543210</span>
-              <span class="pkg-label">Coolblue order</span>
-            </div>
+      <!-- Update variant: package status change (PostNL) -->
+      <a class="notification-card notification-card--update" href="#">
+        <div class="notification-card__header">
+          <span class="pkg-carrier postnl">postnl</span>
+          <div class="notification-card__headline">
+            <span class="notification-card__title pkg-tracking">3STEST1234567890</span>
+            <span class="notification-card__label">bol.com order</span>
           </div>
-          <div class="notification-right">
-            <div class="notification-transition">
-              <span class="status status-in_transit">In Transit</span>
-              <span class="status-arrow">&rarr;</span>
-              <span class="status status-out_for_delivery">Out For Delivery</span>
-            </div>
-            <span class="notification-desc">Package is out for delivery</span>
-            <span class="pkg-date">4 hours ago</span>
-          </div>
+          <span class="status status-in_transit">In Transit</span>
         </div>
-      </div>
+        <p class="notification-card__desc">Arrived at sorting center — Nieuwegein</p>
+        <div class="notification-card__meta">
+          <span class="notification-card__was">was Pre Transit</span>
+          <span aria-hidden="true">·</span>
+          <span class="notification-card__time">2 hours ago</span>
+        </div>
+      </a>
 
-      <!-- Read 1 -->
-      <div class="card notification-card">
-        <div class="notification-row">
-          <div class="notification-left">
-            <span class="pkg-carrier amazon">Amazon</span>
-            <div class="notification-info">
-              <span class="pkg-tracking">123-4567890-1234567</span>
-            </div>
+      <!-- Update variant: Out For Delivery (DHL) -->
+      <a class="notification-card notification-card--update" href="#">
+        <div class="notification-card__header">
+          <span class="pkg-carrier dhl">dhl</span>
+          <div class="notification-card__headline">
+            <span class="notification-card__title pkg-tracking">JVGL09876543210</span>
+            <span class="notification-card__label">Coolblue order</span>
           </div>
-          <div class="notification-right">
-            <div class="notification-transition">
-              <span class="status status-out_for_delivery">Out For Delivery</span>
-              <span class="status-arrow">&rarr;</span>
-              <span class="status status-delivered">Delivered</span>
-            </div>
-            <span class="notification-desc">Package was delivered</span>
-            <span class="pkg-date">Yesterday 16:20</span>
-          </div>
+          <span class="status status-out_for_delivery">Out For Delivery</span>
         </div>
-      </div>
+        <p class="notification-card__desc">Package is out for delivery and will arrive today.</p>
+        <div class="notification-card__meta">
+          <span class="notification-card__was">was In Transit</span>
+          <span aria-hidden="true">·</span>
+          <span class="notification-card__time">4 hours ago</span>
+        </div>
+      </a>
 
-      <!-- Read 2 -->
-      <div class="card notification-card">
-        <div class="notification-row">
-          <div class="notification-left">
-            <span class="pkg-carrier dpd">DPD</span>
-            <div class="notification-info">
-              <span class="pkg-tracking">01234567890123</span>
-            </div>
+      <!-- Update variant: Delivered (Amazon) -->
+      <a class="notification-card notification-card--update" href="#">
+        <div class="notification-card__header">
+          <span class="pkg-carrier amazon">amazon</span>
+          <div class="notification-card__headline">
+            <span class="notification-card__title pkg-tracking">403-2026068-5498762</span>
+            <span class="notification-card__label">Amazon package</span>
           </div>
-          <div class="notification-right">
-            <div class="notification-transition">
-              <span class="status status-connected">Connected</span>
-              <span class="status-arrow">&rarr;</span>
-              <span class="status status-auth_failed">Auth Failed</span>
-            </div>
-            <span class="notification-desc">Sync failed for dpd. The carrier's API or login flow may have changed. Try re-authenticating your account.</span>
-            <span class="pkg-date">Today 06:11</span>
-          </div>
+          <span class="status status-delivered">Delivered</span>
         </div>
-      </div>
+        <p class="notification-card__desc">Package was delivered at the front door.</p>
+        <div class="notification-card__meta">
+          <span class="notification-card__was">was Out For Delivery</span>
+          <span aria-hidden="true">·</span>
+          <span class="notification-card__time">Yesterday 16:20</span>
+        </div>
+      </a>
 
-      <!-- Read 3 -->
-      <div class="card notification-card">
-        <div class="notification-row">
-          <div class="notification-left">
-            <span class="pkg-carrier gls">GLS</span>
-            <div class="notification-info">
-              <span class="pkg-tracking">12345678901</span>
-            </div>
+      <!-- Update variant: Delivered (GLS) -->
+      <a class="notification-card notification-card--update" href="#">
+        <div class="notification-card__header">
+          <span class="pkg-carrier gls">gls</span>
+          <div class="notification-card__headline">
+            <span class="notification-card__title pkg-tracking">12345678901</span>
           </div>
-          <div class="notification-right">
-            <div class="notification-transition">
-              <span class="status status-in_transit">In Transit</span>
-              <span class="status-arrow">&rarr;</span>
-              <span class="status status-delivered">Delivered</span>
-            </div>
-            <span class="notification-desc">Delivered to recipient</span>
-            <span class="pkg-date">3 days ago</span>
-          </div>
+          <span class="status status-delivered">Delivered</span>
         </div>
-      </div>
+        <p class="notification-card__desc">Delivered to recipient</p>
+        <div class="notification-card__meta">
+          <span class="notification-card__was">was In Transit</span>
+          <span aria-hidden="true">·</span>
+          <span class="notification-card__time">3 days ago</span>
+        </div>
+      </a>
+
     </div>
   </div>
 </body>
