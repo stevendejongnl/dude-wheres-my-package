@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.39.4 (2026-04-15)
+
+### Bug Fixes
+
+- **k8s**: Use Recreate strategy to avoid RWO deadlock on rollout
+  ([`e42fa08`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/e42fa08f9c0613cfb894c2bd2fcd25cb362dcf1b))
+
+
 ## v1.39.3 (2026-04-15)
 
 ### Bug Fixes
