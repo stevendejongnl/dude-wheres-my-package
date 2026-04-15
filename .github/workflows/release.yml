@@ -126,10 +126,15 @@ jobs:
           XMLEOF
 
           cd _gh-pages
+
+          # Update version badge across the landing page and mockups
+          sed -i -E 's/(class="version-badge">)v[0-9]+\.[0-9]+\.[0-9]+/\1v'"${VERSION}"'/' \
+            index.html mockups/*.html 2>/dev/null || true
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add updates.xml
-          git diff --cached --quiet || git commit -m "Update extension manifest to v${VERSION}"
+          git add updates.xml index.html mockups/
+          git diff --cached --quiet || git commit -m "Update gh-pages to v${VERSION}"
           git push origin gh-pages
 
       # Build and push Docker image in the same job — no checkout race
