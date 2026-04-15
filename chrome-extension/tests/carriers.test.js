@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { detectCarrier, isNewerVersion } from "../lib/carriers.js";
+import {
+  CARRIER_LOGIN_PATTERNS,
+  detectCarrier,
+  isNewerVersion,
+} from "../lib/carriers.js";
 
 describe("detectCarrier", () => {
   it("detects Amazon NL", () => {
@@ -44,6 +48,28 @@ describe("detectCarrier", () => {
 
   it("returns null for malformed URL", () => {
     expect(detectCarrier("not-a-url")).toBeNull();
+  });
+});
+
+describe("CARRIER_LOGIN_PATTERNS (amazon)", () => {
+  const matches = (url) =>
+    CARRIER_LOGIN_PATTERNS.amazon.some((p) => url.toLowerCase().includes(p));
+
+  it("matches the legacy /ap/signin page", () => {
+    expect(matches("https://www.amazon.nl/ap/signin?openid.return_to=foo")).toBe(true);
+  });
+
+  it("matches MFA challenges at /ap/mfa", () => {
+    expect(matches("https://www.amazon.nl/ap/mfa?arb=abc")).toBe(true);
+  });
+
+  it("matches the new /ax/claim flow (logged-out redirect target)", () => {
+    expect(matches("https://www.amazon.nl/ax/claim?arb=abc")).toBe(true);
+    expect(matches("https://www.amazon.nl/ax/claim/intent?arb=abc")).toBe(true);
+  });
+
+  it("does not match the post-login orders page", () => {
+    expect(matches("https://www.amazon.nl/your-orders/orders")).toBe(false);
   });
 });
 

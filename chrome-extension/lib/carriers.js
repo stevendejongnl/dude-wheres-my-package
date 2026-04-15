@@ -49,9 +49,16 @@ export const CARRIER_SYNC_URLS = {
 
 // URL patterns that indicate a carrier login page (not yet authenticated).
 // Used as a fallback signal alongside DOM detection.
+//
+// Amazon's auth namespace spans two path prefixes:
+//   - /ap/   — the legacy sign-in flow (#ap_email / #ap_password)
+//   - /ax/   — the newer "account claim" flow that fully-logged-out users
+//              are redirected to (#ap_email_login → password step).
+// Both must be treated as login URLs so the extension doesn't mistake them
+// for the post-login destination.
 export const CARRIER_LOGIN_PATTERNS = {
   dpd: ["login.dpdgroup.com", "auth/realms"],
-  amazon: ["/ap/signin", "/ap/mfa"],
+  amazon: ["/ap/signin", "/ap/mfa", "/ax/"],
 };
 
 // Carrier display names for the UI.

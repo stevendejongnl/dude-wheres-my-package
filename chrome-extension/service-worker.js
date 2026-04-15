@@ -222,7 +222,11 @@ async function hasLoginForm(tabId) {
     const results = await chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
-        const u = document.querySelector("#username, #ap_email, input[name='username'], input[name='email']");
+        // Fast path: Amazon's login forms have stable IDs on the <form>.
+        if (document.querySelector("#ap_login_form, form#signIn")) return true;
+        const u = document.querySelector(
+          "#username, #ap_email, #ap_email_login, input[name='username'], input[name='email']",
+        );
         const p = document.querySelector("#password, #ap_password, input[type='password']");
         return Boolean(u && p) || Boolean(u && document.querySelector("#continue"));
       },
@@ -305,22 +309,61 @@ async function handleCarrierLogin(tabId, account) {
 }
 
 /**
- * Amazon sign-in handler.  Amazon actually serves three different entry
- * points in practice, and the chrome extension must cope with all of them:
+ * Amazon sign-in handler.  Amazon routes logged-out users through several
+ * entry points that vary by cookie state, region, and A/B flag:
  *
- *   1. Fresh sign-in with a split form — ``#ap_email`` only, click
- *      ``#continue``, then ``#ap_password`` on the next page.
- *   2. Fresh sign-in with a single-page form — ``#ap_email`` and
- *      ``#ap_password`` both visible; submit via ``#signInSubmit``.
- *   3. Recognized user — Amazon already knows the email, page opens on
- *      ``#ap_password`` only.
+ *   - /ap/signin "combined"     — #ap_email + #ap_password visible together
+ *   - /ap/signin "email-only"   — #ap_email + #continue, password on next page
+ *   - /ap/signin "password-only"— Amazon remembered the email, only #ap_password
+ *   - /ax/claim  "ax-email"     — new claim flow: #ap_email_login inside
+ *                                 #ap_login_form, then /ap/signin for password
  *
- * CAPTCHA (``#auth-captcha-guess``) and MFA (``#auth-mfa-otpcode``) both
- * fall through: we surface the tab so the user can solve it.  Also
- * dismisses the EU cookie-consent banner which otherwise overlays the form.
+ * Rather than branch per entry point, we run a detect → fill → submit →
+ * wait-for-nav loop. Each iteration re-inspects the current DOM, so the
+ * handler naturally walks multi-page flows (e.g. /ax/claim → /ap/signin)
+ * without having to encode the transition graph.
+ *
+ * CAPTCHA (``#auth-captcha-guess``) and MFA (``#auth-mfa-otpcode``) are
+ * terminal for automation — we surface the tab so the user can solve it.
  */
 async function handleAmazonLogin(tabId, email, password) {
-  // Step 0: dismiss the EU cookie consent banner if present.
+  // Dismiss the EU cookie consent banner up front (it can overlay the form).
+  await dismissAmazonCookieBanner(tabId);
+
+  const MAX_STEPS = 5;
+  for (let step = 0; step < MAX_STEPS; step++) {
+    const state = await detectAmazonLoginState(tabId);
+
+    if (state === "captcha" || state === "mfa") {
+      await chrome.tabs.update(tabId, { active: true });
+      return false;
+    }
+
+    // No recognizable form on the page: either we've reached the post-login
+    // destination, or we're stuck on a page we don't know how to fill.
+    if (state === "none") {
+      const info = await chrome.tabs.get(tabId);
+      return !isCarrierLoginPage("amazon", info.url);
+    }
+
+    const nav = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
+    const submitted = await fillAndSubmitAmazonStep(tabId, state, email, password);
+    if (!submitted) {
+      await chrome.tabs.update(tabId, { active: true });
+      return false;
+    }
+    try { await nav; } catch { return false; }
+    await waitForUrlStable(tabId);
+    // Cookie banner sometimes re-renders on the next page.
+    await dismissAmazonCookieBanner(tabId);
+  }
+
+  // Ran out of steps — probably looping on the same form. Surface for the user.
+  await chrome.tabs.update(tabId, { active: true });
+  return false;
+}
+
+async function dismissAmazonCookieBanner(tabId) {
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
@@ -332,154 +375,98 @@ async function handleAmazonLogin(tabId, email, password) {
   } catch {
     // ignore
   }
+}
 
-  // Detect which Amazon form variant we're on.
-  let variant;
+/**
+ * Classify the current Amazon auth page into a state the step submitter
+ * knows how to fill. `offsetParent !== null` is a cheap "actually visible"
+ * check that accounts for `display: none` ancestors — important because
+ * Amazon keeps a hidden ``#ap_email`` around on password-only pages.
+ */
+async function detectAmazonLoginState(tabId) {
   try {
     const result = await chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
+        const visible = (el) => Boolean(el && el.offsetParent !== null);
         if (document.querySelector("#auth-captcha-guess")) return "captcha";
         if (document.querySelector("#auth-mfa-otpcode")) return "mfa";
-        const emailEl = document.querySelector("#ap_email");
-        const passEl = document.querySelector("#ap_password");
-        const emailVisible = emailEl && emailEl.offsetParent !== null;
-        const passVisible = passEl && passEl.offsetParent !== null;
+
+        // New /ax/claim flow uses #ap_email_login inside #ap_login_form.
+        if (visible(document.querySelector("#ap_email_login"))) return "ax-email";
+
+        const emailVisible = visible(document.querySelector("#ap_email"));
+        const passVisible = visible(document.querySelector("#ap_password"));
         if (emailVisible && passVisible) return "combined";
         if (emailVisible) return "email-only";
         if (passVisible) return "password-only";
-        return "unknown";
+        return "none";
       },
     });
-    variant = result?.[0]?.result || "unknown";
+    return result?.[0]?.result || "none";
   } catch {
-    variant = "unknown";
+    return "none";
   }
+}
 
-  // CAPTCHA or MFA: surface the tab to the user.
-  if (variant === "captcha" || variant === "mfa") {
-    await chrome.tabs.update(tabId, { active: true });
-    return false;
-  }
-
-  // Combined form — fill both, submit once.
-  if (variant === "combined") {
-    const nav = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
-    await chrome.scripting.executeScript({
+async function fillAndSubmitAmazonStep(tabId, state, email, password) {
+  try {
+    const result = await chrome.scripting.executeScript({
       target: { tabId },
-      func: (e, p) => {
+      func: (stateArg, e, p) => {
         const setVal = (el, v) => {
-          if (!el) return;
+          if (!el) return false;
           el.value = v;
           el.dispatchEvent(new Event("input", { bubbles: true }));
           el.dispatchEvent(new Event("change", { bubbles: true }));
+          return true;
         };
-        setVal(document.querySelector("#ap_email"), e);
-        setVal(document.querySelector("#ap_password"), p);
-        const btn = document.querySelector("#signInSubmit") ||
-                    document.querySelector("input[type='submit']");
-        if (btn) btn.click();
-      },
-      args: [email, password],
-    });
-    try { await nav; } catch { return false; }
-  } else if (variant === "email-only") {
-    // Split form: fill email → continue → fill password → submit.
-    const nav1 = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      func: (e) => {
-        const el = document.querySelector("#ap_email");
-        if (el) {
-          el.value = e;
-          el.dispatchEvent(new Event("input", { bubbles: true }));
-          el.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-        const btn = document.querySelector("#continue") ||
-                    document.querySelector("input[id='continue']");
-        if (btn) btn.click();
-      },
-      args: [email],
-    });
-    try { await nav1; } catch { return false; }
+        const clickFirst = (selectors) => {
+          for (const sel of selectors) {
+            const btn = document.querySelector(sel);
+            if (btn) { btn.click(); return true; }
+          }
+          return false;
+        };
 
-    // Wait for the password field to appear on the next page.
-    const passReady = await waitForSelector(tabId, "#ap_password", 10_000);
-    if (!passReady) return false;
+        if (stateArg === "ax-email") {
+          if (!setVal(document.querySelector("#ap_email_login"), e)) return false;
+          // The /ax/claim submit button has no stable id; scope the lookup
+          // to #ap_login_form so we don't accidentally click the cookie
+          // banner's accept button or similar.
+          const form = document.querySelector("#ap_login_form");
+          const btn = form?.querySelector(
+            "input[type='submit'], button[type='submit']",
+          );
+          if (btn) { btn.click(); return true; }
+          if (form) { form.submit(); return true; }
+          return false;
+        }
 
-    const nav2 = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      func: (p) => {
-        const el = document.querySelector("#ap_password");
-        if (el) {
-          el.value = p;
-          el.dispatchEvent(new Event("input", { bubbles: true }));
-          el.dispatchEvent(new Event("change", { bubbles: true }));
+        if (stateArg === "combined") {
+          setVal(document.querySelector("#ap_email"), e);
+          setVal(document.querySelector("#ap_password"), p);
+          return clickFirst(["#signInSubmit", "input[type='submit']"]);
         }
-        const btn = document.querySelector("#signInSubmit") ||
-                    document.querySelector("input[type='submit']");
-        if (btn) btn.click();
-      },
-      args: [password],
-    });
-    try { await nav2; } catch { return false; }
-  } else if (variant === "password-only") {
-    // Amazon remembered the email; just submit the password.
-    const nav = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      func: (p) => {
-        const el = document.querySelector("#ap_password");
-        if (el) {
-          el.value = p;
-          el.dispatchEvent(new Event("input", { bubbles: true }));
-          el.dispatchEvent(new Event("change", { bubbles: true }));
+
+        if (stateArg === "email-only") {
+          if (!setVal(document.querySelector("#ap_email"), e)) return false;
+          return clickFirst(["#continue", "input[id='continue']", "input[type='submit']"]);
         }
-        const btn = document.querySelector("#signInSubmit") ||
-                    document.querySelector("input[type='submit']");
-        if (btn) btn.click();
+
+        if (stateArg === "password-only") {
+          if (!setVal(document.querySelector("#ap_password"), p)) return false;
+          return clickFirst(["#signInSubmit", "input[type='submit']"]);
+        }
+
+        return false;
       },
-      args: [password],
+      args: [state, email, password],
     });
-    try { await nav; } catch { return false; }
-  } else {
-    // Unknown variant — no recognizable form fields, bail out.
-    await chrome.tabs.update(tabId, { active: true });
+    return Boolean(result?.[0]?.result);
+  } catch {
     return false;
   }
-
-  // After submitting, Amazon may redirect to MFA, CAPTCHA, or approval.
-  // Check the final state; surface the tab if still on a login-related page.
-  await waitForUrlStable(tabId);
-  const info = await chrome.tabs.get(tabId);
-  if (isCarrierLoginPage("amazon", info.url)) {
-    await chrome.tabs.update(tabId, { active: true });
-    return false;
-  }
-  return true;
-}
-
-/**
- * Poll for a CSS selector to appear in the tab.  Returns true if found
- * within timeoutMs, false otherwise.
- */
-async function waitForSelector(tabId, selector, timeoutMs = 10_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    try {
-      const result = await chrome.scripting.executeScript({
-        target: { tabId },
-        func: (sel) => Boolean(document.querySelector(sel)),
-        args: [selector],
-      });
-      if (result?.[0]?.result) return true;
-    } catch {
-      return false;
-    }
-    await sleep(300);
-  }
-  return false;
 }
 
 function waitForTabNavigation(tabId, timeout) {
