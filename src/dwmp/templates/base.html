@@ -379,6 +379,51 @@
       from { opacity: 0; transform: translateY(12px); }
       to { opacity: 1; transform: translateY(0); }
     }
+    @keyframes slide-in-right {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+
+    /* Notification drawer */
+    .notif-drawer-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0, 0, 0, 0.5);
+      animation: fade-in 0.15s ease-out;
+    }
+    .notif-drawer {
+      position: fixed; top: 0; right: 0; bottom: 0; z-index: 101;
+      width: 420px; max-width: 100vw;
+      background: var(--bg); border-left: 1px solid var(--border);
+      box-shadow: -8px 0 30px rgba(0, 0, 0, 0.3);
+      display: flex; flex-direction: column;
+      animation: slide-in-right 0.2s ease-out;
+    }
+    .notif-drawer-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .notif-drawer-header h3 { font-size: 1rem; font-weight: 600; margin: 0; }
+    .notif-drawer-close {
+      background: none; border: none; color: var(--text-dim); cursor: pointer;
+      font-size: 1.2rem; padding: 4px 8px; border-radius: 4px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .notif-drawer-close:hover { color: var(--text); background: var(--surface2); }
+    .notif-drawer-body {
+      flex: 1; overflow-y: auto; padding: 8px 0;
+    }
+    .notif-drawer-body .notification-card { border-radius: 0; border-left: none; border-right: none; }
+    .notif-drawer-body .notification-row { padding: 12px 20px; }
+    .notif-drawer-body .notification-right { align-items: flex-end; }
+    .notif-drawer-body .empty { padding: 40px 20px; }
+    @media (max-width: 640px) {
+      .notif-drawer { width: 100vw; }
+      .notif-drawer-body .notification-row { flex-direction: column; align-items: flex-start; }
+      .notif-drawer-body .notification-right { align-items: flex-start; width: 100%; }
+      .notif-drawer-body .notification-transition { justify-content: flex-start; }
+      .notif-drawer-body .notification-desc { text-align: left; }
+    }
     .form-group select {
       width: 100%; padding: 8px 12px;
       background: var(--surface2); border: 1px solid var(--border);
@@ -425,7 +470,7 @@
     .status-arrow { color: var(--text-dim); font-size: 0.8rem; }
     .notification-desc {
       font-size: 0.78rem; color: var(--text-dim); line-height: 1.4;
-      max-width: 320px; text-align: right;
+      text-align: right; word-break: break-word;
     }
     .notif-unread-dot {
       width: 8px; height: 8px; border-radius: 50%;
@@ -495,7 +540,7 @@
       <nav>
         <a href="{{ base_path }}/" class="{% if active_nav == 'packages' %}active{% endif %}">Packages</a>
         <a href="{{ base_path }}/accounts" class="{% if active_nav == 'accounts' %}active{% endif %}">Accounts</a>
-        <a href="{{ base_path }}/notifications" class="{% if active_nav == 'notifications' %}active{% endif %} nav-bell">
+        <a href="#" class="nav-bell" onclick="event.preventDefault();document.getElementById('notif-drawer-overlay').style.display='block';document.getElementById('notif-drawer').style.display='flex';htmx.ajax('GET','{{ base_path }}/notifications/drawer','#notif-drawer-body');">
           <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C10.9 2 10 2.9 10 4C10 4.1 10 4.19 10.02 4.28C7.58 5.07 6 7.36 6 10V16L4 18V19H20V18L18 16V10C18 7.36 16.42 5.07 13.98 4.28C14 4.19 14 4.1 14 4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z"/></svg>
           <span id="notif-badge" hx-get="{{ base_path }}/notifications/badge" hx-trigger="load, every 30s" hx-swap="innerHTML"></span>
         </a>
@@ -520,6 +565,18 @@
     </div>
   </footer>
   {% if active_nav %}
+  <!-- Notification drawer -->
+  <div id="notif-drawer-overlay" class="notif-drawer-overlay" style="display:none"
+       onclick="this.style.display='none';document.getElementById('notif-drawer').style.display='none';"></div>
+  <div id="notif-drawer" class="notif-drawer" style="display:none">
+    <div class="notif-drawer-header">
+      <h3>Notifications</h3>
+      <button class="notif-drawer-close"
+              onclick="document.getElementById('notif-drawer-overlay').style.display='none';document.getElementById('notif-drawer').style.display='none';">&times;</button>
+    </div>
+    <div id="notif-drawer-body" class="notif-drawer-body">
+    </div>
+  </div>
   <script src="{{ base_path }}/static/js/notifications.js"></script>
   {% endif %}
 </body>

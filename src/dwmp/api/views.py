@@ -718,6 +718,28 @@ async def notifications_page(
     )
 
 
+@router.get("/notifications/drawer", response_class=HTMLResponse)
+async def notification_drawer(
+    request: Request,
+    service: TrackingService = Depends(get_tracking_service),
+):
+    notifications = await service.list_notifications(limit=50)
+    for n in notifications:
+        n["formatted_time"] = _format_time(n.get("created_at", ""))
+        n["old_status_display"] = _format_status(n["old_status"])
+        n["new_status_display"] = _format_status(n["new_status"])
+
+    # Auto-mark all as read when drawer opens
+    unread_count = await service.get_unread_notification_count()
+    if unread_count > 0:
+        await service.mark_all_notifications_read()
+
+    return templates.TemplateResponse(
+        request, "_notification_list.html",
+        {"notifications": notifications, "base_path": _base_path(request)},
+    )
+
+
 @router.get("/notifications/badge", response_class=HTMLResponse)
 async def notification_badge(
     service: TrackingService = Depends(get_tracking_service),

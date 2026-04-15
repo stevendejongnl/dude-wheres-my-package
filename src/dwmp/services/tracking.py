@@ -60,7 +60,15 @@ class TrackingService:
             )
 
     async def notify_auth_failure(self, carrier: str, message: str) -> None:
-        """Create a notification when a carrier account fails to authenticate."""
+        """Create a notification when a carrier account fails to authenticate.
+
+        Suppresses the notification when the most recent notification for this
+        carrier is already an auth_failed — avoids spamming the user on every
+        sync cycle.  A new notification *will* be created once a successful
+        sync (which produces a status-change notification) clears the streak.
+        """
+        if await self._repository.has_recent_auth_failure(carrier):
+            return
         await self._repository.add_notification(
             package_id=None,
             old_status="connected",

@@ -368,6 +368,29 @@ async def test_auth_failure_notification_without_package(repo: PackageRepository
     assert await repo.get_unread_count() == 1
 
 
+async def test_has_recent_auth_failure(repo: PackageRepository):
+    """has_recent_auth_failure checks the most recent notification per carrier."""
+    # No notifications at all — should be False
+    assert await repo.has_recent_auth_failure("dpd") is False
+
+    # Add an auth_failed notification
+    await repo.add_notification(
+        package_id=None, old_status="connected", new_status="auth_failed",
+        tracking_number="Account", carrier="dpd",
+    )
+    assert await repo.has_recent_auth_failure("dpd") is True
+    # Different carrier is unaffected
+    assert await repo.has_recent_auth_failure("dhl") is False
+
+    # A status-change notification clears the streak
+    pkg_id = await repo.add_package(tracking_number="DPD1", carrier="dpd")
+    await repo.add_notification(
+        package_id=pkg_id, old_status="unknown", new_status="in_transit",
+        tracking_number="DPD1", carrier="dpd",
+    )
+    assert await repo.has_recent_auth_failure("dpd") is False
+
+
 async def test_delete_old_notifications(repo: PackageRepository):
     pkg_id = await repo.add_package(tracking_number="OLD1", carrier="dhl")
     await repo.add_notification(pkg_id, "unknown", "in_transit", "OLD1", "dhl")

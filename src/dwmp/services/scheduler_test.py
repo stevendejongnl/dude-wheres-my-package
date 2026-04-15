@@ -148,6 +148,46 @@ async def test_poll_creates_auth_failure_notification(repo):
     assert notifications[0]["tracking_number"] == "Account"
 
 
+async def test_poll_does_not_duplicate_auth_failure_notification(repo):
+    """Repeated auth failures should NOT create a notification every time.
+
+    Only the first failure creates one.  A new notification is created only
+    after a successful sync clears the streak.
+    """
+    carrier = FailingCarrier()
+    service = TrackingService(repository=repo, carriers={"failing": carrier})
+
+    account_id = await repo.add_account(
+        carrier="failing", auth_type="credentials",
+        tokens={"access_token": "tok"}, username="user",
+    )
+
+    # First failure — notification created
+    await service.notify_auth_failure("failing", "Cookies expired")
+    notifications = await repo.list_notifications()
+    assert len(notifications) == 1
+
+    # Second failure — suppressed (last notification for carrier is auth_failed)
+    await service.notify_auth_failure("failing", "Still broken")
+    notifications = await repo.list_notifications()
+    assert len(notifications) == 1  # still just 1
+
+    # Simulate a successful sync creating a status-change notification
+    pkg_id = await repo.add_package(
+        tracking_number="PKG1", carrier="failing",
+    )
+    await repo.add_notification(
+        package_id=pkg_id, old_status="unknown", new_status="in_transit",
+        tracking_number="PKG1", carrier="failing",
+    )
+
+    # Third failure AFTER a successful sync — notification created again
+    await service.notify_auth_failure("failing", "Broken again")
+    notifications = await repo.list_notifications()
+    assert len(notifications) == 3  # original + status change + new auth failure
+    assert notifications[0]["new_status"] == "auth_failed"
+
+
 async def test_poll_handles_empty(repo):
     service = TrackingService(repository=repo, carriers={})
     scheduler = PackageScheduler(tracking_service=service)

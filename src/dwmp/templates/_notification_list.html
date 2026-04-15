@@ -1,0 +1,31 @@
+{% if notifications %}
+{% for n in notifications %}
+<div class="card notification-card" id="notif-{{ n.id }}">
+  <div class="notification-row">
+    <div class="notification-left">
+      <span class="pkg-carrier {{ n.carrier }}">{{ n.carrier }}</span>
+      <div class="notification-info">
+        <span class="pkg-tracking">{{ n.tracking_number }}</span>
+        {% if n.label %}<span class="pkg-label">{{ n.label }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="notification-right">
+      <div class="notification-transition">
+        <span class="status status-{{ n.old_status }}">{{ n.old_status_display }}</span>
+        <span class="status-arrow">&rarr;</span>
+        <span class="status status-{{ n.new_status }}">{{ n.new_status_display }}</span>
+      </div>
+      {% if n.description %}
+      <span class="notification-desc">{{ n.description }}</span>
+      {% endif %}
+      <span class="pkg-date">{{ n.formatted_time }}</span>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty">
+  <p>No notifications yet</p>
+  <p>Status changes will appear here when your packages update.</p>
+</div>
+{% endif %}
