@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.41.1 (2026-04-15)
+
+### Bug Fixes
+
+- **extension**: Handle Amazon's new /ax/claim login flow
+  ([`363ff99`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/363ff99ddd8e5a8fae7d725d8ce896c1e227c754))
+
+
 ## v1.41.0 (2026-04-15)
 
 ### Features
