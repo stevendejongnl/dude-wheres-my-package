@@ -208,13 +208,53 @@ uv run uvicorn dwmp.api.app:app --reload
 Then visit <http://localhost:8000/> for the web UI (package list, account setup,
 notifications), or hit the JSON API directly — see below.
 
+## Development
+
+Tests live next to the code (`*_test.py`) — `pytest` discovers them via the
+`tool.pytest.ini_options` in `pyproject.toml`. Run the full suite with:
+
+```bash
+uv run pytest src/dwmp
+uv run ruff check src/dwmp
+```
+
+### Seeding a demo database
+
+`dwmp.testing` is the canonical store for sample accounts, packages, and
+notifications — one place every test, Playwright run, or manual QA session can
+reach for representative data. It covers every carrier and every notification
+variant the UI renders (including the `auth_failed` alert card).
+
+Seed a fresh SQLite DB for local visual testing:
+
+```bash
+uv run python -m dwmp.testing --db /tmp/dwmp-demo.db
+
+DB_PATH=/tmp/dwmp-demo.db POLL_INTERVAL_MINUTES=99999 \
+    uv run uvicorn dwmp.api.app:app --port 8087
+```
+
+Or use it from a test:
+
+```python
+from dwmp.testing import seed_all, SAMPLE_NOTIFICATIONS
+
+async def test_something(repo):
+    ids = await seed_all(repo)
+    assert len(ids["notifications"]) == len(SAMPLE_NOTIFICATIONS)
+```
+
+Granular helpers (`seed_accounts`, `seed_packages`, `seed_notifications`) plus
+raw `SAMPLE_*` constants are exported from the same module if you need a
+tailored subset.
+
 ## Web UI
 
 Dwmp ships a server-rendered HTML UI at `/`:
 
 - `/` — package list with the "Track a package" modal, per-package **Refresh** and **Delete** buttons, and collapsible **Details** sections showing postal code, tracking URL, estimated delivery, source, and timestamps
 - `/accounts` — connected accounts, inline add/edit/test/sync flows, **Browser Sync** modal with universal **Sync Packages** bookmarklet (works on Amazon, DPD, and more), and delivery postal code field on all carrier account forms (enables public tracking fallback when account cookies expire)
-- `/notifications` — status-change history with unread badge, rich browser push notifications showing carrier, status, and event description
+- `/notifications` — status-change history with unread badge and two card variants: **package updates** (carrier chip, tracking number, the new status as a single pill, the delivery description, and a `was {old status} · {time}` meta line — whole card clicks through to the package list) and **carrier alerts** (red-bordered card with ⚠ icon and an inline **Reconnect →** button that deep-links to the right carrier row on `/accounts`, for when a sync fails with `auth_failed`). Rich browser push notifications mirror the data so the native banner shows carrier, status, and event description.
 - `/login` / `/logout` — password gate (only enabled when `PASSWORD_HASH` is set)
 
 Form submissions show a loading overlay (blur + spinner) to prevent double-clicks.

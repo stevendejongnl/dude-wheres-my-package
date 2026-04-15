@@ -1,27 +1,50 @@
 {% if notifications %}
 {% for n in notifications %}
-<div class="card notification-card" id="notif-{{ n.id }}">
-  <div class="notification-row">
-    <div class="notification-left">
-      <span class="pkg-carrier {{ n.carrier }}">{{ n.carrier }}</span>
-      <div class="notification-info">
-        <span class="pkg-tracking">{{ n.tracking_number }}</span>
-        {% if n.label %}<span class="pkg-label">{{ n.label }}</span>{% endif %}
-      </div>
+{% if n.new_status == "auth_failed" %}
+{# --- Alert variant: carrier sync / auth failure ------------------------- #}
+<div class="card notification-card notification-card--alert" id="notif-{{ n.id }}">
+  <div class="notification-card__header">
+    <span class="pkg-carrier {{ n.carrier }}">{{ n.carrier }}</span>
+    <div class="notification-card__headline">
+      <span class="notification-card__icon" aria-hidden="true">⚠</span>
+      <span class="notification-card__title">{{ n.carrier|upper }} account sync failed</span>
     </div>
-    <div class="notification-right">
-      <div class="notification-transition">
-        <span class="status status-{{ n.old_status }}">{{ n.old_status_display }}</span>
-        <span class="status-arrow">&rarr;</span>
-        <span class="status status-{{ n.new_status }}">{{ n.new_status_display }}</span>
-      </div>
-      {% if n.description %}
-      <span class="notification-desc">{{ n.description }}</span>
-      {% endif %}
-      <span class="pkg-date">{{ n.formatted_time }}</span>
-    </div>
+    <a class="btn btn-ghost btn-sm notification-card__action"
+       href="{{ base_path }}/accounts#account-carrier-{{ n.carrier }}">
+      Reconnect &rarr;
+    </a>
+  </div>
+  {% if n.description %}
+  <p class="notification-card__desc">{{ n.description }}</p>
+  {% endif %}
+  <div class="notification-card__meta">
+    <span class="notification-card__time">{{ n.formatted_time }}</span>
   </div>
 </div>
+{% else %}
+{# --- Update variant: package status change ----------------------------- #}
+<a class="card notification-card notification-card--update" id="notif-{{ n.id }}"
+   href="{{ base_path }}/packages">
+  <div class="notification-card__header">
+    <span class="pkg-carrier {{ n.carrier }}">{{ n.carrier }}</span>
+    <div class="notification-card__headline">
+      <span class="notification-card__title pkg-tracking">{{ n.tracking_number }}</span>
+      {% if n.label %}<span class="notification-card__label">{{ n.label }}</span>{% endif %}
+    </div>
+    <span class="status status-{{ n.new_status }}">{{ n.new_status_display }}</span>
+  </div>
+  {% if n.description %}
+  <p class="notification-card__desc">{{ n.description }}</p>
+  {% endif %}
+  <div class="notification-card__meta">
+    {% if n.old_status and n.old_status != n.new_status %}
+    <span class="notification-card__was">was {{ n.old_status_display }}</span>
+    <span class="notification-card__meta-sep" aria-hidden="true">·</span>
+    {% endif %}
+    <span class="notification-card__time">{{ n.formatted_time }}</span>
+  </div>
+</a>
+{% endif %}
 {% endfor %}
 {% else %}
 <div class="empty">

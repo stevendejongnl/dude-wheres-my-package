@@ -414,16 +414,11 @@
     .notif-drawer-body {
       flex: 1; overflow-y: auto; padding: 8px 0;
     }
-    .notif-drawer-body .notification-card { border-radius: 0; border-left: none; border-right: none; }
-    .notif-drawer-body .notification-row { padding: 12px 20px; }
-    .notif-drawer-body .notification-right { align-items: flex-end; }
+    .notif-drawer-body .notification-card { border-radius: 0; border-right: none; }
+    .notif-drawer-body .notification-card--update { border-left: none; }
     .notif-drawer-body .empty { padding: 40px 20px; }
     @media (max-width: 640px) {
       .notif-drawer { width: 100vw; }
-      .notif-drawer-body .notification-row { flex-direction: column; align-items: flex-start; }
-      .notif-drawer-body .notification-right { align-items: flex-start; width: 100%; }
-      .notif-drawer-body .notification-transition { justify-content: flex-start; }
-      .notif-drawer-body .notification-desc { text-align: left; }
     }
     .form-group select {
       width: 100%; padding: 8px 12px;
@@ -457,21 +452,47 @@
       padding: 0 4px; pointer-events: none;
     }
 
-    /* Notification center page */
-    .notification-card { transition: background 0.2s; }
-    .notification-card.unread { background: var(--surface2); border-left: 3px solid var(--accent); }
-    .notification-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 20px; gap: 12px;
+    /* Notifications */
+    .notification-card {
+      display: block;
+      padding: 14px 18px;
+      color: var(--text);
+      text-decoration: none;
+      transition: background 0.15s;
     }
-    .notification-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
-    .notification-info { display: flex; flex-direction: column; min-width: 0; }
-    .notification-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
-    .notification-transition { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-    .status-arrow { color: var(--text-dim); font-size: 0.8rem; }
-    .notification-desc {
-      font-size: 0.78rem; color: var(--text-dim); line-height: 1.4;
-      text-align: right; word-break: break-word;
+    a.notification-card:hover { background: var(--surface2); }
+    .notification-card.unread { background: var(--surface2); border-left: 3px solid var(--accent); }
+    .notification-card--alert { border-left: 3px solid var(--red); }
+    .notification-card__header {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .notification-card__headline {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .notification-card--alert .notification-card__headline {
+      flex-direction: row; align-items: center; gap: 8px;
+    }
+    .notification-card__title {
+      font-size: 0.9rem; line-height: 1.3;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .notification-card__label {
+      font-size: 0.78rem; color: var(--text-dim);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .notification-card__icon {
+      color: var(--red); font-size: 1rem; flex-shrink: 0;
+    }
+    .notification-card__action { flex-shrink: 0; }
+    .notification-card__desc {
+      font-size: 0.82rem; color: var(--text); line-height: 1.45;
+      margin: 8px 0 0 76px; word-break: break-word;
+    }
+    .notification-card__meta {
+      font-size: 0.72rem; color: var(--text-dim);
+      margin: 6px 0 0 76px;
+      display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
     }
     .notif-unread-dot {
       width: 8px; height: 8px; border-radius: 50%;
@@ -519,9 +540,7 @@
       .card-body { padding: 0 14px 12px; }
       .account { flex-direction: column; gap: 10px; align-items: flex-start; }
       .account-actions { align-self: flex-end; }
-      .notification-row { flex-direction: column; align-items: flex-start; }
-      .notification-right { align-items: flex-start; width: 100%; }
-      .notification-transition { justify-content: flex-start; }
+      .notification-card__header { flex-wrap: wrap; }
     }
     @media (min-width: 641px) {
       .app-title-short { display: none; }
