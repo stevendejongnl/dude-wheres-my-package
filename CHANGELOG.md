@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.40.1 (2026-04-15)
+
+### Bug Fixes
+
+- **extension**: Handle all Amazon login variants (combined/split/password-only)
+  ([`977d962`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/977d962e893e7ff961c0df70bbcdc62c387acd31))
+
+
 ## v1.40.0 (2026-04-15)
 
 ### Features
