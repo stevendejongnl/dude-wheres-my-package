@@ -104,9 +104,18 @@ async function syncCarrierViaTab(account) {
 
     await waitForTabLoad(tabId);
 
-    // If the tab landed on a login page, fill credentials and submit
+    // Wait for any chained redirects to settle (DPD goes through several
+    // hops: app -> SSO check -> Keycloak login). Without this the URL
+    // check below can race the final redirect.
+    await waitForUrlStable(tabId);
+
+    // If the tab landed on a login page (URL match OR a login form is
+    // visible in the DOM), fill credentials and submit.
     const tabInfo = await chrome.tabs.get(tabId);
-    if (isCarrierLoginPage(account.carrier, tabInfo.url)) {
+    const onLogin =
+      isCarrierLoginPage(account.carrier, tabInfo.url) ||
+      (await hasLoginForm(tabId));
+    if (onLogin) {
       const loggedIn = await handleCarrierLogin(tabId, account);
       if (!loggedIn) {
         await storeSyncResult(account.id, false, "Login failed -- check credentials");
@@ -163,6 +172,53 @@ function waitForTabLoad(tabId) {
     }
     chrome.tabs.onUpdated.addListener(listener);
   });
+}
+
+/**
+ * After the initial 'complete' fires, carriers can still chain client-side
+ * redirects (Keycloak SSO bounce, OAuth callback). Poll the tab URL until it
+ * stops changing for ~1.5s before declaring the navigation done.
+ */
+async function waitForUrlStable(tabId, idleMs = 1500, maxMs = 10_000) {
+  let lastUrl = null;
+  let lastChange = Date.now();
+  const deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
+    let url;
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      url = tab.url;
+    } catch {
+      return;
+    }
+    if (url !== lastUrl) {
+      lastUrl = url;
+      lastChange = Date.now();
+    } else if (Date.now() - lastChange >= idleMs) {
+      return;
+    }
+    await sleep(250);
+  }
+}
+
+/**
+ * Detect a login form by DOM rather than URL. Catches login pages whose URL
+ * doesn't match our patterns (e.g. a portal page that embeds the form).
+ */
+async function hasLoginForm(tabId) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const u = document.querySelector("#username, #ap_email, input[name='username'], input[name='email']");
+        const p = document.querySelector("#password, #ap_password, input[type='password']");
+        return Boolean(u && p) || Boolean(u && document.querySelector("#continue"));
+      },
+    });
+    return Boolean(results?.[0]?.result);
+  } catch {
+    return false;
+  }
 }
 
 async function captureTabHtml(tabId) {

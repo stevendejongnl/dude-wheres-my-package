@@ -18,7 +18,10 @@ export const CARRIER_SYNC_URLS = {
   amazon: "https://www.amazon.nl/gp/your-account/order-history",
   postnl: "https://jouw.postnl.nl/",
   dhl: "https://my.dhlecommerce.nl/",
-  dpd: "https://www.dpdgroup.com/nl/mydpd/my-parcels",
+  // /incoming triggers the full Keycloak login redirect when not
+  // authenticated. The bare /my-parcels portal does a silent SSO check
+  // (prompt=none) that never shows the login form.
+  dpd: "https://www.dpdgroup.com/nl/mydpd/my-parcels/incoming",
 };
 
 // URL patterns that indicate a carrier login page (not yet authenticated).
