@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v1.38.0 (2026-04-15)
+
+### Bug Fixes
+
+- **ci**: Remove unused variable in scheduler test
+  ([`b31d68f`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/b31d68f08ecfde7fe1ec5f20d4d9d88cf93e26cd))
+
+### Continuous Integration
+
+- Auto-update gh-pages version badge on release
+  ([`d577241`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/d577241b9f24602c4d345fc29729dfa327e1d7bc))
+
+### Features
+
+- **notifications**: Deduplicate auth failures, fix text truncation, add drawer UI
+  ([`2e92e48`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/2e92e489fe503b4168899af6e5e44736ea47a626))
+
+
 ## v1.37.1 (2026-04-14)
 
 ### Bug Fixes
