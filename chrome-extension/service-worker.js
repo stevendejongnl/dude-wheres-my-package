@@ -305,65 +305,181 @@ async function handleCarrierLogin(tabId, account) {
 }
 
 /**
- * Amazon's two-step login: email page → password page → orders.
- * MFA/captcha fall through to the user — we just fill what we can.
+ * Amazon sign-in handler.  Amazon actually serves three different entry
+ * points in practice, and the chrome extension must cope with all of them:
+ *
+ *   1. Fresh sign-in with a split form — ``#ap_email`` only, click
+ *      ``#continue``, then ``#ap_password`` on the next page.
+ *   2. Fresh sign-in with a single-page form — ``#ap_email`` and
+ *      ``#ap_password`` both visible; submit via ``#signInSubmit``.
+ *   3. Recognized user — Amazon already knows the email, page opens on
+ *      ``#ap_password`` only.
+ *
+ * CAPTCHA (``#auth-captcha-guess``) and MFA (``#auth-mfa-otpcode``) both
+ * fall through: we surface the tab so the user can solve it.  Also
+ * dismisses the EU cookie-consent banner which otherwise overlays the form.
  */
 async function handleAmazonLogin(tabId, email, password) {
-  // Step 1: fill email and submit
-  const nav1 = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    func: (e) => {
-      const el = document.querySelector("#ap_email") ||
-                 document.querySelector("input[name='email']");
-      if (el) {
-        el.value = e;
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-      const btn = document.querySelector("#continue") ||
-                  document.querySelector("input[id='continue']");
-      if (btn) btn.click();
-    },
-    args: [email],
-  });
-
+  // Step 0: dismiss the EU cookie consent banner if present.
   try {
-    await nav1;
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const accept = document.querySelector("#sp-cc-accept");
+        if (accept) accept.click();
+      },
+    });
   } catch {
+    // ignore
+  }
+
+  // Detect which Amazon form variant we're on.
+  let variant;
+  try {
+    const result = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        if (document.querySelector("#auth-captcha-guess")) return "captcha";
+        if (document.querySelector("#auth-mfa-otpcode")) return "mfa";
+        const emailEl = document.querySelector("#ap_email");
+        const passEl = document.querySelector("#ap_password");
+        const emailVisible = emailEl && emailEl.offsetParent !== null;
+        const passVisible = passEl && passEl.offsetParent !== null;
+        if (emailVisible && passVisible) return "combined";
+        if (emailVisible) return "email-only";
+        if (passVisible) return "password-only";
+        return "unknown";
+      },
+    });
+    variant = result?.[0]?.result || "unknown";
+  } catch {
+    variant = "unknown";
+  }
+
+  // CAPTCHA or MFA: surface the tab to the user.
+  if (variant === "captcha" || variant === "mfa") {
+    await chrome.tabs.update(tabId, { active: true });
     return false;
   }
 
-  // Step 2: fill password and submit
-  const nav2 = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    func: (p) => {
-      const el = document.querySelector("#ap_password") ||
-                 document.querySelector("input[name='password']");
-      if (el) {
-        el.value = p;
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-      const btn = document.querySelector("#signInSubmit") ||
-                  document.querySelector("input[type='submit']");
-      if (btn) btn.click();
-    },
-    args: [password],
-  });
+  // Combined form — fill both, submit once.
+  if (variant === "combined") {
+    const nav = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (e, p) => {
+        const setVal = (el, v) => {
+          if (!el) return;
+          el.value = v;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        };
+        setVal(document.querySelector("#ap_email"), e);
+        setVal(document.querySelector("#ap_password"), p);
+        const btn = document.querySelector("#signInSubmit") ||
+                    document.querySelector("input[type='submit']");
+        if (btn) btn.click();
+      },
+      args: [email, password],
+    });
+    try { await nav; } catch { return false; }
+  } else if (variant === "email-only") {
+    // Split form: fill email → continue → fill password → submit.
+    const nav1 = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (e) => {
+        const el = document.querySelector("#ap_email");
+        if (el) {
+          el.value = e;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        const btn = document.querySelector("#continue") ||
+                    document.querySelector("input[id='continue']");
+        if (btn) btn.click();
+      },
+      args: [email],
+    });
+    try { await nav1; } catch { return false; }
 
-  try {
-    await nav2;
-  } catch {
+    // Wait for the password field to appear on the next page.
+    const passReady = await waitForSelector(tabId, "#ap_password", 10_000);
+    if (!passReady) return false;
+
+    const nav2 = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (p) => {
+        const el = document.querySelector("#ap_password");
+        if (el) {
+          el.value = p;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        const btn = document.querySelector("#signInSubmit") ||
+                    document.querySelector("input[type='submit']");
+        if (btn) btn.click();
+      },
+      args: [password],
+    });
+    try { await nav2; } catch { return false; }
+  } else if (variant === "password-only") {
+    // Amazon remembered the email; just submit the password.
+    const nav = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (p) => {
+        const el = document.querySelector("#ap_password");
+        if (el) {
+          el.value = p;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        const btn = document.querySelector("#signInSubmit") ||
+                    document.querySelector("input[type='submit']");
+        if (btn) btn.click();
+      },
+      args: [password],
+    });
+    try { await nav; } catch { return false; }
+  } else {
+    // Unknown variant — no recognizable form fields, bail out.
+    await chrome.tabs.update(tabId, { active: true });
     return false;
   }
 
-  // If we hit MFA/captcha, surface the tab so the user can solve it
+  // After submitting, Amazon may redirect to MFA, CAPTCHA, or approval.
+  // Check the final state; surface the tab if still on a login-related page.
+  await waitForUrlStable(tabId);
   const info = await chrome.tabs.get(tabId);
   if (isCarrierLoginPage("amazon", info.url)) {
     await chrome.tabs.update(tabId, { active: true });
     return false;
   }
   return true;
+}
+
+/**
+ * Poll for a CSS selector to appear in the tab.  Returns true if found
+ * within timeoutMs, false otherwise.
+ */
+async function waitForSelector(tabId, selector, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const result = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: (sel) => Boolean(document.querySelector(sel)),
+        args: [selector],
+      });
+      if (result?.[0]?.result) return true;
+    } catch {
+      return false;
+    }
+    await sleep(300);
+  }
+  return false;
 }
 
 function waitForTabNavigation(tabId, timeout) {
