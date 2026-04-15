@@ -409,6 +409,8 @@ a:hover { color: var(--accent-hover); }
   display: block;
   background: var(--bg);
   overflow: hidden;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* Extension mockup gets special treatment — centered narrow frame */
@@ -418,6 +420,8 @@ a:hover { color: var(--accent-hover); }
 
 .extension-mini-frame iframe {
   overflow: hidden;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* ── Carrier Grid ────────────────────────────── */
