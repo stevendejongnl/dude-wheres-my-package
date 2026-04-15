@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.39.0 (2026-04-15)
+
+### Features
+
+- **accounts**: Add sync enabled/disabled toggle per account
+  ([`8bfb5f7`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/8bfb5f7df422cacfa0b687744581395e66167f8f))
+
+
 ## v1.38.0 (2026-04-15)
 
 ### Bug Fixes
