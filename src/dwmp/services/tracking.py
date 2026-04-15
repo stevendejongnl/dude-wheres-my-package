@@ -129,10 +129,32 @@ class TrackingService:
         password: str,
         totp_secret: str | None = None,
     ) -> AuthTokens:
-        """Attempt a credentials login without persisting. Raises CarrierAuthError on failure."""
+        """Prepare tokens for a credentials-based or browser-push carrier.
+
+        For :class:`AuthType.CREDENTIALS` carriers (DHL) this actually calls
+        ``carrier.login()`` to validate the credentials live against the
+        upstream.
+
+        For :class:`AuthType.BROWSER_PUSH` carriers (Amazon, DPD) the server
+        never logs in itself — the Chrome extension uses the stored
+        credentials in a real browser tab. So we just package the inputs
+        into an :class:`AuthTokens` for the caller to persist. The
+        credentials live in ``refresh_token`` (JSON) where the extension
+        reads them via ``get_account_credentials``.
+        """
         carrier = self._carriers.get(carrier_name)
         if carrier is None:
             raise ValueError(f"Unknown carrier: {carrier_name}")
+
+        if carrier.auth_type == AuthType.BROWSER_PUSH:
+            creds: dict[str, str] = {"email": username, "password": password}
+            if totp_secret:
+                creds["totp_secret"] = totp_secret
+            return AuthTokens(
+                access_token="",
+                refresh_token=json.dumps(creds),
+            )
+
         if carrier.auth_type != AuthType.CREDENTIALS:
             raise ValueError(f"{carrier_name} does not use credentials")
 
@@ -159,10 +181,16 @@ class TrackingService:
         tokens = await self.validate_account_credentials(
             carrier_name, username, password, totp_secret=totp_secret
         )
+        carrier = self._carriers.get(carrier_name)
+        auth_type_str = (
+            "browser_push"
+            if carrier and carrier.auth_type == AuthType.BROWSER_PUSH
+            else "credentials"
+        )
 
         account_id = await self._repository.add_account(
             carrier=carrier_name,
-            auth_type="credentials",
+            auth_type=auth_type_str,
             tokens=asdict(tokens),
             username=username,
             lookback_days=lookback_days,
@@ -401,6 +429,21 @@ class TrackingService:
         carrier = self._carriers.get(account["carrier"])
         if carrier is None:
             raise ValueError(f"Unknown carrier: {account['carrier']}")
+
+        # Browser-push carriers (Amazon, DPD) are driven by the Chrome
+        # extension — the scheduler and the account-row "Sync" button
+        # don't talk to the upstream. We mark the account healthy so the
+        # UI doesn't show stale error state and return an empty result.
+        if carrier.auth_type == AuthType.BROWSER_PUSH:
+            logger.info(
+                "Skipping server-side sync for %s account %d — "
+                "browser-push carriers sync via the Chrome extension.",
+                account["carrier"], account_id,
+            )
+            await self._repository.update_account_status(
+                account_id, AccountStatus.CONNECTED
+            )
+            return []
 
         tokens_dict = account.get("tokens") or {}
         tokens = AuthTokens(

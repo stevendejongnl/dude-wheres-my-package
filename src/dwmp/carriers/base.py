@@ -19,6 +19,12 @@ class AuthType(StrEnum):
     OAUTH = "oauth"
     CREDENTIALS = "credentials"
     MANUAL_TOKEN = "manual_token"
+    # Server stores credentials (email / password / optional TOTP) but never
+    # calls the carrier itself — the Chrome extension fetches them, performs
+    # the login in a real browser tab, scrapes the orders page, and POSTs
+    # the HTML back to ``/browser-push``. Used by carriers whose production
+    # login flow rejects headless replay (Amazon CAPTCHA, DPD Cloudflare).
+    BROWSER_PUSH = "browser_push"
 
 
 class AccountStatus(StrEnum):

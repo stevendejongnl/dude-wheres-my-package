@@ -301,8 +301,9 @@ async def universal_browser_push(
 ) -> list[dict]:
     """Universal browser-push: detect carrier from URL, find account, sync.
 
-    The universal bookmarklet sends {html, url}. We map the URL to a carrier,
-    find the account, and sync.
+    The DWMP Chrome extension POSTs ``{html, url}`` here after scraping a
+    carrier site in a real browser tab. We map the URL to a carrier, find
+    the account, and sync.
     """
     from urllib.parse import urlparse
     hostname = urlparse(body.url).hostname or ""
@@ -342,10 +343,11 @@ async def browser_push(
     body: BrowserPushRequest,
     service: TrackingService = Depends(get_tracking_service),
 ) -> list[dict]:
-    """Accept raw HTML captured by the user's browser and sync from it.
+    """Accept raw HTML captured by the DWMP Chrome extension and sync from it.
 
-    Called by the browser-push relay page (same-origin) after receiving
-    the HTML via postMessage from the bookmarklet on the carrier site.
+    The extension scrapes the carrier site in the user's real browser and
+    POSTs the HTML here keyed to a specific account. Use ``POST
+    /browser-push`` (no account_id) for auto-detection by URL.
     """
     try:
         return await service.sync_account_from_html(account_id, body.html)

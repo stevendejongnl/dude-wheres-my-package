@@ -150,6 +150,19 @@ class PackageRepository:
             )
             await self.db.commit()
 
+        # v1.41: Amazon + DPD switched from server-side Playwright login
+        # to browser-push only. Flip the auth_type on any pre-existing
+        # accounts so the new service layer treats them correctly.
+        # Stored credentials (username, tokens.refresh_token JSON) are
+        # preserved — the Chrome extension reads them to perform the login
+        # in the user's own browser.
+        await self.db.execute(
+            "UPDATE accounts SET auth_type = 'browser_push' "
+            "WHERE carrier IN ('amazon', 'dpd') "
+            "AND auth_type IN ('credentials', 'manual_token')"
+        )
+        await self.db.commit()
+
     @property
     def db(self) -> aiosqlite.Connection:
         assert self._db is not None, "Repository not initialized — call init() first"

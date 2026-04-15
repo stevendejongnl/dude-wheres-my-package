@@ -8,34 +8,30 @@ Package tracking service for Dutch carriers. Runs as a container with a REST API
 
 ### Amazon
 
-**Auth type:** `credentials` (email + password + optional TOTP)
+**Auth type:** `browser_push` — sync runs **only via the DWMP Chrome extension**.
 
-**Recommended: Browser-push bookmarklet** — Amazon's bot detection blocks headless browser login from server environments. Use the universal **Sync Packages** bookmarklet instead:
+Amazon's bot detection reliably blocks headless logins from server IPs
+(CAPTCHA, push-MFA, OTP walls). After trying every server-side workaround we
+settled on the only path that actually keeps working: the extension does the
+login on your own browser using credentials you've stored on the account, then
+pushes the rendered orders HTML back to DWMP via `POST /browser-push`.
 
-1. Connect your Amazon account (credentials or cookie JSON) via the web UI
-2. Open the **Accounts** page and click **Browser Sync** on your Amazon account
-3. Drag the **Sync Packages** bookmarklet to your bookmarks bar
-4. Go to https://www.amazon.nl/your-orders/orders and log in
-5. Click the bookmarklet — packages sync instantly
+**How to connect:**
 
-The same bookmarklet also works on DPD and other supported carrier sites.
+1. Install the [DWMP Chrome extension](https://github.com/stevendejongnl/dude-wheres-my-package/releases/latest).
+2. Open the DWMP web UI → **Accounts** → **Add Amazon**.
+3. Enter your Amazon email, password, and (if MFA is enabled) the TOTP
+   secret from your authenticator app's setup screen. Click **Save**.
+4. Open the extension's popup and click **Sync** — it opens an Amazon tab,
+   signs in using the stored credentials, and pushes the orders page back.
 
-**Fallback: Playwright sync** — if you prefer automated sync, connect with credentials:
+DWMP never talks to Amazon itself — there's no Playwright running on the
+server, no CAPTCHA to solve, no cookie hijacking. The credentials stored on
+the account are only ever read by the extension you installed.
 
-```bash
-curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/credentials \
-  -H "Content-Type: application/json" \
-  -d '{
-    "carrier": "amazon",
-    "username": "<your Amazon email>",
-    "password": "<your Amazon password>",
-    "totp_secret": "<optional TOTP setup key>"
-  }'
-```
-
-Playwright launches headless Chromium, logs in, and captures the orders page. Cookies are cached between syncs. This works when Amazon doesn't present a CAPTCHA or push-MFA challenge, but may fail from server IPs.
-
-**MFA:** TOTP (authenticator app) is supported. Push notification MFA is not — switch to TOTP in your Amazon security settings if you use push-based approval.
+**MFA:** TOTP (authenticator app) is supported. Push / SMS / approval-based
+MFA is not — switch to TOTP in your Amazon security settings if your account
+uses push-based approval.
 
 ### PostNL
 
@@ -105,50 +101,32 @@ curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
 
 ### DPD
 
-**Auth type:** `manual_token` (browser-push bookmarklet recommended)
+**Auth type:** `browser_push` — sync runs **only via the DWMP Chrome extension**.
 
-DPD uses Keycloak SSO at `login.dpdgroup.com` with Cloudflare bot protection on the parcels page. No JSON API — the service parses the server-rendered HTML. Cookie-based account sync is unreliable because Keycloak sessions don't survive cross-environment replay.
+DPD routes logins through Keycloak SSO at `login.dpdgroup.com` and protects
+the parcels page with Cloudflare. Every server-side workaround we tried
+(headless Playwright, cookie replay, manual HTML paste) eventually breaks —
+Cloudflare binds `cf_clearance` to the TLS fingerprint of the issuing browser,
+so cookies captured elsewhere don't replay from the DWMP pod's IP.
 
-**Recommended: Browser-push bookmarklet**
+**How to connect:**
 
-The simplest way to sync DPD parcels is via the universal browser-push bookmarklet:
+1. Install the [DWMP Chrome extension](https://github.com/stevendejongnl/dude-wheres-my-package/releases/latest).
+2. Open the DWMP web UI → **Accounts** → **Add DPD**.
+3. Enter your DPD email + password and click **Save**.
+4. Open the extension's popup and click **Sync** — it opens a DPD tab,
+   signs in through Keycloak as *you*, and pushes the parcels HTML back
+   to DWMP via `POST /browser-push`.
 
-1. Open the **Accounts** page in dwmp
-2. Drag the **Sync Packages** bookmarklet to your bookmarks bar (shown next to your DPD or Amazon account)
-3. Log in to DPD at https://www.dpdgroup.com/nl/mydpd and navigate to **My parcels** > **Incoming**
-4. Click the bookmarklet — it detects the carrier site, captures the page HTML, and sends it to dwmp
+DWMP never talks to DPD itself — no Playwright on the server, no Keycloak
+dance, no cookie hijacking. The stored credentials are only ever read by
+the extension you installed.
 
-The bookmarklet contains a JWT token (365-day expiry) embedded at render time, so no manual authentication is needed.
-
-**Fallback: Manual HTML capture**
-
-You can still capture the HTML manually:
-
-1. Log in at https://www.dpdgroup.com/nl/mydpd/login
-2. Navigate to **My parcels** > **Incoming**
-3. Open DevTools (F12) > **Console** and run:
-   ```js
-   copy(document.documentElement.outerHTML)
-   ```
-4. Save the clipboard content to a file (e.g. `dpd.html`)
-5. Strip the JSON string wrapper if present (the copied text may be wrapped in quotes)
-6. Connect — send the HTML as the `access_token`:
-
-```bash
-curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/token \
-  -H "Content-Type: application/json" \
-  -d "{\"carrier\":\"dpd\",\"access_token\":\"$(cat dpd.html)\"}"
-```
-
-7. Sync your packages:
-
-```bash
-curl -X POST https://dwmp.madebysteven.nl/api/v1/accounts/<id>/sync
-```
-
-**Public tracking:** Individual DPD packages can be refreshed via postal-code verification (no auth needed) using the per-package refresh endpoint.
-
-**Note:** DPD parcels are scraped from HTML snapshots. The bookmarklet automates what was previously a tedious copy-paste workflow.
+**Public tracking** stays server-side for packages whose account is no
+longer active: DPD lets guests view tracking details after verifying the
+delivery postal code, and DWMP's `track()` path uses a Playwright guest
+flow to hit that endpoint. That's why `postal_code` is required on each
+DPD package — without it the public-track fallback has nothing to verify.
 
 ### GLS
 
@@ -286,7 +264,7 @@ mockups stay byte-identical to production with zero manual upkeep.
 Dwmp ships a server-rendered HTML UI at `/`:
 
 - `/` — package list with the "Track a package" modal, per-package **Refresh** and **Delete** buttons, and collapsible **Details** sections showing postal code, tracking URL, estimated delivery, source, and timestamps
-- `/accounts` — connected accounts, inline add/edit/test/sync flows, **Browser Sync** modal with universal **Sync Packages** bookmarklet (works on Amazon, DPD, and more), and delivery postal code field on all carrier account forms (enables public tracking fallback when account cookies expire)
+- `/accounts` — connected accounts with inline add/edit/test/sync flows and a delivery postal-code field on every carrier form (enables public-tracking fallback once account sessions expire). Amazon/DPD accounts are extension-driven and show credential fields only — no server-side login button
 - `/notifications` — status-change history with unread badge and two card variants: **package updates** (carrier chip, tracking number, the new status as a single pill, the delivery description, and a `was {old status} · {time}` meta line — whole card clicks through to the package list) and **carrier alerts** (red-bordered card with ⚠ icon and an inline **Reconnect →** button that deep-links to the right carrier row on `/accounts`, for when a sync fails with `auth_failed`). Rich browser push notifications mirror the data so the native banner shows carrier, status, and event description.
 - `/login` / `/logout` — password gate (only enabled when `PASSWORD_HASH` is set)
 
@@ -301,10 +279,9 @@ If the `PASSWORD_HASH` environment variable is set, every route except
 and `/redoc` requires auth. If it's unset, the app is open — fine for a
 trusted LAN, not fine for the public internet.
 
-Browsers get a cookie session via `/login`. The browser-push bookmarklet uses a
-JWT token embedded at render time (365-day expiry) so the relay page can
-authenticate without cookies. API clients exchange the password for a long-lived
-JWT:
+Browsers get a cookie session via `/login`. The DWMP Chrome extension
+exchanges the password for a long-lived JWT (365-day expiry) and presents
+it as a `Bearer` token on every API call. Other API clients do the same:
 
 ```bash
 curl -X POST https://dwmp.madebysteven.nl/api/v1/auth/token \
@@ -346,10 +323,8 @@ GET    /api/v1/accounts                   # List connected accounts (tokens stri
 GET    /api/v1/accounts/{id}              # Account details
 DELETE /api/v1/accounts/{id}              # Disconnect account
 POST   /api/v1/accounts/{id}/sync         # Force sync packages from account
-POST   /api/v1/accounts/{id}/browser-push # Accept raw HTML for parsing (per-account bookmarklet)
-GET    /api/v1/accounts/{id}/browser-push?token=...  # Per-account relay page
-POST   /api/v1/browser-push               # Universal browser-push (auto-detects carrier from URL)
-GET    /browser-push?token=...             # Universal relay page for bookmarklet
+POST   /api/v1/accounts/{id}/browser-push # Chrome extension: push scraped HTML keyed to one account
+POST   /api/v1/browser-push               # Chrome extension: push scraped HTML, carrier auto-detected from URL
 ```
 
 ### Packages
@@ -393,9 +368,9 @@ docker run -p 8000:8000 -v dwmp-data:/app/data dwmp
 | `PASSWORD_HASH` | *(unset)* | Argon2 hash of the login password. Unset → open access. See *Authentication* above for how to generate it. |
 | `JWT_SECRET` | *(random)* | HS256 signing secret for session JWTs. Defaults to a per-process random value, so sessions invalidate on every restart unless you pin it. |
 | `TZ` | `Europe/Amsterdam` | Display timezone for rendered dates/times in the web UI. |
-| `PLAYWRIGHT_BROWSER_CHANNEL` | `chrome` | Playwright browser channel used by carriers that scrape via headless browser (Amazon, DPD). Set empty to use bundled Chromium. |
+| `PLAYWRIGHT_BROWSER_CHANNEL` | `chrome` | Playwright browser channel used by the DPD guest-track flow (public tracking fallback). Set empty to use bundled Chromium. |
 | `DHL_API_KEY` | *(unset)* | Free API key from [developer.dhl.com](https://developer.dhl.com). Enables rich event timeline for DHL packages (6+ events). Without it, falls back to Playwright scraping. |
-| `DWMP_PUBLIC_URL` | *(unset)* | Public-facing URL (e.g. `https://dwmp.madebysteven.nl`). Needed for the browser-push bookmarklet when behind a reverse proxy or Cloudflare. |
+| `DWMP_PUBLIC_URL` | *(unset)* | Public-facing URL (e.g. `https://dwmp.madebysteven.nl`). Used by the Chrome extension's service worker when DWMP sits behind a reverse proxy or Cloudflare and its origin differs from the one the extension's popup was opened against. |
 
 ## Kubernetes
 

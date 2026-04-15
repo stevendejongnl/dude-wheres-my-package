@@ -24,18 +24,33 @@ from __future__ import annotations
 # --- Accounts ---------------------------------------------------------------
 
 SAMPLE_ACCOUNTS: list[dict] = [
+    # Amazon and DPD are extension-driven (AuthType.BROWSER_PUSH). The
+    # server stores credentials in ``tokens.refresh_token`` as JSON so the
+    # Chrome extension can read them via ``get_account_credentials`` and
+    # log in on the user's own browser tab. ``access_token`` stays empty
+    # until the extension's first push.
     {
         "carrier": "amazon",
-        "auth_type": "credentials",
-        "tokens": {"access_token": "demo-amazon-token"},
+        "auth_type": "browser_push",
+        "tokens": {
+            "access_token": "",
+            "refresh_token": (
+                '{"email": "dude@example.com", "password": "demo-amazon-password"}'
+            ),
+        },
         "username": "dude@example.com",
         "lookback_days": 30,
         "postal_code": "1234AB",
     },
     {
         "carrier": "dpd",
-        "auth_type": "credentials",
-        "tokens": {"access_token": "demo-dpd-token"},
+        "auth_type": "browser_push",
+        "tokens": {
+            "access_token": "",
+            "refresh_token": (
+                '{"email": "steven@example.com", "password": "demo-dpd-password"}'
+            ),
+        },
         "username": "steven@example.com",
         "lookback_days": 30,
         "postal_code": "1234AB",

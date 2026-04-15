@@ -108,14 +108,18 @@ async def test_accounts_page_lists_carriers_with_add_buttons(client: AsyncClient
     assert "No account needed" not in body
 
 
-async def test_add_form_amazon_includes_totp_field(client: AsyncClient):
+async def test_add_form_amazon_is_browser_push_with_totp(client: AsyncClient):
+    """Amazon moved to browser-push: credentials are stored for the extension,
+    server never signs in, so no 'Test connection' button is rendered."""
     response = await client.get("/accounts/add/amazon")
     assert response.status_code == 200
     body = response.text
     assert 'name="username"' in body
     assert 'name="password"' in body
     assert 'name="totp_secret"' in body
-    assert "Test connection" in body
+    assert "DWMP Chrome extension" in body
+    # No Playwright login → no server-side test button.
+    assert "Test connection" not in body
 
 
 async def test_add_form_postnl_shows_session_storage_wizard(client: AsyncClient):
@@ -128,16 +132,19 @@ async def test_add_form_postnl_shows_session_storage_wizard(client: AsyncClient)
     assert 'name="refresh_token"' in body
 
 
-async def test_add_form_dpd_shows_credentials_and_cookies_fallback(client: AsyncClient):
+async def test_add_form_dpd_is_browser_push_no_cookie_fallback(client: AsyncClient):
+    """DPD moved to browser-push: credentials only — no cookies/paste flow."""
     response = await client.get("/accounts/add/dpd")
     assert response.status_code == 200
     body = response.text
-    # Primary: credentials
     assert 'name="username"' in body
     assert 'name="password"' in body
-    # Fallback: cookies
-    assert 'name="cookies_json"' in body
-    assert "Cookie-Editor" in body
+    assert "DWMP Chrome extension" in body
+    # The old cookie-hijack / Cookie-Editor flow is gone.
+    assert 'name="cookies_json"' not in body
+    assert "Cookie-Editor" not in body
+    # No server-side test button for browser-push.
+    assert "Test connection" not in body
 
 
 async def test_add_form_gls_returns_404(client: AsyncClient):

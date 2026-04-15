@@ -1,5 +1,16 @@
-import asyncio
-import json
+"""Amazon orders carrier — browser-push only.
+
+The server never talks to Amazon directly. The DWMP Chrome extension logs
+in on the user's own browser using the credentials stored on the account,
+scrapes the orders page, and POSTs the HTML back via ``/browser-push``.
+This module just parses that HTML.
+
+The public share-tracker (``track()``) remains server-side — Amazon exposes
+a per-parcel URL on the orders page that renders without login, and we
+persist it as ``tracking_url`` when we first see it, so subsequent
+refreshes can follow that link anonymously.
+"""
+
 import logging
 import re
 from datetime import UTC, datetime, timedelta
@@ -20,7 +31,6 @@ from dwmp.carriers.base import (
 logger = logging.getLogger(__name__)
 
 AMAZON_BASE = "https://www.amazon.nl"
-AMAZON_ORDERS_URL = f"{AMAZON_BASE}/your-orders/orders"
 # Public share-tracking endpoint. Accessible without login when called with
 # `unauthenticated=1&shareToken=<tok>`. The short-link domain `amzn.eu/d/<id>`
 # 301s here. We extract either form during sync and store it as tracking_url.
@@ -37,8 +47,6 @@ _SHARE_LINK_PATTERNS = (
 # Ordered most-specific first to avoid partial matches
 # (e.g. "wordt vandaag bezorgd" before "bezorgd").
 STATUS_MAP: list[tuple[str, TrackingStatus]] = [
-    # Most-specific phrases first to avoid partial substring matches.
-    # "niet bezorgd" must precede "bezorgd", etc.
     ("wordt vandaag bezorgd", TrackingStatus.OUT_FOR_DELIVERY),
     ("vandaag verwacht", TrackingStatus.OUT_FOR_DELIVERY),
     ("out for delivery", TrackingStatus.OUT_FOR_DELIVERY),
@@ -125,217 +133,49 @@ def _parse_dutch_date(text: str) -> datetime | None:
         return None
 
 
-def _parse_cookies(cookie_string: str) -> dict[str, str]:
-    """Parse a raw Cookie header string into a dict."""
-    cookies: dict[str, str] = {}
-    for part in cookie_string.split(";"):
-        part = part.strip()
-        if "=" in part:
-            key, _, value = part.partition("=")
-            cookies[key.strip()] = value.strip()
-    return cookies
-
-
 class Amazon(CarrierBase):
     name = "amazon"
-    auth_type = AuthType.CREDENTIALS
+    auth_type = AuthType.BROWSER_PUSH
 
     def __init__(self, http_client: httpx.AsyncClient | None = None) -> None:
         self._client = http_client
-        self._updated_tokens: AuthTokens | None = None
-
-    def get_updated_tokens(self) -> AuthTokens | None:
-        """Return refreshed browser cookies captured during the last sync."""
-        tokens = self._updated_tokens
-        self._updated_tokens = None
-        return tokens
 
     async def validate_token(self, tokens: AuthTokens) -> None:
-        """Validate cookies JSON without launching Playwright.
+        """No-op for browser-push carriers.
 
-        Like DPD, Amazon's bot detection can block headless login from the
-        pod's IP. When users paste cookies from their real browser, we just
-        check the format — the first sync will surface any session issues.
+        There's nothing for the server to validate — the extension will
+        exercise the credentials on the user's browser the first time it
+        runs. Overriding the base default avoids calling ``sync_packages``
+        which raises by design.
         """
-        raw = tokens.access_token
-        if raw and raw.strip().startswith("["):
-            try:
-                cookies = json.loads(raw)
-                if not isinstance(cookies, list):
-                    raise ValueError("Expected a JSON array of cookies")
-            except (json.JSONDecodeError, ValueError) as exc:
-                raise CarrierAuthError(
-                    self.name, f"Invalid cookies JSON: {exc}"
-                ) from exc
-            return
-        # Not cookies — fall back to default (minimal sync, triggers login)
-        await super().validate_token(tokens)
-
-    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
-        totp_secret = kwargs.get("totp_secret")
-
-        _html, cookies_json = await _playwright_login_and_capture(
-            email=username,
-            password=password,
-            totp_secret=totp_secret,
-            orders_url=AMAZON_ORDERS_URL,
-        )
-
-        # Store credentials for automatic re-login when cookies expire
-        creds = json.dumps({
-            "email": username,
-            "password": password,
-            "totp_secret": totp_secret,
-        })
-
-        return AuthTokens(
-            access_token=cookies_json,
-            refresh_token=creds,
-        )
+        return
 
     async def sync_packages(
         self, tokens: AuthTokens, lookback_days: int = 30
     ) -> list[TrackingResult]:
-        raw = tokens.access_token
-        self._updated_tokens = None
+        """Never called by the service layer for browser-push carriers.
 
-        # Mode 1: Playwright cookies (JSON array) → automated browser capture
-        if raw and raw.strip().startswith("["):
-            from dwmp.carriers.browser import capture_page_html
-
-            try:
-                html, updated_cookies = await capture_page_html(
-                    url=AMAZON_ORDERS_URL,
-                    cookies_json=raw,
-                    carrier_name=self.name,
-                    login_indicators=["ap/signin", "ap/mfa"],
-                    wait_selector=".order-card, .js-order-card, .a-box-group.order",
-                )
-                self._updated_tokens = AuthTokens(
-                    access_token=updated_cookies,
-                    refresh_token=tokens.refresh_token,
-                )
-            except CarrierAuthError:
-                # Cookies expired — re-login with stored credentials
-                logger.info("Amazon cookies expired, attempting re-login")
-                html = await self._relogin(tokens)
-
-            results = self._parse_orders_page(html, lookback_days)
-            return await self._enrich_with_share_tracker(results)
-
-        # Mode 2: Legacy raw HTML (manual capture, backwards compatible)
-        if raw and raw.strip().startswith("<"):
-            results = self._parse_orders_page(raw, lookback_days)
-            return await self._enrich_with_share_tracker(results)
-
-        # Mode 3: No cookies yet — first sync after login() stored credentials
-        if tokens.refresh_token:
-            logger.info("No cached cookies, performing initial Amazon login")
-            html = await self._relogin(tokens)
-            results = self._parse_orders_page(html, lookback_days)
-            return await self._enrich_with_share_tracker(results)
-
-        raise CarrierAuthError(
-            carrier=self.name,
-            message=(
-                "Amazon account not configured. "
-                "Connect with your Amazon email and password."
-            ),
-        )
-
-    async def _relogin(self, tokens: AuthTokens) -> str:
-        """Re-login using stored credentials. Returns orders page HTML."""
-        if not tokens.refresh_token:
-            raise CarrierAuthError(
-                self.name,
-                "Amazon session cookies have expired. Re-export fresh cookies "
-                "from your browser (Cookie-Editor → Export → JSON) and update "
-                "the account.",
-            )
-
-        creds = json.loads(tokens.refresh_token)
-        html, updated_cookies = await _playwright_login_and_capture(
-            email=creds["email"],
-            password=creds["password"],
-            totp_secret=creds.get("totp_secret"),
-            orders_url=AMAZON_ORDERS_URL,
-        )
-        self._updated_tokens = AuthTokens(
-            access_token=updated_cookies,
-            refresh_token=tokens.refresh_token,
-        )
-        return html
-
-    async def _enrich_with_share_tracker(
-        self, results: list[TrackingResult]
-    ) -> list[TrackingResult]:
-        """Fetch share tracker pages for active packages to get richer timelines.
-
-        The orders page only yields two events (order date + status). The public
-        share tracker exposes milestone events (ordered → shipped → out for
-        delivery → delivered). Fetching these during sync fills in the gaps.
+        The tracking service early-returns for ``auth_type == BROWSER_PUSH``
+        accounts. This override only exists to satisfy :class:`CarrierBase`'s
+        abstract contract — if it *does* fire, something is misconfigured,
+        so we fail loudly with a user-facing message rather than silently
+        returning ``[]``.
         """
-        _ACTIVE = (
-            TrackingStatus.IN_TRANSIT,
-            TrackingStatus.OUT_FOR_DELIVERY,
-            TrackingStatus.PRE_TRANSIT,
+        raise CarrierAuthError(
+            self.name,
+            "Amazon syncs only via the DWMP Chrome extension. Install the "
+            "extension and trigger a sync from its popup.",
         )
-        to_enrich = [
-            r for r in results
-            if r.tracking_url and r.status in _ACTIVE
-        ]
-        if not to_enrich:
-            return results
-
-        async def _fetch_one(result: TrackingResult) -> TrackingResult:
-            try:
-                enriched = await self.track(
-                    result.tracking_number, tracking_url=result.tracking_url,
-                )
-            except Exception:
-                return result
-            if enriched.status == TrackingStatus.UNKNOWN or not enriched.events:
-                return result
-            # Merge: keep order-page events (they have real timestamps) and
-            # add share-tracker events that aren't duplicates.
-            existing_descs = {e.description for e in result.events}
-            merged = list(result.events)
-            for evt in enriched.events:
-                if evt.description not in existing_descs:
-                    merged.append(evt)
-            return TrackingResult(
-                tracking_number=result.tracking_number,
-                carrier=result.carrier,
-                status=enriched.status if enriched.status != TrackingStatus.UNKNOWN else result.status,
-                estimated_delivery=enriched.estimated_delivery or result.estimated_delivery,
-                events=sorted(merged, key=lambda e: e.timestamp),
-                tracking_url=result.tracking_url,
-                postal_code=result.postal_code,
-            )
-
-        enriched_map: dict[str, TrackingResult] = {}
-        fetched = await asyncio.gather(
-            *[_fetch_one(r) for r in to_enrich],
-            return_exceptions=True,
-        )
-        for original, fetched_result in zip(to_enrich, fetched):
-            if isinstance(fetched_result, TrackingResult):
-                enriched_map[original.tracking_number] = fetched_result
-
-        return [
-            enriched_map.get(r.tracking_number, r)
-            for r in results
-        ]
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
-        """Public tracking via the `share` endpoint.
+        """Public tracking via the ``share`` endpoint.
 
         Amazon has no public (tracking_number → status) lookup — the order ID
         alone isn't a carrier-portal tracking number. But the orders page
         exposes a per-parcel shareable URL that renders without login. Sync
-        captures that URL as `tracking_url`; this method fetches it.
+        captures that URL as ``tracking_url``; this method fetches it.
 
-        If no `tracking_url` is available we return UNKNOWN with no events —
+        If no ``tracking_url`` is available we return UNKNOWN with no events —
         the TrackingService downgrade safeguard preserves any prior status.
         """
         tracking_url = kwargs.get("tracking_url") or ""
@@ -393,8 +233,6 @@ class Amazon(CarrierBase):
         """
         soup = BeautifulSoup(html, "lxml")
 
-        # The primary status headline lives in #primaryStatus or a similar
-        # wrapper. Fall back to scanning the whole body for known phrases.
         status_el = soup.select_one(
             "#primaryStatus, [data-testid='primary-status'], "
             ".pt-delivery-card-primary-status, .pt-primary-status"
@@ -452,7 +290,11 @@ class Amazon(CarrierBase):
     def _parse_parcels_page(
         self, html: str, lookback_days: int = 30
     ) -> list[TrackingResult]:
-        """Alias for browser-push compatibility (same interface as DPD)."""
+        """Entry point for the browser-push HTML sync path.
+
+        Alias kept for interface parity with DPD and the tracking service's
+        ``sync_account_from_html``.
+        """
         return self._parse_orders_page(html, lookback_days)
 
     def _parse_orders_page(
@@ -599,8 +441,8 @@ class Amazon(CarrierBase):
 def _extract_share_url(card: object) -> str | None:
     """Find a public Amazon share-tracking URL inside an order card.
 
-    Matches both `/progress-tracker/package/share?...` (same-host) and the
-    `amzn.eu/d/...` short links (which 301 to the same tracker). Returns the
+    Matches both ``/progress-tracker/package/share?...`` (same-host) and the
+    ``amzn.eu/d/...`` short links (which 301 to the same tracker). Returns the
     absolute URL or None if the card has no shareable tracking link.
     """
     for link in card.select("a[href]"):  # type: ignore[union-attr]
@@ -613,203 +455,6 @@ def _extract_share_url(card: object) -> str | None:
             return f"{AMAZON_BASE}{href}"
         return f"{AMAZON_BASE}/{href.lstrip('/')}"
     return None
-
-
-async def _playwright_login_and_capture(
-    email: str,
-    password: str,
-    totp_secret: str | None,
-    orders_url: str,
-) -> tuple[str, str]:
-    """Log in to Amazon via Playwright and capture the orders page.
-
-    Navigates to the orders URL (Amazon redirects to sign-in if needed),
-    authenticates, handles TOTP MFA, then captures the rendered HTML.
-
-    Returns ``(orders_html, cookies_json)``.
-    """
-    from playwright.async_api import async_playwright
-
-    from dwmp.carriers.browser import (
-        _USER_AGENT,
-        _browser_lock,
-        _launch_browser,
-        _stealth,
-    )
-
-    async with _browser_lock:
-        async with _stealth(_USER_AGENT).use_async(async_playwright()) as pw:
-            browser = await _launch_browser(pw)
-            try:
-                context = await browser.new_context(
-                    user_agent=_USER_AGENT,
-                    viewport={"width": 1280, "height": 800},
-                    locale="nl-NL",
-                    timezone_id="Europe/Amsterdam",
-                )
-                page = await context.new_page()
-
-                # Navigate to orders — Amazon redirects to sign-in if needed
-                await page.goto(orders_url, wait_until="networkidle", timeout=20_000)
-
-                # Detect login page and authenticate. Use URL check OR either
-                # of the two first-step fields Amazon may present (recognized
-                # users skip straight to #ap_password).
-                on_login = (
-                    "ap/signin" in page.url.lower()
-                    or await page.query_selector("#ap_email")
-                    or await page.query_selector("#ap_password")
-                )
-                if on_login:
-                    await _do_login(page, email, password, totp_secret)
-
-                # Wait for orders to render
-                try:
-                    await page.wait_for_selector(
-                        ".order-card, .js-order-card, .a-box-group.order",
-                        timeout=15_000,
-                    )
-                except Exception:
-                    logger.warning("Order cards not found — capturing page as-is")
-
-                html = await page.content()
-                cookies = await context.cookies()
-
-                logger.info(
-                    "Amazon login+capture complete, %d bytes, %d cookies",
-                    len(html), len(cookies),
-                )
-                return html, json.dumps(cookies)
-            finally:
-                await browser.close()
-
-
-async def _do_login(
-    page: object,
-    email: str,
-    password: str,
-    totp_secret: str | None,
-) -> None:
-    """Fill in Amazon's sign-in form (email → password → optional TOTP).
-
-    Handles the three entry points Amazon actually serves in practice:
-
-    1. Fresh sign-in — ``#ap_email`` first, then ``#ap_password`` on the same
-       page or on a follow-up page reached via ``#continue``.
-    2. Recognized user — Amazon remembered the email, so we land directly on
-       a password-only page with only ``#ap_password`` visible.
-    3. Interrupted session — we re-enter on the MFA page (``#auth-mfa-otpcode``)
-       because a previous login already passed the password step.
-
-    Also dismisses the EU cookie-consent banner, which otherwise overlays the
-    form and makes every input "present but not visible" — which breaks
-    ``wait_for_selector(state="visible")``.
-    """
-    # EU cookie banner covers the login form in headless contexts — dismiss
-    # if present. Short timeout; most login pages don't show one.
-    try:
-        await page.wait_for_selector(  # type: ignore[union-attr]
-            "#sp-cc-accept", timeout=2_000, state="visible",
-        )
-        await page.click("#sp-cc-accept")  # type: ignore[union-attr]
-        await page.wait_for_load_state("networkidle")  # type: ignore[union-attr]
-    except Exception:
-        pass  # No banner — continue.
-
-    # Race the fields Amazon might have served us, plus the CAPTCHA input
-    # as an early-exit. ``wait_for_selector`` returns whichever matches first.
-    try:
-        entry = await page.wait_for_selector(  # type: ignore[union-attr]
-            "#ap_email, #ap_password, #auth-mfa-otpcode, #auth-captcha-guess",
-            timeout=10_000,
-            state="visible",
-        )
-    except Exception as exc:
-        raise CarrierAuthError(
-            "amazon",
-            "Amazon login form did not appear "
-            f"(url={getattr(page, 'url', '<unknown>')!r}). Amazon may be "
-            "presenting a bot-challenge or approval interstitial, or the "
-            "login flow may have changed. Log in via a real browser once "
-            "to clear any pending challenge, then retry.",
-        ) from exc
-
-    entry_id: str = await entry.evaluate("el => el.id")  # type: ignore[union-attr]
-
-    if entry_id == "auth-captcha-guess":
-        raise CarrierAuthError(
-            "amazon",
-            "Amazon is showing a CAPTCHA challenge. Log in via a real "
-            "browser once to clear it, then retry.",
-        )
-
-    if entry_id == "ap_email":
-        await entry.fill(email)  # type: ignore[union-attr]
-        # Same-page (email + password together) vs split (continue → password).
-        password_input = await page.query_selector("#ap_password")  # type: ignore[union-attr]
-        if password_input and await password_input.is_visible():  # type: ignore[union-attr]
-            await password_input.fill(password)  # type: ignore[union-attr]
-            await page.click("#signInSubmit")  # type: ignore[union-attr]
-        else:
-            await page.click("#continue")  # type: ignore[union-attr]
-            await page.wait_for_selector(  # type: ignore[union-attr]
-                "#ap_password", timeout=10_000, state="visible",
-            )
-            await page.fill("#ap_password", password)  # type: ignore[union-attr]
-            await page.click("#signInSubmit")  # type: ignore[union-attr]
-        await page.wait_for_load_state("networkidle")  # type: ignore[union-attr]
-    elif entry_id == "ap_password":
-        # Recognized user — Amazon skipped the email step.
-        await entry.fill(password)  # type: ignore[union-attr]
-        await page.click("#signInSubmit")  # type: ignore[union-attr]
-        await page.wait_for_load_state("networkidle")  # type: ignore[union-attr]
-    # entry_id == "auth-mfa-otpcode" falls through to the MFA block below.
-
-    # Handle TOTP MFA
-    mfa_input = await page.query_selector("#auth-mfa-otpcode")  # type: ignore[union-attr]
-    if mfa_input:
-        if not totp_secret:
-            raise CarrierAuthError(
-                "amazon",
-                "Amazon MFA is enabled. Reconnect your account with your "
-                "TOTP secret (the setup key from your authenticator app).",
-            )
-        import pyotp
-
-        code = pyotp.TOTP(totp_secret).now()
-        await mfa_input.fill(code)
-
-        remember = await page.query_selector(  # type: ignore[union-attr]
-            "#auth-mfa-remember-device"
-        )
-        if remember:
-            await remember.check()
-
-        submit = await page.query_selector(  # type: ignore[union-attr]
-            "#auth-signin-button"
-        )
-        if submit:
-            await submit.click()
-        await page.wait_for_load_state("networkidle")  # type: ignore[union-attr]
-
-    # Handle approval-based MFA (can't automate)
-    if await page.query_selector(  # type: ignore[union-attr]
-        "#auth-approve-notification, .cvf-widget-btn-verify"
-    ):
-        raise CarrierAuthError(
-            "amazon",
-            "Amazon is requesting push notification approval. "
-            "Switch to TOTP-based MFA in your Amazon security settings "
-            "for automated tracking to work.",
-        )
-
-    # Check if still on login page (wrong credentials)
-    current_url = getattr(page, "url", "")
-    if "ap/signin" in current_url:
-        raise CarrierAuthError(
-            "amazon",
-            "Login failed — check your email and password.",
-        )
 
 
 class _noop_ctx:

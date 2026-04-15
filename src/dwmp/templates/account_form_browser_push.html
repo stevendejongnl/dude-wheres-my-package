@@ -1,12 +1,12 @@
 {#
-  Credentials form — used by DHL (the remaining carrier that does
-  server-side credentials login). Amazon + DPD moved to
-  account_form_browser_push.html.
+  Browser-push credentials form — shared by carriers that sync through the
+  DWMP Chrome extension (Amazon, DPD). The server never logs in itself;
+  the extension reads the stored credentials and performs the login in a
+  real browser tab.
 
   Context:
-    carrier   — "dhl"
-    account   — optional; when present, form is in Edit mode and pre-fills
-                known values (username, lookback_days).
+    carrier   — "amazon" or "dpd"
+    account   — optional; Edit mode when present.
     base_path — reverse-proxy prefix
 #}
 {% set form_id = ("edit-" ~ account.id) if account else carrier %}
@@ -14,8 +14,12 @@
 {% set cancel_url = ("/accounts/" ~ account.id ~ "/edit/cancel") if account else ("/accounts/add/" ~ carrier ~ "/cancel") %}
 {% set cancel_target = ("#edit-form-" ~ account.id) if account else ("#add-form-" ~ carrier) %}
 {% set title_verb = "Edit" if account else "Connect" %}
+{% set carrier_urls = {
+  "amazon": "https://www.amazon.nl/your-orders/orders",
+  "dpd": "https://www.dpdgroup.com/nl/mydpd/my-parcels/incoming",
+} %}
 <form class="add-form" id="add-form-{{ form_id }}-form">
-  {% with loading_label = ("Verifying credentials with " ~ carrier|capitalize ~ "…") %}
+  {% with loading_label = "Saving credentials…" %}
   {% include "_form_loader.html" %}
   {% endwith %}
   <div class="form-body">
@@ -27,16 +31,20 @@
       hx-swap="innerHTML">Cancel</button>
   </div>
 
-  {% if not account %}
   <p class="form-hint">
-    Logs in to <code>my.dhlecommerce.nl</code> with your DHL eCommerce account.
-    Don't have one? <a href="https://my.dhlecommerce.nl/account/sign-up" target="_blank" rel="noopener">Sign up here</a> first.
+    {{ carrier|capitalize }} syncs through the
+    <a href="https://github.com/stevendejongnl/dude-wheres-my-package/releases/latest"
+       target="_blank" rel="noopener">DWMP Chrome extension</a>. DWMP stores
+    your credentials so the extension can log in on your own browser, scrape
+    the <a href="{{ carrier_urls[carrier] }}" target="_blank" rel="noopener">{{ carrier|upper }} parcels page</a>,
+    and push the result back — DWMP itself never talks to {{ carrier|capitalize }} directly.
   </p>
-  {% else %}
-  <p class="form-hint">
-    Re-enter your password to refresh the stored session tokens.
-  </p>
-  {% endif %}
+
+  <ol class="wizard-steps" style="margin-bottom:16px;">
+    <li>Enter your {{ carrier|capitalize }} email + password below and click <strong>Save</strong>.</li>
+    <li>Install the DWMP Chrome extension (if you haven't yet) and open its popup.</li>
+    <li>Click the <strong>Sync</strong> button in the extension — it opens a tab, signs in, and pushes orders back.</li>
+  </ol>
 
   <div class="form-group">
     <label for="username-{{ form_id }}">Email</label>
@@ -46,8 +54,20 @@
 
   <div class="form-group">
     <label for="password-{{ form_id }}">Password</label>
-    <input type="password" id="password-{{ form_id }}" name="password" required autocomplete="current-password">
+    <input type="password" id="password-{{ form_id }}" name="password"
+      {% if not account %}required{% endif %}
+      autocomplete="current-password"
+      placeholder="{% if account %}(unchanged — leave blank to keep){% endif %}">
   </div>
+
+  {% if carrier == "amazon" %}
+  <div class="form-group">
+    <label for="totp-{{ form_id }}">TOTP secret <span class="form-optional">(optional)</span></label>
+    <input type="text" id="totp-{{ form_id }}" name="totp_secret"
+      placeholder="JBSWY3DPEHPK3PXP" autocomplete="off" spellcheck="false">
+    <small class="form-help">Base32 key from your authenticator app's setup screen — only needed if your Amazon account has MFA enabled.</small>
+  </div>
+  {% endif %}
 
   <div class="form-group">
     <label for="postal-{{ form_id }}">Delivery postal code</label>
@@ -66,16 +86,7 @@
   <div id="test-result-{{ form_id }}"></div>
 
   <div class="form-actions">
-    <button type="button" class="btn btn-ghost"
-      hx-post="{{ base_path }}/accounts/add/{{ carrier }}/test"
-      hx-include="closest form"
-      hx-target="#test-result-{{ form_id }}"
-      hx-indicator="closest form"
-      hx-on::after-request="this.closest('form').querySelector('.save-btn').disabled = !document.querySelector('#test-result-{{ form_id }} .test-result.ok')">
-      Test connection
-      <span class="htmx-indicator" id="test-spinner-{{ form_id }}"><span class="spinner"></span></span>
-    </button>
-    <button type="button" class="btn btn-primary save-btn" {% if not account %}disabled{% endif %}
+    <button type="button" class="btn btn-primary save-btn"
       hx-post="{{ base_path }}{{ save_url }}"
       hx-include="closest form"
       hx-target="#test-result-{{ form_id }}"
