@@ -75,7 +75,7 @@ class TrackingService:
             new_status="auth_failed",
             tracking_number="Account",
             carrier=carrier,
-            label=message,
+            description=message,
         )
 
     # --- Account management ---
