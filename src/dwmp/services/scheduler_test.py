@@ -157,7 +157,7 @@ async def test_poll_does_not_duplicate_auth_failure_notification(repo):
     carrier = FailingCarrier()
     service = TrackingService(repository=repo, carriers={"failing": carrier})
 
-    account_id = await repo.add_account(
+    await repo.add_account(
         carrier="failing", auth_type="credentials",
         tokens={"access_token": "tok"}, username="user",
     )
