@@ -248,6 +248,39 @@ Granular helpers (`seed_accounts`, `seed_packages`, `seed_notifications`) plus
 raw `SAMPLE_*` constants are exported from the same module if you need a
 tailored subset.
 
+### Landing-page mockups
+
+The mockups iframed from the gh-pages landing site
+(`stevendejongnl.github.io/dude-wheres-my-package`) are **generated** from
+the real Jinja templates seeded with the fixtures above — the landing
+site never carries a hand-maintained copy of the app HTML.
+
+```bash
+uv run python -m dwmp.mockups --out /path/to/gh-pages/mockups
+```
+
+This writes `dashboard.html`, `notifications.html`, and `timeline.html`
+into the target directory. The generator boots the FastAPI app in-process
+against a throwaway SQLite DB, seeds via `dwmp.testing.seed_all`, hits
+the real routes with an ASGI transport, then post-processes the HTML:
+
+- strips the HTMX CDN script + the browser-push glue (no backend, so
+  they'd flap trying to call home);
+- pre-opens the notifications drawer with its fetched body for the
+  notifications mockup;
+- expands the first seeded card's body for the timeline mockup (with
+  five synthetic PostNL tracking events);
+- repoints `/static/...` asset URLs at the gh-pages-side `assets/`
+  folder so the iframes render the icon/favicon offline.
+
+`extension.html` stays hand-crafted for now — the Chrome-extension popup
+is client-side rendered (`popup.js` fetches from the live API), which
+doesn't slot into this server-side pipeline.
+
+The release workflow (`.github/workflows/release.yml`) runs the generator
+against the cloned `gh-pages` checkout on every released version, so the
+mockups stay byte-identical to production with zero manual upkeep.
+
 ## Web UI
 
 Dwmp ships a server-rendered HTML UI at `/`:

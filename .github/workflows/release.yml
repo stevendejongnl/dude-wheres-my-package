@@ -125,11 +125,20 @@ jobs:
           </gupdate>
           XMLEOF
 
+          # Regenerate dashboard / notifications / timeline mockups from the
+          # real FastAPI templates, seeded with dwmp.testing fixtures. The
+          # generator bakes in the freshly-bumped version via pkg metadata,
+          # so the sed version-bump below only has to touch files the
+          # generator doesn't own (index.html and the hand-crafted
+          # extension.html).
+          uv sync --all-extras
+          uv run python -m dwmp.mockups --out _gh-pages/mockups
+
           cd _gh-pages
 
-          # Update version badge across the landing page and mockups
+          # Update version badge on pages the generator doesn't write.
           sed -i -E 's/(class="version-badge">)v[0-9]+\.[0-9]+\.[0-9]+/\1v'"${VERSION}"'/' \
-            index.html mockups/*.html 2>/dev/null || true
+            index.html mockups/extension.html 2>/dev/null || true
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
