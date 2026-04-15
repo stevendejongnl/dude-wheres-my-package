@@ -12,6 +12,12 @@ metadata:
     keel.sh/match-tag: "true"
 spec:
   replicas: 1
+  # The data PVC is ReadWriteOnce — only one pod can mount it at a time.
+  # Recreate kills the old pod before spinning up the new one, avoiding the
+  # deadlock where the new pod can never mount the volume because the old
+  # pod still has it.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: dwmp
