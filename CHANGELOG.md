@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.39.6 (2026-04-15)
+
+### Bug Fixes
+
+- **extension**: Trigger DPD Keycloak login by using /incoming + DOM detection
+  ([`ec0ed96`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/ec0ed969eb813d6a2b94509b7441abf3a1ed18de))
+
+
 ## v1.39.5 (2026-04-15)
 
 ### Bug Fixes
