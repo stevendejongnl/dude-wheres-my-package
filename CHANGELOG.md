@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.39.2 (2026-04-15)
+
+### Bug Fixes
+
+- **accounts**: Enable Save button in edit mode without requiring re-test
+  ([`50132d3`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/50132d39ffa1a1a3d4473d49ad885a583fdfa458))
+
+
 ## v1.39.1 (2026-04-15)
 
 ### Bug Fixes
