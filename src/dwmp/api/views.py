@@ -381,11 +381,18 @@ async def edit_account_save(
                 lookback_days, totp_secret=totp_secret or None,
                 postal_code=postal_code.strip() or None,
             )
-        else:
+        elif access_token.strip():
             await service.update_account_manual_token(
                 account_id, account["carrier"], access_token,
                 refresh_token or None, lookback_days,
                 user_agent=user_agent or None,
+                postal_code=postal_code.strip() or None,
+            )
+        else:
+            # Settings-only edit (e.g. lookback_days, postal_code) —
+            # no new credentials provided, just update the fields.
+            await service.update_account_settings(
+                account_id, lookback_days,
                 postal_code=postal_code.strip() or None,
             )
     except CarrierAuthError as exc:

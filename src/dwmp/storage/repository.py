@@ -273,6 +273,23 @@ class PackageRepository:
         )
         await self.db.commit()
 
+    async def update_account_settings(
+        self,
+        account_id: int,
+        lookback_days: int,
+        postal_code: str | None = None,
+    ) -> bool:
+        """Update only non-credential settings without touching tokens."""
+        now = datetime.now(UTC).isoformat()
+        cursor = await self.db.execute(
+            """UPDATE accounts
+               SET lookback_days = ?, postal_code = ?, updated_at = ?
+               WHERE id = ?""",
+            (lookback_days, postal_code, now, account_id),
+        )
+        await self.db.commit()
+        return cursor.rowcount > 0
+
     async def update_account_sync_enabled(
         self, account_id: int, enabled: bool,
     ) -> bool:

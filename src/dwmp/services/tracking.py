@@ -331,6 +331,19 @@ class TrackingService:
     async def delete_account(self, account_id: int) -> bool:
         return await self._repository.delete_account(account_id)
 
+    async def update_account_settings(
+        self,
+        account_id: int,
+        lookback_days: int,
+        postal_code: str | None = None,
+    ) -> None:
+        """Update only non-credential settings (lookback_days, postal_code)."""
+        updated = await self._repository.update_account_settings(
+            account_id, lookback_days, postal_code=postal_code,
+        )
+        if not updated:
+            raise ValueError(f"Account {account_id} not found")
+
     async def set_account_sync_enabled(
         self, account_id: int, enabled: bool,
     ) -> bool:
