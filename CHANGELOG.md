@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.40.0 (2026-04-15)
+
+### Features
+
+- **extension**: Always route sync via login URL + add update check button
+  ([`822a2eb`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/822a2eb0a15f4e3c8c798b6fb2b08a172060b6bf))
+
+
 ## v1.39.6 (2026-04-15)
 
 ### Bug Fixes
