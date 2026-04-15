@@ -59,7 +59,7 @@
   <div class="form-group">
     <label for="postal-{{ form_id }}">Delivery postal code</label>
     <input type="text" id="postal-{{ form_id }}" name="postal_code"
-      value="{{ account.postal_code if account else '' }}"
+      value="{{ (account.postal_code if account else '') or '' }}"
       placeholder="1234AB" autocomplete="postal-code">
     <small class="form-help">Applied to all packages from this account. Enables public tracking when tokens expire.</small>
   </div>

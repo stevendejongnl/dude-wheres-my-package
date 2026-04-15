@@ -26,6 +26,7 @@ export const CARRIER_SYNC_URLS = {
 // page instead of the parcels page.
 export const CARRIER_LOGIN_PATTERNS = {
   dpd: ["login.dpdgroup.com", "auth/realms"],
+  amazon: ["/ap/signin", "/ap/mfa"],
 };
 
 // Carrier display names for the UI.

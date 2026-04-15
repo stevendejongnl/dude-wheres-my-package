@@ -344,6 +344,48 @@ class TrackingService:
         if not updated:
             raise ValueError(f"Account {account_id} not found")
 
+    async def save_account_credentials(
+        self,
+        account_id: int,
+        carrier_name: str,
+        username: str,
+        password: str,
+        lookback_days: int = 30,
+        totp_secret: str | None = None,
+        postal_code: str | None = None,
+    ) -> None:
+        """Save updated credentials WITHOUT re-validating.
+
+        Used by the Edit flow — the user already tested via the Test button,
+        so re-running Playwright (which may rate-limit or hit a captcha) is
+        wasteful.  The next sync will use these credentials and surface any
+        auth issue via the normal notification path.
+        """
+        # Store credentials in the same shape as the carrier's login() does
+        # so _relogin() can pick them up: refresh_token holds the JSON creds.
+        creds_json = json.dumps({"email": username, "password": password,
+                                 "totp_secret": totp_secret})
+        # Preserve the existing access_token (cookies) — they may still be
+        # valid; if not, _relogin() uses the credentials we just stored.
+        existing = await self._repository.get_account(account_id)
+        if existing is None:
+            raise ValueError(f"Account {account_id} not found")
+        existing_tokens = existing.get("tokens") or {}
+        tokens_dict = {
+            "access_token": existing_tokens.get("access_token", ""),
+            "refresh_token": creds_json,
+            "user_agent": existing_tokens.get("user_agent"),
+        }
+        updated = await self._repository.update_account(
+            account_id=account_id,
+            tokens=tokens_dict,
+            username=username,
+            lookback_days=lookback_days,
+            postal_code=postal_code,
+        )
+        if not updated:
+            raise ValueError(f"Account {account_id} not found")
+
     async def set_account_sync_enabled(
         self, account_id: int, enabled: bool,
     ) -> bool:

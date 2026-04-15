@@ -195,11 +195,13 @@ async function handleCarrierLogin(tabId, account) {
 
   const { username, password } = result.data;
 
-  // Register navigation listener BEFORE submitting the form so we don't
-  // miss the "loading" event if the redirect fires quickly.
+  if (account.carrier === "amazon") {
+    return handleAmazonLogin(tabId, username, password);
+  }
+
+  // Generic Keycloak-style login (DPD)
   const nav = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
 
-  // Fill in the Keycloak login form and submit
   await chrome.scripting.executeScript({
     target: { tabId },
     func: (email, pass) => {
@@ -230,9 +232,70 @@ async function handleCarrierLogin(tabId, account) {
 
   await nav;
 
-  // Verify we left the login page
   const info = await chrome.tabs.get(tabId);
   return !isCarrierLoginPage(account.carrier, info.url);
+}
+
+/**
+ * Amazon's two-step login: email page → password page → orders.
+ * MFA/captcha fall through to the user — we just fill what we can.
+ */
+async function handleAmazonLogin(tabId, email, password) {
+  // Step 1: fill email and submit
+  const nav1 = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    func: (e) => {
+      const el = document.querySelector("#ap_email") ||
+                 document.querySelector("input[name='email']");
+      if (el) {
+        el.value = e;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      const btn = document.querySelector("#continue") ||
+                  document.querySelector("input[id='continue']");
+      if (btn) btn.click();
+    },
+    args: [email],
+  });
+
+  try {
+    await nav1;
+  } catch {
+    return false;
+  }
+
+  // Step 2: fill password and submit
+  const nav2 = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    func: (p) => {
+      const el = document.querySelector("#ap_password") ||
+                 document.querySelector("input[name='password']");
+      if (el) {
+        el.value = p;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      const btn = document.querySelector("#signInSubmit") ||
+                  document.querySelector("input[type='submit']");
+      if (btn) btn.click();
+    },
+    args: [password],
+  });
+
+  try {
+    await nav2;
+  } catch {
+    return false;
+  }
+
+  // If we hit MFA/captcha, surface the tab so the user can solve it
+  const info = await chrome.tabs.get(tabId);
+  if (isCarrierLoginPage("amazon", info.url)) {
+    await chrome.tabs.update(tabId, { active: true });
+    return false;
+  }
+  return true;
 }
 
 function waitForTabNavigation(tabId, timeout) {

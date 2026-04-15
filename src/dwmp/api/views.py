@@ -376,7 +376,10 @@ async def edit_account_save(
                 postal_code=postal_code.strip() or None,
             )
         elif username.strip() and password.strip():
-            await service.update_account_credentials(
+            # Trust the Test-connection check — saving doesn't re-run
+            # Playwright (rate limits / captchas would silently fail
+            # the save).  Next sync uses these credentials.
+            await service.save_account_credentials(
                 account_id, account["carrier"], username, password,
                 lookback_days, totp_secret=totp_secret or None,
                 postal_code=postal_code.strip() or None,
