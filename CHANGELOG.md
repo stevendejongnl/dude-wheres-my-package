@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.39.1 (2026-04-15)
+
+### Bug Fixes
+
+- **notifications**: Show full auth failure message instead of truncating
+  ([`fc945c5`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/fc945c5020e3beb6a0d1b0f872070fa945a20168))
+
+
 ## v1.39.0 (2026-04-15)
 
 ### Features
