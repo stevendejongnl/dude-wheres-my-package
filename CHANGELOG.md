@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.41.0 (2026-04-15)
+
+### Features
+
+- **mockups**: Generate gh-pages mockups from real templates
+  ([`57d5c3d`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/57d5c3d1a567d11301e11b138f1762cc01024a56))
+
+- **ui**: Redesign notification card + add dwmp.testing fixture store
+  ([`2e74e43`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/2e74e4362b6e4ae43311cf75bb1e37d06ce754d6))
+
+### Refactoring
+
+- **carriers**: Amazon + dpd are extension-only now
+  ([`f94459f`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/f94459f4d631792ead106c5d1ca0790adfeb3c7d))
+
+
 ## v1.40.1 (2026-04-15)
 
 ### Bug Fixes

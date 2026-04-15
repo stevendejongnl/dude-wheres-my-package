@@ -35,7 +35,7 @@ spec:
           # Kept in sync by semantic-release (see pyproject.toml build_command).
           # Do NOT edit by hand — keel.sh rolls the live image forward on new
           # tags, and a manual downgrade here would be undone on the next apply.
-          image: ghcr.io/stevendejongnl/dude-wheres-my-package:1.40.1
+          image: ghcr.io/stevendejongnl/dude-wheres-my-package:1.41.0
           ports:
             - containerPort: 8000
           envFrom:
