@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.39.5 (2026-04-15)
+
+### Bug Fixes
+
+- **accounts**: Persist edits without re-validating; auto-login Amazon via extension
+  ([`0000e35`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/0000e3534c3db36b84f75435af7ba84510b246b8))
+
+
 ## v1.39.4 (2026-04-15)
 
 ### Bug Fixes
