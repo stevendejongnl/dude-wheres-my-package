@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.39.3 (2026-04-15)
+
+### Bug Fixes
+
+- **accounts**: Save settings without re-validating when credentials unchanged
+  ([`056f4c6`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/056f4c61621763aaa4458d4224c0d1a51475dbf5))
+
+
 ## v1.39.2 (2026-04-15)
 
 ### Bug Fixes
