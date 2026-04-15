@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gupdate xmlns="http://www.google.com/update2/response" protocol="2.0">
   <app appid="nlpaleefekmldlpaemafdnpildddanng">
-    <updatecheck crbversion="*" version="1.39.2" src="https://github.com/stevendejongnl/dude-wheres-my-package/releases/download/v1.39.2/dwmp-chrome-extension-1.39.2.crx"/>
+    <updatecheck crbversion="*" version="1.39.3" src="https://github.com/stevendejongnl/dude-wheres-my-package/releases/download/v1.39.3/dwmp-chrome-extension-1.39.3.crx"/>
   </app>
 </gupdate>
