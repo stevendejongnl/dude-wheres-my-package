@@ -68,15 +68,15 @@ async function runAutoSync() {
 }
 
 async function syncCarrierViaTab(account) {
-  const url = CARRIER_SYNC_URLS[account.carrier];
-  if (!url) {
+  const urls = CARRIER_SYNC_URLS[account.carrier];
+  if (!urls?.parcels) {
     await storeSyncResult(account.id, false, `No sync URL for ${account.carrier}`);
     return;
   }
 
-  // Carriers with login patterns (e.g. DPD) require stored credentials
-  // so the extension can fill in the login form automatically.
-  if (CARRIER_LOGIN_PATTERNS[account.carrier] && !account.has_credentials) {
+  // Carriers with a login URL require stored credentials so the extension
+  // can fill in the login form automatically.
+  if (urls.login && !account.has_credentials) {
     await storeSyncResult(
       account.id,
       false,
@@ -88,25 +88,26 @@ async function syncCarrierViaTab(account) {
   let tabId = null;
   let shouldCloseTab = true;
 
+  // Always go through the login URL when one is configured. This guarantees
+  // the carrier presents its sign-in form (or skips straight to the
+  // destination if a session is already active) — far more reliable than
+  // hoping the parcels page redirects to login on cookie expiry.
+  const startUrl = urls.login || urls.parcels;
+
   try {
     // Reuse an existing tab on this carrier domain if one is open
-    const domain = new URL(url).hostname;
+    const domain = new URL(startUrl).hostname;
     const existing = await chrome.tabs.query({ url: `*://*.${domain}/*` });
     if (existing.length > 0) {
       tabId = existing[0].id;
       shouldCloseTab = false;
-      // Reload to get fresh data
-      await chrome.tabs.reload(tabId);
+      await chrome.tabs.update(tabId, { url: startUrl });
     } else {
-      const tab = await chrome.tabs.create({ url, active: false });
+      const tab = await chrome.tabs.create({ url: startUrl, active: false });
       tabId = tab.id;
     }
 
     await waitForTabLoad(tabId);
-
-    // Wait for any chained redirects to settle (DPD goes through several
-    // hops: app -> SSO check -> Keycloak login). Without this the URL
-    // check below can race the final redirect.
     await waitForUrlStable(tabId);
 
     // If the tab landed on a login page (URL match OR a login form is
@@ -121,6 +122,17 @@ async function syncCarrierViaTab(account) {
         await storeSyncResult(account.id, false, "Login failed -- check credentials");
         return;
       }
+      await waitForUrlStable(tabId);
+    }
+
+    // After login (or if already logged in), navigate to the parcels page
+    // so we capture the right HTML — the post-login redirect may land us
+    // on a dashboard instead of the parcels list.
+    const currentUrl = (await chrome.tabs.get(tabId)).url || "";
+    if (urls.login && !currentUrl.startsWith(urls.parcels)) {
+      await chrome.tabs.update(tabId, { url: urls.parcels });
+      await waitForTabLoad(tabId);
+      await waitForUrlStable(tabId);
     }
 
     await sleep(RENDER_WAIT_MS);

@@ -34,6 +34,7 @@ const pkgDelivered = document.getElementById("pkg-delivered");
 const syncInterval = document.getElementById("sync-interval");
 const openDashboard = document.getElementById("open-dashboard");
 const disconnect = document.getElementById("disconnect");
+const checkUpdateBtn = document.getElementById("check-update-btn");
 
 // ── Init ───────────────────────────────────────────────────────────
 
@@ -371,6 +372,28 @@ syncInterval.addEventListener("change", () => {
     type: "update-sync-interval",
     interval: Number(syncInterval.value),
   });
+});
+
+checkUpdateBtn.addEventListener("click", async () => {
+  const original = checkUpdateBtn.textContent;
+  checkUpdateBtn.disabled = true;
+  checkUpdateBtn.textContent = "Checking...";
+  await chrome.runtime.sendMessage({ type: "check-update" });
+  // Refresh the banner from the freshly-written storage value
+  await chrome.storage.local.remove("dwmp_update_dismissed");
+  const { dwmp_update } = await chrome.storage.local.get("dwmp_update");
+  if (dwmp_update?.version) {
+    updateVersion.textContent = dwmp_update.version;
+    updateLink.href = dwmp_update.downloadUrl;
+    updateBanner.classList.remove("hidden");
+    checkUpdateBtn.textContent = `v${dwmp_update.version} available`;
+  } else {
+    checkUpdateBtn.textContent = "Up to date";
+  }
+  setTimeout(() => {
+    checkUpdateBtn.disabled = false;
+    checkUpdateBtn.textContent = original;
+  }, 2500);
 });
 
 // ── Disconnect ─────────────────────────────────────────────────────

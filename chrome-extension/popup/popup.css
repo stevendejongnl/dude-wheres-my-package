@@ -240,6 +240,11 @@ body {
   cursor: not-allowed;
 }
 
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+}
+
 /* ── Toggle switch ───────────────────────────── */
 
 .toggle {

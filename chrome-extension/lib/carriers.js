@@ -13,20 +13,42 @@ export const URL_CARRIER_MAP = [
   ["dhl.com", "dhl"],
 ];
 
-// Carrier -> tracking/orders page URL for auto-sync tab navigation.
+// Carrier -> { login, parcels } URLs for auto-sync tab navigation.
+//
+// `login` is the URL to open *first* when stored credentials are available —
+// this guarantees the carrier shows its sign-in form so the extension can
+// fill credentials reliably (instead of relying on possibly-stale cookies
+// silently passing an SSO check).
+//
+// `parcels` is the URL we navigate to *after* login completes, to capture
+// the actual parcel/orders HTML that DWMP parses.
+//
+// For carriers without an extension auto-login flow, `login` is omitted and
+// the extension just opens `parcels` directly.
 export const CARRIER_SYNC_URLS = {
-  amazon: "https://www.amazon.nl/gp/your-account/order-history",
-  postnl: "https://jouw.postnl.nl/",
-  dhl: "https://my.dhlecommerce.nl/",
-  // /incoming triggers the full Keycloak login redirect when not
-  // authenticated. The bare /my-parcels portal does a silent SSO check
-  // (prompt=none) that never shows the login form.
-  dpd: "https://www.dpdgroup.com/nl/mydpd/my-parcels/incoming",
+  amazon: {
+    // openid.return_to ensures Amazon redirects to the orders page after
+    // a successful login instead of the default account dashboard.
+    login: "https://www.amazon.nl/ap/signin?openid.return_to=" +
+      encodeURIComponent("https://www.amazon.nl/your-orders/orders") +
+      "&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select" +
+      "&openid.assoc_handle=nlflex&openid.mode=checkid_setup" +
+      "&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select" +
+      "&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0",
+    parcels: "https://www.amazon.nl/your-orders/orders",
+  },
+  dpd: {
+    // /nl/mydpd/login always redirects through Keycloak with an explicit
+    // login prompt (no prompt=none silent SSO).
+    login: "https://www.dpdgroup.com/nl/mydpd/login",
+    parcels: "https://www.dpdgroup.com/nl/mydpd/my-parcels/incoming",
+  },
+  postnl: { parcels: "https://jouw.postnl.nl/" },
+  dhl: { parcels: "https://my.dhlecommerce.nl/" },
 };
 
 // URL patterns that indicate a carrier login page (not yet authenticated).
-// Used by the service worker to detect when the sync tab landed on a login
-// page instead of the parcels page.
+// Used as a fallback signal alongside DOM detection.
 export const CARRIER_LOGIN_PATTERNS = {
   dpd: ["login.dpdgroup.com", "auth/realms"],
   amazon: ["/ap/signin", "/ap/mfa"],
