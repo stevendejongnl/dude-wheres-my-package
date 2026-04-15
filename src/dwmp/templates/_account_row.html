@@ -53,6 +53,13 @@
         Sync
         <span class="htmx-indicator" id="sync-spinner-{{ account.id }}"><span class="spinner"></span></span>
       </button>
+      <button class="btn btn-ghost btn-sm{% if not account.sync_enabled %} btn-sync-off{% endif %}"
+        hx-post="{{ base_path }}/accounts/{{ account.id }}/toggle-sync"
+        hx-target="#account-{{ account.id }}"
+        hx-swap="outerHTML"
+        title="{% if account.sync_enabled %}Disable automatic syncing{% else %}Enable automatic syncing{% endif %}">
+        {% if account.sync_enabled %}Auto-sync on{% else %}Auto-sync off{% endif %}
+      </button>
       <button class="btn btn-ghost btn-sm"
         hx-get="{{ base_path }}/accounts/{{ account.id }}/edit"
         hx-target="#edit-form-{{ account.id }}"

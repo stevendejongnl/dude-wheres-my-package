@@ -426,6 +426,34 @@ async def sync_account_view(
     return templates.TemplateResponse(request, "_account_row.html", ctx)
 
 
+@router.post("/accounts/{account_id}/toggle-sync", response_class=HTMLResponse)
+async def toggle_account_sync_view(
+    request: Request,
+    account_id: int,
+    service: TrackingService = Depends(get_tracking_service),
+):
+    """HTMX endpoint: toggle sync_enabled and return the refreshed row."""
+    account = await service.get_account(account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    new_enabled = not account.get("sync_enabled", True)
+    await service.set_account_sync_enabled(account_id, new_enabled)
+
+    account = await service.get_account(account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    account.pop("tokens", None)
+
+    ctx = {
+        "account": account,
+        "base_path": _base_path(request),
+        "api_token": create_token(),
+        "dwmp_origin": _public_origin(request),
+    }
+    return templates.TemplateResponse(request, "_account_row.html", ctx)
+
+
 @router.post("/accounts/add/{carrier}/save", response_class=HTMLResponse)
 async def add_account_save(
     request: Request,

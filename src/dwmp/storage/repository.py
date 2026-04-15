@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     status TEXT NOT NULL DEFAULT 'connected',
     status_message TEXT,
     last_synced TEXT,
+    sync_enabled INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE(carrier, username)
@@ -130,6 +131,13 @@ class PackageRepository:
         if "postal_code" not in acct_cols:
             await self.db.execute(
                 "ALTER TABLE accounts ADD COLUMN postal_code TEXT"
+            )
+            await self.db.commit()
+
+        # v1.38: add accounts.sync_enabled toggle
+        if "sync_enabled" not in acct_cols:
+            await self.db.execute(
+                "ALTER TABLE accounts ADD COLUMN sync_enabled INTEGER NOT NULL DEFAULT 1"
             )
             await self.db.commit()
 
@@ -264,6 +272,17 @@ class PackageRepository:
             (now, now, account_id),
         )
         await self.db.commit()
+
+    async def update_account_sync_enabled(
+        self, account_id: int, enabled: bool,
+    ) -> bool:
+        now = datetime.now(UTC).isoformat()
+        cursor = await self.db.execute(
+            "UPDATE accounts SET sync_enabled = ?, updated_at = ? WHERE id = ?",
+            (1 if enabled else 0, now, account_id),
+        )
+        await self.db.commit()
+        return cursor.rowcount > 0
 
     # --- Package methods ---
 

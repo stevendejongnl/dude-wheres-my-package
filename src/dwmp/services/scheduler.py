@@ -46,6 +46,13 @@ class PackageScheduler:
         #    stamps last_refreshed_at for every parcel the account still sees.
         accounts = await self._service.list_accounts()
         for account in accounts:
+            if not account.get("sync_enabled", True):
+                logger.info(
+                    "Skipping account %s (%s) — sync disabled",
+                    account["id"],
+                    account["carrier"],
+                )
+                continue
             if account["status"] == "auth_failed":
                 logger.warning(
                     "Skipping account %s (%s) — auth_failed: %s",

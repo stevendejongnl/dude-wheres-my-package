@@ -331,6 +331,13 @@ class TrackingService:
     async def delete_account(self, account_id: int) -> bool:
         return await self._repository.delete_account(account_id)
 
+    async def set_account_sync_enabled(
+        self, account_id: int, enabled: bool,
+    ) -> bool:
+        return await self._repository.update_account_sync_enabled(
+            account_id, enabled,
+        )
+
     async def sync_account(self, account_id: int) -> list[dict]:
         account = await self._repository.get_account(account_id)
         if account is None:

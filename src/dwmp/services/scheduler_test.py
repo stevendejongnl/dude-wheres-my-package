@@ -89,6 +89,21 @@ async def test_poll_syncs_accounts_and_manual_packages(repo):
     assert carrier.track_count == 1
 
 
+async def test_poll_skips_sync_disabled_accounts(repo):
+    carrier = StubCarrier()
+    service = TrackingService(repository=repo, carriers={"stub": carrier})
+    scheduler = PackageScheduler(tracking_service=service)
+
+    account_id = await repo.add_account(
+        carrier="stub", auth_type="credentials",
+        tokens={"access_token": "tok"}, username="user",
+    )
+    await repo.update_account_sync_enabled(account_id, False)
+
+    await scheduler._poll_all()
+    assert carrier.sync_count == 0
+
+
 async def test_poll_skips_auth_failed_accounts(repo):
     carrier = StubCarrier()
     service = TrackingService(repository=repo, carriers={"stub": carrier})

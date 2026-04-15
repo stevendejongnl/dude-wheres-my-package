@@ -219,6 +219,28 @@ async def test_update_account_status(repo: PackageRepository):
     assert "re-authenticate" in account["status_message"]
 
 
+async def test_update_account_sync_enabled(repo: PackageRepository):
+    account_id = await repo.add_account(carrier="dhl", auth_type="credentials")
+
+    # Defaults to enabled
+    account = await repo.get_account(account_id)
+    assert account["sync_enabled"] == 1
+
+    # Disable
+    result = await repo.update_account_sync_enabled(account_id, False)
+    assert result is True
+    account = await repo.get_account(account_id)
+    assert account["sync_enabled"] == 0
+
+    # Re-enable
+    await repo.update_account_sync_enabled(account_id, True)
+    account = await repo.get_account(account_id)
+    assert account["sync_enabled"] == 1
+
+    # Non-existent account
+    assert await repo.update_account_sync_enabled(999, False) is False
+
+
 async def test_add_package_with_account(repo: PackageRepository):
     account_id = await repo.add_account(carrier="postnl", auth_type="oauth")
     pkg_id = await repo.add_package(
