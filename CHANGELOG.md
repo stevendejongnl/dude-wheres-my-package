@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.42.0 (2026-04-16)
+
+### Features
+
+- **dpd**: Parse real DOM structure for timeline events, sender, and postal code
+  ([`d413ae3`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/d413ae33df8a88b75826abcfe4b804017ffd4fba))
+
+### Testing
+
+- Add coverage for duplicate event constraint and API error fallback
+  ([`c5f11ac`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/c5f11ac789be25a67ecaac0e1f011edc66348199))
+
+
 ## v1.41.5 (2026-04-16)
 
 ### Bug Fixes
