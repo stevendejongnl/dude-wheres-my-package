@@ -1,10 +1,11 @@
 {#
   Package card partial — used both inline in the packages page and as the
-  HTMX response to POST /packages/{id}/refresh.
+  HTMX response to GET /packages/{id}/card or POST /packages/{id}/refresh.
 
   Context:
     pkg       — enriched package dict (events, sender, first_event_date, etc.)
     base_path — reverse-proxy prefix
+    expanded  — optional, if true render card-body open (used by HTMX responses)
 #}
 <div class="card" id="pkg-{{ pkg.id }}">
   <div class="card-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
@@ -30,8 +31,13 @@
       <span class="pkg-date">{{ pkg.last_update }}</span>
     </div>
   </div>
-  <div class="card-body collapsed">
+  <div class="card-body {{ '' if expanded else 'collapsed' }}"
+    hx-get="{{ base_path }}/packages/{{ pkg.id }}/card"
+    hx-target="#pkg-{{ pkg.id }}"
+    hx-swap="outerHTML"
+    hx-trigger="intersect once">
     <div class="card-actions">
+      {% if pkg.carrier not in ('dpd', 'amazon') %}
       <button class="btn btn-ghost btn-sm"
         hx-post="{{ base_path }}/packages/{{ pkg.id }}/refresh"
         hx-target="#pkg-{{ pkg.id }}"
@@ -40,6 +46,7 @@
         Refresh
         <span class="htmx-indicator"><span class="spinner"></span></span>
       </button>
+      {% endif %}
       <button class="btn btn-danger btn-sm"
         hx-delete="{{ base_path }}/api/v1/packages/{{ pkg.id }}"
         hx-target="#pkg-{{ pkg.id }}"
