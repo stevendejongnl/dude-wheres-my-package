@@ -139,9 +139,15 @@ def _enrich_package(pkg: dict) -> dict:
     if events:
         first_event_date = _format_time(events[0].get("timestamp", ""))
 
+    # Last synced (from the linked account, if any)
+    last_synced = ""
+    if pkg.get("account_last_synced"):
+        last_synced = _format_time(pkg["account_last_synced"])
+
     pkg["sender"] = sender
     pkg["first_event_date"] = first_event_date
     pkg["last_update"] = last_update
+    pkg["last_synced"] = last_synced
     return pkg
 
 

@@ -357,7 +357,11 @@ class PackageRepository:
 
     async def get_package(self, package_id: int) -> dict | None:
         cursor = await self.db.execute(
-            "SELECT * FROM packages WHERE id = ?", (package_id,)
+            """SELECT p.*, a.last_synced AS account_last_synced
+               FROM packages p
+               LEFT JOIN accounts a ON p.account_id = a.id
+               WHERE p.id = ?""",
+            (package_id,),
         )
         row = await cursor.fetchone()
         return dict(row) if row else None

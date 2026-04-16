@@ -29,6 +29,9 @@
     <div class="pkg-meta">
       <span class="status status-{{ pkg.current_status }}">{{ pkg.current_status | replace('_', ' ') }}</span>
       <span class="pkg-date">{{ pkg.last_update }}</span>
+      {% if pkg.last_synced %}
+      <span class="pkg-date pkg-synced">Synced {{ pkg.last_synced }}</span>
+      {% endif %}
     </div>
   </div>
   <div class="card-body {{ '' if expanded else 'collapsed' }}"
