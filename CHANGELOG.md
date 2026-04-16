@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.41.2 (2026-04-16)
+
+### Bug Fixes
+
+- **timeline**: Deduplicate events from dateless carrier syncs
+  ([`75cfca1`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/75cfca1bf609bf9e30122f4ce3d30c1108eae07a))
+
+
 ## v1.41.1 (2026-04-15)
 
 ### Bug Fixes
