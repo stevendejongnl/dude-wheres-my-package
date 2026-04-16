@@ -32,10 +32,12 @@
     </div>
   </div>
   <div class="card-body {{ '' if expanded else 'collapsed' }}"
+    {% if not expanded %}
     hx-get="{{ base_path }}/packages/{{ pkg.id }}/card"
     hx-target="#pkg-{{ pkg.id }}"
     hx-swap="outerHTML"
-    hx-trigger="intersect once">
+    hx-trigger="intersect once"
+    {% endif %}>
     <div class="card-actions">
       {% if pkg.carrier not in ('dpd', 'amazon') %}
       <button class="btn btn-ghost btn-sm"
