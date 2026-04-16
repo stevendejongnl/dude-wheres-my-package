@@ -9,6 +9,7 @@ from dwmp.carriers.base import (
     TrackingEvent,
     TrackingResult,
     TrackingStatus,
+    no_date_fallback,
 )
 
 # GLS Netherlands tracking API (apm.gls.nl)
@@ -132,7 +133,7 @@ class GLS(CarrierBase):
             try:
                 ts = _ensure_utc(datetime.fromisoformat(date_str))
             except ValueError:
-                ts = datetime.now(UTC)
+                ts = no_date_fallback()
 
             location_parts = [p for p in [depot_name, country] if p and p != "-"]
 

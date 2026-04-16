@@ -1,7 +1,16 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
+
+
+def no_date_fallback() -> datetime:
+    """Stable fallback timestamp for events with no parseable date.
+
+    Uses start-of-day so repeated syncs on the same day produce
+    identical timestamps, enabling UNIQUE constraint dedup.
+    """
+    return datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 class TrackingStatus(StrEnum):

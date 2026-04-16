@@ -97,6 +97,35 @@ async def test_duplicate_event_is_ignored(repo: PackageRepository):
     assert len(events) == 1
 
 
+async def test_duplicate_event_different_timestamp_same_description_is_ignored(
+    repo: PackageRepository,
+):
+    """Same (package, status, description) with different timestamps = same event."""
+    pkg_id = await repo.add_package(tracking_number="DUP2", carrier="amazon")
+    ts1 = datetime(2026, 4, 11, 10, 0, tzinfo=UTC)
+    ts2 = datetime(2026, 4, 11, 10, 30, tzinfo=UTC)
+
+    await repo.add_event(pkg_id, ts1, "delivered", "Retourzending voltooid")
+    await repo.add_event(pkg_id, ts2, "delivered", "Retourzending voltooid")
+
+    events = await repo.get_events(pkg_id)
+    assert len(events) == 1
+    assert events[0]["timestamp"] == ts1.isoformat()
+
+
+async def test_different_description_events_both_kept(repo: PackageRepository):
+    """Same (package, status) but different descriptions = distinct events."""
+    pkg_id = await repo.add_package(tracking_number="DUP3", carrier="amazon")
+    ts1 = datetime(2026, 4, 11, 10, 0, tzinfo=UTC)
+    ts2 = datetime(2026, 4, 12, 10, 0, tzinfo=UTC)
+
+    await repo.add_event(pkg_id, ts1, "in_transit", "Wordt vandaag bezorgd")
+    await repo.add_event(pkg_id, ts2, "delivered", "Bezorgd op 12 april")
+
+    events = await repo.get_events(pkg_id)
+    assert len(events) == 2
+
+
 async def test_duplicate_package_raises(repo: PackageRepository):
     await repo.add_package(tracking_number="SAME1", carrier="postnl")
     with pytest.raises(ValueError, match="already tracked"):

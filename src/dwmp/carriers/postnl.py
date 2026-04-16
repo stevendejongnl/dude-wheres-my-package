@@ -10,6 +10,7 @@ from dwmp.carriers.base import (
     TrackingEvent,
     TrackingResult,
     TrackingStatus,
+    no_date_fallback,
 )
 
 # PostNL API endpoints
@@ -226,7 +227,7 @@ class PostNL(CarrierBase):
             location = event_data.get("location", {})
             location_str = location.get("name") if isinstance(location, dict) else None
 
-            ts = datetime.fromisoformat(ts_str) if ts_str else datetime.now()
+            ts = datetime.fromisoformat(ts_str) if ts_str else no_date_fallback()
 
             events.append(
                 TrackingEvent(

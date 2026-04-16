@@ -163,6 +163,19 @@ class PackageRepository:
         )
         await self.db.commit()
 
+        # v1.42: clean up duplicate timeline events caused by datetime.now()
+        # fallback timestamps. Keeps the earliest event per
+        # (package_id, status, description) group.
+        await self.db.execute(
+            """DELETE FROM tracking_events
+               WHERE id NOT IN (
+                   SELECT MIN(id)
+                   FROM tracking_events
+                   GROUP BY package_id, status, description
+               )"""
+        )
+        await self.db.commit()
+
     @property
     def db(self) -> aiosqlite.Connection:
         assert self._db is not None, "Repository not initialized — call init() first"
@@ -451,9 +464,14 @@ class PackageRepository:
         location: str | None = None,
     ) -> None:
         await self.db.execute(
-            """INSERT OR IGNORE INTO tracking_events (package_id, timestamp, status, description, location)
-               VALUES (?, ?, ?, ?, ?)""",
-            (package_id, timestamp.isoformat(), status, description, location),
+            """INSERT INTO tracking_events (package_id, timestamp, status, description, location)
+               SELECT ?, ?, ?, ?, ?
+               WHERE NOT EXISTS (
+                   SELECT 1 FROM tracking_events
+                   WHERE package_id = ? AND status = ? AND description = ?
+               )""",
+            (package_id, timestamp.isoformat(), status, description, location,
+             package_id, status, description),
         )
         await self.db.commit()
 

@@ -26,6 +26,7 @@ from dwmp.carriers.base import (
     TrackingEvent,
     TrackingResult,
     TrackingStatus,
+    no_date_fallback,
 )
 
 logger = logging.getLogger(__name__)
@@ -188,7 +189,7 @@ class DPD(CarrierBase):
             events: list[TrackingEvent] = []
             if sender:
                 events.append(TrackingEvent(
-                    timestamp=datetime.now(UTC),
+                    timestamp=no_date_fallback(),
                     status=TrackingStatus.PRE_TRANSIT,
                     description=sender,
                 ))
@@ -377,9 +378,9 @@ class DPD(CarrierBase):
             date_text = date_el.get_text(strip=True) if date_el else ""
 
             try:
-                ts = datetime.fromisoformat(date_text) if date_text else datetime.now(UTC)
+                ts = datetime.fromisoformat(date_text) if date_text else no_date_fallback()
             except ValueError:
-                ts = datetime.now(UTC)
+                ts = no_date_fallback()
 
             if description:
                 events.append(TrackingEvent(

@@ -97,6 +97,31 @@ def test_parse_dutch_date_invalid():
     assert _parse_dutch_date("Bezorgd op 32 apr.") is None  # Invalid day
 
 
+# --- stable fallback timestamps ---
+
+
+def test_no_date_status_uses_stable_fallback():
+    """Status text with no parseable date should use start-of-day, not datetime.now()."""
+    carrier = Amazon()
+    html = """
+    <html><body>
+    <div class="order-card">
+        <span class="value">305-1111111-3333333</span>
+        <div class="delivery-box">
+            <span class="delivery-box__primary-text">Wordt vandaag bezorgd</span>
+        </div>
+    </div>
+    </body></html>
+    """
+    results = carrier._parse_orders_page(html)
+    assert len(results) == 1
+    # The status event should have a midnight timestamp (start-of-day fallback)
+    status_events = [e for e in results[0].events if e.description == "Wordt vandaag bezorgd"]
+    assert len(status_events) == 1
+    ts = status_events[0].timestamp
+    assert ts.hour == 0 and ts.minute == 0 and ts.second == 0 and ts.microsecond == 0
+
+
 # --- order page HTML parsing (extension-pushed) ---
 
 

@@ -26,6 +26,7 @@ from dwmp.carriers.base import (
     TrackingEvent,
     TrackingResult,
     TrackingStatus,
+    no_date_fallback,
 )
 
 logger = logging.getLogger(__name__)
@@ -257,7 +258,7 @@ class Amazon(CarrierBase):
             evt_status = _parse_status(text)
             evt_date = _parse_dutch_date(text)
             events.append(TrackingEvent(
-                timestamp=evt_date or datetime.now(UTC),
+                timestamp=evt_date or no_date_fallback(),
                 status=evt_status,
                 description=text,
             ))
@@ -265,7 +266,7 @@ class Amazon(CarrierBase):
         if not events and status != TrackingStatus.UNKNOWN:
             evt_date = _parse_dutch_date(status_text) if status_text else None
             events.append(TrackingEvent(
-                timestamp=evt_date or datetime.now(UTC),
+                timestamp=evt_date or no_date_fallback(),
                 status=status,
                 description=status_text or status.value,
             ))
@@ -412,7 +413,7 @@ class Amazon(CarrierBase):
         if status_text and status != TrackingStatus.UNKNOWN:
             event_date = _parse_dutch_date(status_text)
             events.append(TrackingEvent(
-                timestamp=event_date or datetime.now(UTC),
+                timestamp=event_date or no_date_fallback(),
                 status=status,
                 description=status_text,
             ))
@@ -423,7 +424,7 @@ class Amazon(CarrierBase):
 
         if not events and status != TrackingStatus.UNKNOWN:
             events.append(TrackingEvent(
-                timestamp=datetime.now(UTC),
+                timestamp=no_date_fallback(),
                 status=status,
                 description=status_text or status.value,
             ))

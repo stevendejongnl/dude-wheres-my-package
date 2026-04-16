@@ -12,6 +12,7 @@ from dwmp.carriers.base import (
     TrackingEvent,
     TrackingResult,
     TrackingStatus,
+    no_date_fallback,
 )
 
 logger = logging.getLogger(__name__)
@@ -312,9 +313,9 @@ class DHL(CarrierBase):
                     location = locality
 
             try:
-                ts = _ensure_utc(datetime.fromisoformat(ts_str)) if ts_str else datetime.now(UTC)
+                ts = _ensure_utc(datetime.fromisoformat(ts_str)) if ts_str else no_date_fallback()
             except ValueError:
-                ts = datetime.now(UTC)
+                ts = no_date_fallback()
 
             ev_status_code = ev.get("statusCode", "")
             ev_status = _map_status_code(ev_status_code)
@@ -352,7 +353,7 @@ class DHL(CarrierBase):
             if not desc:
                 continue
             events.append(TrackingEvent(
-                timestamp=datetime.now(UTC),
+                timestamp=no_date_fallback(),
                 status=_parse_status(desc),
                 description=desc[:200],
             ))
