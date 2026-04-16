@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.44.1 (2026-04-16)
+
+### Bug Fixes
+
+- **ui**: Include account_last_synced in list_packages query
+  ([`c81aef5`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/c81aef54d6299dd151f003abb68db59607e94004))
+
+
 ## v1.44.0 (2026-04-16)
 
 ### Features
