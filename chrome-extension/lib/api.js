@@ -57,7 +57,7 @@ async function apiCall(method, path, body) {
     if (!res.ok) {
       return {
         ok: false,
-        error: data?.detail || res.statusText,
+        error: data?.detail || res.statusText || `Server error (${res.status})`,
         status: res.status,
       };
     }
