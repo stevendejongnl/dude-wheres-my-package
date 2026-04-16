@@ -126,6 +126,22 @@ async def test_different_description_events_both_kept(repo: PackageRepository):
     assert len(events) == 2
 
 
+async def test_same_timestamp_status_different_description_does_not_crash(
+    repo: PackageRepository,
+):
+    """Same (package, timestamp, status) but different descriptions — hits
+    the UNIQUE constraint. INSERT OR IGNORE must swallow the conflict."""
+    pkg_id = await repo.add_package(tracking_number="DUP4", carrier="dpd")
+    ts = datetime(2026, 4, 16, 0, 0, tzinfo=UTC)
+
+    await repo.add_event(pkg_id, ts, "pre_transit", "Ventilatieland.nl")
+    await repo.add_event(pkg_id, ts, "pre_transit", "Zending aangekondigd")
+
+    events = await repo.get_events(pkg_id)
+    assert len(events) == 1
+    assert events[0]["description"] == "Ventilatieland.nl"
+
+
 async def test_duplicate_package_raises(repo: PackageRepository):
     await repo.add_package(tracking_number="SAME1", carrier="postnl")
     with pytest.raises(ValueError, match="already tracked"):

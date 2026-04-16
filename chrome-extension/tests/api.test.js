@@ -66,6 +66,44 @@ describe("storage helpers", () => {
   });
 });
 
+describe("apiCall error fallback", () => {
+  beforeEach(async () => {
+    Object.keys(store).forEach((k) => delete store[k]);
+    vi.restoreAllMocks();
+    await saveConfig("https://dwmp.test", "tok");
+  });
+
+  it("shows status code when server returns non-JSON error", async () => {
+    const { browserPush } = await import("../lib/api.js");
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: "",
+      json: async () => {
+        throw new Error("not json");
+      },
+    });
+
+    const result = await browserPush("<html>503</html>", "https://dpdgroup.com/nl");
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("Server error (503)");
+  });
+
+  it("prefers detail from JSON response", async () => {
+    const { browserPush } = await import("../lib/api.js");
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      statusText: "Bad Gateway",
+      json: async () => ({ detail: "DPD is experiencing a technical issue" }),
+    });
+
+    const result = await browserPush("<html></html>", "https://dpdgroup.com/nl");
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("DPD is experiencing a technical issue");
+  });
+});
+
 describe("healthCheck", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
