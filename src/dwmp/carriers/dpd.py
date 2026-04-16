@@ -253,47 +253,107 @@ class DPD(CarrierBase):
                 if status_text_el and status == TrackingStatus.UNKNOWN:
                     status = _parse_status(status_text_el.get_text())
 
-            # Parse tracking events
+            # Parse tracking events from structured timeline
             events: list[TrackingEvent] = []
-            # Events are in text format: "11.04.2026 , 03:49\nOirschot, NL\n\nDescription"
-            tracking_section = (
-                soup.select_one(".parcelDetailsBox")
-                or soup.find(class_=re.compile(r"parcelDetailsBox"))
-            )
-            if tracking_section:
-                event_items = tracking_section.select("li, .tracking-event, tr")
-                for item in event_items:
-                    text = item.get_text(separator="\n", strip=True)
-                    event = self._parse_event_text(text)
-                    if event:
-                        events.append(event)
 
-            # If no structured events found, try parsing from body text
+            # Real DPD DOM: .content-item-track li with .entry-date,
+            # .entry-time, .place-track, .entry-body p
+            for item in soup.select("li.content-item-track"):
+                date_el = item.select_one(".entry-date")
+                time_el = item.select_one(".entry-time")
+                place_el = item.select_one(".place-track span")
+                desc_el = item.select_one(".entry-body p")
+
+                if not date_el:
+                    continue
+                date_str = date_el.get_text(strip=True)
+                time_str = time_el.get_text(strip=True) if time_el else "00:00"
+                try:
+                    ts = datetime.strptime(
+                        f"{date_str} {time_str}", "%d.%m.%Y %H:%M"
+                    ).replace(tzinfo=UTC)
+                except ValueError:
+                    continue
+
+                description = desc_el.get_text(strip=True) if desc_el else ""
+                location = place_el.get_text(strip=True) if place_el else None
+
+                if description:
+                    events.append(TrackingEvent(
+                        timestamp=ts,
+                        status=_parse_status(description),
+                        description=description,
+                        location=location or None,
+                    ))
+
+            # Fallback: legacy .parcelDetailsBox selectors
+            if not events:
+                tracking_section = (
+                    soup.select_one(".parcelDetailsBox")
+                    or soup.find(class_=re.compile(r"parcelDetailsBox"))
+                )
+                if tracking_section:
+                    event_items = tracking_section.select("li, .tracking-event, tr")
+                    for item in event_items:
+                        text = item.get_text(separator="\n", strip=True)
+                        event = self._parse_event_text(text)
+                        if event:
+                            events.append(event)
+
+            # Last resort: parse from body text
             if not events:
                 body_text = soup.get_text(separator="\n", strip=True)
                 tracking_idx = body_text.find("Tracking details")
                 if tracking_idx > -1:
-                    # Stop at FAQ section
                     faq_idx = body_text.find("FAQ", tracking_idx)
                     end = faq_idx if faq_idx > tracking_idx else tracking_idx + 2000
                     tracking_text = body_text[tracking_idx:end]
                     events = self._parse_tracking_text(tracking_text)
 
+            # Extract sender name from the "Delivery address" section.
+            # The "From:" label is a .block-data-label followed by <p>SenderName</p>.
+            sender = ""
+            postal_code = ""
+            for label_el in soup.select(".block-data-label"):
+                label_text = label_el.get_text(strip=True)
+                if label_text == "From:":
+                    sibling = label_el.find_next_sibling("p")
+                    if sibling:
+                        sender = sibling.get_text(strip=True)
+
+            # Extract postal code from delivery address line
+            # e.g. "Cyclamenstraat 55 , 1431RZ Aalsmeer"
+            addr_el = soup.select_one(".delivery-address-icon.location")
+            if addr_el:
+                addr_p = addr_el.find_parent("div")
+                if addr_p:
+                    addr_text = addr_p.get_text(strip=True)
+                    pc_match = re.search(r"\b(\d{4}\s?[A-Z]{2})\b", addr_text)
+                    if pc_match:
+                        postal_code = pc_match.group(1).replace(" ", "")
+
             sorted_events = sorted(events, key=lambda e: e.timestamp)
             if status == TrackingStatus.UNKNOWN and sorted_events:
                 status = sorted_events[-1].status
 
+            # Add sender as a PRE_TRANSIT event — this is the "From:" label
+            # for the UI, distinct from tracking PRE_TRANSIT events like
+            # "exchanging data internally".
+            if sender:
+                sorted_events.insert(0, TrackingEvent(
+                    timestamp=no_date_fallback(),
+                    status=TrackingStatus.PRE_TRANSIT,
+                    description=sender,
+                ))
+
             # Update the matching result or add new one.
-            # Preserve the sender PRE_TRANSIT event from the list if the
-            # detailed tracking events don't already contain one.
             found = False
             for i, r in enumerate(results):
                 if r.tracking_number == barcode:
                     merged = list(sorted_events)
-                    has_pre = any(
-                        e.status == TrackingStatus.PRE_TRANSIT for e in merged
-                    )
-                    if not has_pre:
+                    # If we didn't find a sender in the detail section,
+                    # preserve the one from the parcel list.
+                    if not sender:
                         for e in r.events:
                             if e.status == TrackingStatus.PRE_TRANSIT:
                                 merged.insert(0, e)
@@ -303,6 +363,7 @@ class DPD(CarrierBase):
                         carrier=self.name,
                         status=status,
                         events=sorted(merged, key=lambda e: e.timestamp),
+                        postal_code=postal_code or None,
                     )
                     found = True
                     break
@@ -313,6 +374,7 @@ class DPD(CarrierBase):
                     carrier=self.name,
                     status=status,
                     events=sorted_events,
+                    postal_code=postal_code or None,
                 ))
 
         return results

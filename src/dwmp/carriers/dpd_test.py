@@ -79,6 +79,97 @@ def test_parse_tracking_text():
     assert events[1].status == TrackingStatus.PRE_TRANSIT
 
 
+def test_parse_parcels_page_real_dom():
+    """Parse the real DPD DOM structure with .content-item-track timeline,
+    sender from delivery address, and postal code."""
+    carrier = DPD()
+    html = """
+    <html><body>
+    <a href="/nl/mydpd/my-parcels/incoming?parcelNumber=05222667810779">
+        <span class="parcelAlias">Parcel from Ventilatieland.nl</span>
+    </a>
+    <span class="parcelNumber">05222667810779</span>
+    <div class="parcelStatusBox">
+        <div class="status-icon transit"></div>
+    </div>
+
+    <ul class="content-holder-track">
+        <li class="content-item-track">
+            <div class="timeline-entry">
+                <div class="entry-header">
+                    <div class="time-track">
+                        <span class="entry-date">13.04.2026</span>
+                        <span>, </span>
+                        <span class="entry-time">04:49</span>
+                    </div>
+                    <div class="place-track"><span>Oirschot, NL</span></div>
+                </div>
+                <div class="entry-body"><p>Your parcel is on its way</p></div>
+            </div>
+        </li>
+        <li class="content-item-track">
+            <div class="timeline-entry">
+                <div class="entry-header">
+                    <div class="time-track">
+                        <span class="entry-date">11.04.2026</span>
+                        <span>, </span>
+                        <span class="entry-time">03:49</span>
+                    </div>
+                    <div class="place-track"><span>Oirschot, NL</span></div>
+                </div>
+                <div class="entry-body"><p>Your parcel arrived at our depot</p></div>
+            </div>
+        </li>
+        <li class="content-item-track last">
+            <div class="timeline-entry">
+                <div class="entry-header">
+                    <div class="time-track">
+                        <span class="entry-date">10.04.2026</span>
+                        <span>, </span>
+                        <span class="entry-time">14:05</span>
+                    </div>
+                    <div class="place-track"><span></span></div>
+                </div>
+                <div class="entry-body"><p>We are exchanging data internally</p></div>
+            </div>
+        </li>
+    </ul>
+
+    <div class="deliveryDetails">
+        <div class="block-data">
+            <p class="block-data-label">From:</p>
+            <p>Ventilatieland.nl</p>
+        </div>
+        <div>
+            <p class="delivery-address-icon location"></p>
+            <p>Cyclamenstraat 55 , 1431RZ Aalsmeer</p>
+        </div>
+    </div>
+    </body></html>
+    """
+    results = carrier._parse_parcels_page(html)
+    assert len(results) == 1
+    r = results[0]
+    assert r.tracking_number == "05222667810779"
+    assert r.status == TrackingStatus.IN_TRANSIT
+    assert r.postal_code == "1431RZ"
+
+    # 3 timeline events + 1 sender PRE_TRANSIT
+    descriptions = [e.description for e in r.events]
+    assert "Ventilatieland.nl" in descriptions
+    assert "Your parcel is on its way" in descriptions
+    assert "Your parcel arrived at our depot" in descriptions
+    assert "We are exchanging data internally" in descriptions
+
+    # Verify locations are parsed
+    transit_events = [e for e in r.events if e.location]
+    assert any(e.location == "Oirschot, NL" for e in transit_events)
+
+    # Verify chronological order
+    timestamps = [e.timestamp for e in r.events]
+    assert timestamps == sorted(timestamps)
+
+
 def test_parse_empty_page():
     carrier = DPD()
     results = carrier._parse_parcels_page("<html><body></body></html>")
