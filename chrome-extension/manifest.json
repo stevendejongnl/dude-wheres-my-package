@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Dude, Where's My Package?",
-  "version": "1.41.4",
+  "version": "1.41.5",
   "description": "Browser-push sync for DWMP package tracker",
   "update_url": "https://stevendejongnl.github.io/dude-wheres-my-package/updates.xml",
   "permissions": [

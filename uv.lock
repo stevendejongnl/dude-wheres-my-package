@@ -190,7 +190,7 @@ wheels = [
 
 [[package]]
 name = "dude-wheres-my-package"
-version = "1.41.4"
+version = "1.41.5"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },

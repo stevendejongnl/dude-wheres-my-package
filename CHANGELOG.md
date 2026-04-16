@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.41.5 (2026-04-16)
+
+### Bug Fixes
+
+- **storage**: Handle duplicate event constraint with INSERT OR IGNORE
+  ([`497befd`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/497befd316e4c1125201b6b9a2505cfe35584e3d))
+
+
 ## v1.41.4 (2026-04-16)
 
 ### Bug Fixes
