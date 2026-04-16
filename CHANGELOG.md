@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.43.1 (2026-04-16)
+
+### Bug Fixes
+
+- **ui**: Prevent infinite HTMX loop on expanded card
+  ([`28d4408`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/28d4408eb46a90ced770439cff8b539cfa5ba6e4))
+
+
 ## v1.43.0 (2026-04-16)
 
 ### Features
