@@ -464,7 +464,8 @@ class PackageRepository:
         location: str | None = None,
     ) -> None:
         await self.db.execute(
-            """INSERT INTO tracking_events (package_id, timestamp, status, description, location)
+            """INSERT OR IGNORE INTO tracking_events
+               (package_id, timestamp, status, description, location)
                SELECT ?, ?, ?, ?, ?
                WHERE NOT EXISTS (
                    SELECT 1 FROM tracking_events
