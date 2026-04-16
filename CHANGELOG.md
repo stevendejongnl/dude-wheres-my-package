@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.41.4 (2026-04-16)
+
+### Bug Fixes
+
+- **extension**: Show status code when server returns non-JSON error
+  ([`c15fcf3`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/c15fcf30183214d2cb7bc87ceb542474808ddd70))
+
+
 ## v1.41.3 (2026-04-16)
 
 ### Bug Fixes
