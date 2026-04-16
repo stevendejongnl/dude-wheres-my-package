@@ -376,7 +376,10 @@ class PackageRepository:
 
     async def list_packages(self) -> list[dict]:
         cursor = await self.db.execute(
-            "SELECT * FROM packages ORDER BY created_at DESC"
+            """SELECT p.*, a.last_synced AS account_last_synced
+               FROM packages p
+               LEFT JOIN accounts a ON p.account_id = a.id
+               ORDER BY p.created_at DESC"""
         )
         return [dict(row) for row in await cursor.fetchall()]
 
