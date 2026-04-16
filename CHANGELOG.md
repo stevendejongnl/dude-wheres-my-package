@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.43.0 (2026-04-16)
+
+### Features
+
+- **ui**: Lazy-load package card from DB on expand, hide refresh for browser-push carriers
+  ([`27d610b`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/27d610bd1fdb5fdb13b73bc5ffbad698e5bafa37))
+
+
 ## v1.42.0 (2026-04-16)
 
 ### Features
