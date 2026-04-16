@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.44.0 (2026-04-16)
+
+### Features
+
+- **ui**: Show account last synced time on package card
+  ([`ea8a42e`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/ea8a42e3be3b276dedf3b1a56ed5d93548f6a0f1))
+
+
 ## v1.43.1 (2026-04-16)
 
 ### Bug Fixes
