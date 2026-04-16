@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.41.3 (2026-04-16)
+
+### Bug Fixes
+
+- **dpd**: Detect error and guest pages instead of silently returning empty results
+  ([`76de39d`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/76de39dd82ab6345147ca06fb2026a063dd95a83))
+
+
 ## v1.41.2 (2026-04-16)
 
 ### Bug Fixes
