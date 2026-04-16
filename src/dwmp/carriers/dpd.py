@@ -23,6 +23,7 @@ from dwmp.carriers.base import (
     AuthType,
     CarrierAuthError,
     CarrierBase,
+    CarrierSyncError,
     TrackingEvent,
     TrackingResult,
     TrackingStatus,
@@ -86,6 +87,21 @@ def _is_guest_page(html: str) -> bool:
     """Return True if the HTML looks like DPD's logged-out guest mode."""
     lower = html.lower()
     return any(indicator in lower for indicator in _GUEST_INDICATORS)
+
+
+# Strings DPD renders when the site is experiencing a technical issue.
+# The "Private customers portal" page with a generic error message.
+_ERROR_INDICATORS = (
+    "technical issue occurred",
+    "technisch probleem opgetreden",
+    "technische storing",
+)
+
+
+def _is_error_page(html: str) -> bool:
+    """Return True if the HTML is a DPD error/outage page."""
+    lower = html.lower()
+    return any(indicator in lower for indicator in _ERROR_INDICATORS)
 
 
 class DPD(CarrierBase):
@@ -165,6 +181,17 @@ class DPD(CarrierBase):
     def _parse_parcels_page(
         self, html: str, lookback_days: int = 30
     ) -> list[TrackingResult]:
+        if _is_error_page(html):
+            raise CarrierSyncError(
+                self.name,
+                "DPD is experiencing a technical issue — try again later",
+            )
+        if _is_guest_page(html):
+            raise CarrierAuthError(
+                self.name,
+                "DPD session expired — the extension will re-login on the next sync",
+            )
+
         soup = BeautifulSoup(html, "lxml")
         results: list[TrackingResult] = []
         # Find parcel links — handle both normal and escaped class attributes

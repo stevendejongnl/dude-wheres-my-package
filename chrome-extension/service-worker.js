@@ -152,6 +152,12 @@ async function syncCarrierViaTab(account) {
       return;
     }
 
+    // Detect carrier error/outage page (e.g. DPD "Technical issue occurred")
+    if (isCarrierErrorPage(html)) {
+      await storeSyncResult(account.id, false, "Carrier site error -- try again later");
+      return;
+    }
+
     const pageUrl = (await chrome.tabs.get(tabId)).url;
     const pushResult = await browserPush(html, pageUrl);
 
@@ -251,6 +257,15 @@ function isCloudflareChallenge(html) {
     lower.includes("<title>just a moment") ||
     lower.includes("checking your browser") ||
     lower.includes("cf-challenge")
+  );
+}
+
+function isCarrierErrorPage(html) {
+  const lower = html.substring(0, 3000).toLowerCase();
+  return (
+    lower.includes("technical issue occurred") ||
+    lower.includes("technisch probleem opgetreden") ||
+    lower.includes("technische storing")
   );
 }
 

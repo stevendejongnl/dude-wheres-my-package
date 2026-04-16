@@ -55,6 +55,21 @@ class CarrierAuthError(Exception):
         super().__init__(f"[{carrier}] Auth failed: {message}")
 
 
+class CarrierSyncError(Exception):
+    """Raised when the carrier site returns an error page instead of parcels.
+
+    Distinct from :class:`CarrierAuthError` — the session may be fine but
+    the carrier is experiencing a technical issue. The service catches this
+    and marks the account status as ``error`` (not ``auth_failed``) so the
+    next extension sync will retry rather than prompting re-authentication.
+    """
+
+    def __init__(self, carrier: str, message: str) -> None:
+        self.carrier = carrier
+        self.message = message
+        super().__init__(f"[{carrier}] Sync error: {message}")
+
+
 @dataclass(frozen=True)
 class TrackingEvent:
     timestamp: datetime

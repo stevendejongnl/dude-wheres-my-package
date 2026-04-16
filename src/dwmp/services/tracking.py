@@ -8,6 +8,7 @@ from dwmp.carriers.base import (
     AuthType,
     CarrierAuthError,
     CarrierBase,
+    CarrierSyncError,
     TrackingStatus,
 )
 from dwmp.storage.repository import PackageRepository
@@ -568,7 +569,18 @@ class TrackingService:
                 f"{account['carrier']} does not support browser-push sync"
             )
 
-        results = carrier._parse_parcels_page(html, account["lookback_days"])
+        try:
+            results = carrier._parse_parcels_page(html, account["lookback_days"])
+        except CarrierAuthError:
+            await self._repository.update_account_status(
+                account_id, AccountStatus.AUTH_FAILED
+            )
+            raise
+        except CarrierSyncError:
+            await self._repository.update_account_status(
+                account_id, AccountStatus.ERROR
+            )
+            raise
 
         # Mark account healthy
         await self._repository.update_account_status(

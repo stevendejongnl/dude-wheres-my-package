@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from dwmp.api.auth import create_token, verify_password
 from dwmp.api.dependencies import get_tracking_service
-from dwmp.carriers.base import CarrierAuthError
+from dwmp.carriers.base import CarrierAuthError, CarrierSyncError
 from dwmp.services.tracking import TrackingService
 
 router = APIRouter(prefix="/api/v1")
@@ -333,6 +333,8 @@ async def universal_browser_push(
         return await service.sync_account_from_html(account["id"], body.html)
     except CarrierAuthError as exc:
         raise HTTPException(status_code=502, detail=exc.message)
+    except CarrierSyncError as exc:
+        raise HTTPException(status_code=502, detail=exc.message)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -352,6 +354,8 @@ async def browser_push(
     try:
         return await service.sync_account_from_html(account_id, body.html)
     except CarrierAuthError as exc:
+        raise HTTPException(status_code=502, detail=exc.message)
+    except CarrierSyncError as exc:
         raise HTTPException(status_code=502, detail=exc.message)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

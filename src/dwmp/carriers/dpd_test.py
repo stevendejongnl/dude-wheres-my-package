@@ -1,7 +1,13 @@
 import pytest
 
-from dwmp.carriers.base import AuthTokens, AuthType, CarrierAuthError, TrackingStatus
-from dwmp.carriers.dpd import DPD, _is_guest_page, _parse_status
+from dwmp.carriers.base import (
+    AuthTokens,
+    AuthType,
+    CarrierAuthError,
+    CarrierSyncError,
+    TrackingStatus,
+)
+from dwmp.carriers.dpd import DPD, _is_error_page, _is_guest_page, _parse_status
 
 
 def test_dpd_is_browser_push():
@@ -158,3 +164,38 @@ def test_is_guest_page_positive():
 def test_is_guest_page_negative():
     assert not _is_guest_page("<html><a href='?parcelNumber=123'>Parcel</a></html>")
     assert not _is_guest_page("")
+
+
+# --- error page detection ---
+
+
+def test_is_error_page_positive():
+    assert _is_error_page(
+        "<html><body><h1>Private customers portal</h1>"
+        "<p>Technical issue occurred while processing the request.</p>"
+        "</body></html>"
+    )
+    assert _is_error_page("<p>Er is een technisch probleem opgetreden.</p>")
+
+
+def test_is_error_page_negative():
+    assert not _is_error_page("<html><a href='?parcelNumber=123'>Parcel</a></html>")
+    assert not _is_error_page("")
+
+
+def test_parse_parcels_page_raises_on_error_page():
+    carrier = DPD()
+    html = (
+        "<html><body><h1>Private customers portal</h1>"
+        "<p>Technical issue occurred while processing the request.</p>"
+        "</body></html>"
+    )
+    with pytest.raises(CarrierSyncError, match="technical issue"):
+        carrier._parse_parcels_page(html)
+
+
+def test_parse_parcels_page_raises_on_guest_page():
+    carrier = DPD()
+    html = "<html><body><h2>Guest User Login</h2></body></html>"
+    with pytest.raises(CarrierAuthError, match="session expired"):
+        carrier._parse_parcels_page(html)
