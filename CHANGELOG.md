@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.44.2 (2026-04-17)
+
+### Bug Fixes
+
+- **accounts**: Format last_synced with timezone-aware display
+  ([`679a8fb`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/679a8fb2513564fdb11159418ad258bc4bc6162d))
+
+
 ## v1.44.1 (2026-04-16)
 
 ### Bug Fixes
