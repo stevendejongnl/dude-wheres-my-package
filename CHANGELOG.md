@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.44.3 (2026-04-17)
+
+### Bug Fixes
+
+- **extension**: Clear DPD site data and retry on carrier error page
+  ([`65d1bfc`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/65d1bfcfee1b38b53fa7edaef8f46b9edb354de1))
+
+
 ## v1.44.2 (2026-04-17)
 
 ### Bug Fixes
