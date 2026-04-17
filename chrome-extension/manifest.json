@@ -8,7 +8,8 @@
     "storage",
     "alarms",
     "tabs",
-    "scripting"
+    "scripting",
+    "browsingData"
   ],
   "host_permissions": [
     "<all_urls>"

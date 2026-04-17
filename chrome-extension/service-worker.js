@@ -137,7 +137,7 @@ async function syncCarrierViaTab(account) {
 
     await sleep(RENDER_WAIT_MS);
 
-    const html = await captureTabHtml(tabId);
+    let html = await captureTabHtml(tabId);
     if (!html) {
       await storeSyncResult(account.id, false, "Could not capture page content");
       return;
@@ -152,10 +152,46 @@ async function syncCarrierViaTab(account) {
       return;
     }
 
-    // Detect carrier error/outage page (e.g. DPD "Technical issue occurred")
+    // Detect carrier error/outage page (e.g. DPD "Technical issue occurred").
+    // Clear site data for the carrier domain and retry once with a fresh login —
+    // stale cookies are the most common cause of DPD landing on its error page.
     if (isCarrierErrorPage(html)) {
-      await storeSyncResult(account.id, false, "Carrier site error -- try again later");
-      return;
+      const domain = new URL(startUrl).hostname;
+      await clearCarrierSiteData(domain);
+      await chrome.tabs.update(tabId, { url: startUrl });
+      await waitForTabLoad(tabId);
+      await waitForUrlStable(tabId);
+
+      // Re-login after clearing cookies
+      const retryTabInfo = await chrome.tabs.get(tabId);
+      const retryOnLogin =
+        isCarrierLoginPage(account.carrier, retryTabInfo.url) ||
+        (await hasLoginForm(tabId));
+      if (retryOnLogin) {
+        const loggedIn = await handleCarrierLogin(tabId, account);
+        if (!loggedIn) {
+          await storeSyncResult(account.id, false, "Login failed after clearing site data");
+          return;
+        }
+        await waitForUrlStable(tabId);
+      }
+
+      if (urls.login) {
+        const afterLoginUrl = (await chrome.tabs.get(tabId)).url || "";
+        if (!afterLoginUrl.startsWith(urls.parcels)) {
+          await chrome.tabs.update(tabId, { url: urls.parcels });
+          await waitForTabLoad(tabId);
+          await waitForUrlStable(tabId);
+        }
+      }
+
+      await sleep(RENDER_WAIT_MS);
+      const retryHtml = await captureTabHtml(tabId);
+      if (!retryHtml || isCarrierErrorPage(retryHtml)) {
+        await storeSyncResult(account.id, false, "Carrier site error -- try again later");
+        return;
+      }
+      html = retryHtml;
     }
 
     const pageUrl = (await chrome.tabs.get(tabId)).url;
@@ -257,6 +293,13 @@ function isCloudflareChallenge(html) {
     lower.includes("<title>just a moment") ||
     lower.includes("checking your browser") ||
     lower.includes("cf-challenge")
+  );
+}
+
+function clearCarrierSiteData(hostname) {
+  return chrome.browsingData.remove(
+    { origins: [`https://${hostname}`] },
+    { cookies: true, cache: true, localStorage: true, sessionStorage: true },
   );
 }
 
