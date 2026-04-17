@@ -227,6 +227,8 @@ async def accounts_page(
     accounts = await service.list_accounts()
     for account in accounts:
         account.pop("tokens", None)
+        if account.get("last_synced"):
+            account["last_synced"] = _format_time(account["last_synced"])
 
     carriers = []
     for name in service.list_carriers():
@@ -434,6 +436,8 @@ async def sync_account_view(
     if account is None:
         raise HTTPException(status_code=404, detail="Account not found")
     account.pop("tokens", None)
+    if account.get("last_synced"):
+        account["last_synced"] = _format_time(account["last_synced"])
 
     ctx = {
         "account": account,
@@ -461,6 +465,8 @@ async def toggle_account_sync_view(
     if account is None:
         raise HTTPException(status_code=404, detail="Account not found")
     account.pop("tokens", None)
+    if account.get("last_synced"):
+        account["last_synced"] = _format_time(account["last_synced"])
 
     ctx = {
         "account": account,

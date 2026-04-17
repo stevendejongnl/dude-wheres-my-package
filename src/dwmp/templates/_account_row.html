@@ -24,7 +24,7 @@
           {% endif %}
         </div>
         {% if account.last_synced %}
-        <div style="font-size:0.7rem;color:var(--text-dim);">Last synced: {{ account.last_synced[:16] | replace('T', ' ') }}</div>
+        <div style="font-size:0.7rem;color:var(--text-dim);">Last synced: {{ account.last_synced }}</div>
         {% endif %}
 
         {% if sync_result %}
