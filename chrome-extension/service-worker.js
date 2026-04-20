@@ -140,15 +140,27 @@ async function syncCarrierViaTab(account) {
     // PostNL: extract the bearer token from sessionStorage and push it to the
     // server, then trigger a server-side GraphQL sync. No HTML capture needed.
     if (account.carrier === "postnl") {
-      // The token is written asynchronously by client-side JS after page load.
-      // Poll until it appears (up to 10s).
+      // Wait until the tab is on jouw.postnl.nl (not still on login.postnl.nl
+      // mid-OIDC-redirect), then poll until the token key is written by the
+      // page's JS (up to 15s total).
       let accessToken = null;
-      const deadline = Date.now() + 10_000;
+      const deadline = Date.now() + 15_000;
       while (Date.now() < deadline) {
-        const tokenResult = await chrome.scripting.executeScript({
-          target: { tabId },
-          func: () => sessionStorage.getItem("poa.auth.access_token"),
-        });
+        const tabUrl = (await chrome.tabs.get(tabId)).url || "";
+        if (!tabUrl.includes("jouw.postnl.nl")) {
+          await sleep(500);
+          continue;
+        }
+        let tokenResult;
+        try {
+          tokenResult = await chrome.scripting.executeScript({
+            target: { tabId },
+            func: () => sessionStorage.getItem("poa.auth.access_token"),
+          });
+        } catch {
+          await sleep(500);
+          continue;
+        }
         accessToken = tokenResult?.[0]?.result || null;
         if (accessToken) break;
         await sleep(500);
