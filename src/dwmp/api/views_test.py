@@ -122,14 +122,13 @@ async def test_add_form_amazon_is_browser_push_with_totp(client: AsyncClient):
     assert "Test connection" not in body
 
 
-async def test_add_form_postnl_shows_session_storage_wizard(client: AsyncClient):
+async def test_add_form_postnl_shows_credentials_form(client: AsyncClient):
     response = await client.get("/accounts/add/postnl")
     assert response.status_code == 200
     body = response.text
-    assert "Session Storage" in body
-    assert "akamai:1e450c3d-5bbb-4f34-9264-dd51fa9fd066:oidc-tokens" in body
-    assert 'name="access_token"' in body
-    assert 'name="refresh_token"' in body
+    assert 'name="username"' in body
+    assert 'name="password"' in body
+    assert "jouw.postnl.nl" in body
 
 
 async def test_add_form_dpd_is_browser_push_no_cookie_fallback(client: AsyncClient):

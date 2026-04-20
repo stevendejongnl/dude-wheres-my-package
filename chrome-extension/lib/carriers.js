@@ -43,7 +43,10 @@ export const CARRIER_SYNC_URLS = {
     login: "https://www.dpdgroup.com/nl/mydpd/login",
     parcels: "https://www.dpdgroup.com/nl/mydpd/my-parcels/incoming",
   },
-  postnl: { parcels: "https://jouw.postnl.nl/" },
+  postnl: {
+    login: "https://jouw.postnl.nl/account",
+    parcels: "https://jouw.postnl.nl/",
+  },
   dhl: { parcels: "https://my.dhlecommerce.nl/" },
 };
 
@@ -59,6 +62,7 @@ export const CARRIER_SYNC_URLS = {
 export const CARRIER_LOGIN_PATTERNS = {
   dpd: ["login.dpdgroup.com", "auth/realms"],
   amazon: ["/ap/signin", "/ap/mfa", "/ax/"],
+  postnl: ["login.postnl.nl"],
 };
 
 // Carrier display names for the UI.

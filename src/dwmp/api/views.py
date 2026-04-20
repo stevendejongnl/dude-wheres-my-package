@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import UTC, datetime
 from importlib.metadata import version as pkg_version
@@ -318,9 +319,15 @@ async def add_account_test(
                 carrier, cookies_json.strip(),
             )
         elif username.strip() and password.strip():
-            await service.validate_account_credentials(
-                carrier, username, password, totp_secret=totp_secret or None,
-            )
+            c = service.get_carrier(carrier)
+            if c is not None and c.auth_type.value == "manual_token":
+                # Credentials-for-extension carriers (e.g. PostNL): no server-side
+                # validation possible — the extension will verify on first sync.
+                pass
+            else:
+                await service.validate_account_credentials(
+                    carrier, username, password, totp_secret=totp_secret or None,
+                )
         else:
             await service.validate_account_manual_token(
                 carrier, access_token, refresh_token or None,
@@ -499,11 +506,21 @@ async def add_account_save(
                 postal_code=postal_code.strip() or None,
             )
         elif username.strip() and password.strip():
-            await service.connect_account_credentials(
-                carrier, username, password, lookback_days,
-                totp_secret=totp_secret or None,
-                postal_code=postal_code.strip() or None,
-            )
+            c = service.get_carrier(carrier)
+            if c is not None and c.auth_type.value == "manual_token":
+                # Extension-login carriers (e.g. PostNL): store credentials so
+                # the extension can auto-login and refresh the token on each sync.
+                creds_json = json.dumps({"email": username, "password": password})
+                await service.connect_account_manual_token(
+                    carrier, "", creds_json, lookback_days,
+                    postal_code=postal_code.strip() or None,
+                )
+            else:
+                await service.connect_account_credentials(
+                    carrier, username, password, lookback_days,
+                    totp_secret=totp_secret or None,
+                    postal_code=postal_code.strip() or None,
+                )
         else:
             await service.connect_account_manual_token(
                 carrier, access_token, refresh_token or None, lookback_days,

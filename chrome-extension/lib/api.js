@@ -113,6 +113,12 @@ export function getAccountCredentials(accountId) {
   return apiCall("GET", `/api/v1/accounts/${accountId}/credentials`);
 }
 
+export function updateAccountToken(accountId, accessToken) {
+  return apiCall("PATCH", `/api/v1/accounts/${accountId}/token`, {
+    access_token: accessToken,
+  });
+}
+
 // ── Self-update check ──────────────────────────────────────────────
 
 export async function checkForUpdate() {

@@ -14,7 +14,7 @@
 {% set title_verb = "Edit" if account else "Connect" %}
 {% set tokens = account.tokens if account else {} %}
 <form class="add-form" id="add-form-{{ form_id }}-form">
-  {% with loading_label = "Verifying PostNL token…" %}
+  {% with loading_label = "Saving PostNL credentials…" %}
   {% include "_form_loader.html" %}
   {% endwith %}
   <div class="form-body">
@@ -27,33 +27,24 @@
   </div>
 
   <p class="form-hint">
-    PostNL has no public API. You'll capture an OAuth token from your browser
-    after logging in. Tokens are short-lived (~5 min) — the refresh token below
-    keeps the session alive.
+    Save your PostNL login credentials below so the Chrome extension can
+    automatically log in and refresh your token on every sync. No manual token
+    copying needed.
   </p>
 
-  <ol class="wizard-steps">
-    <li>Open <a href="https://jouw.postnl.nl/account/mijn-pakketten" target="_blank" rel="noopener">jouw.postnl.nl/account/mijn-pakketten</a> and log in.</li>
-    <li>Open DevTools (<kbd>F12</kbd>) → <strong>Application</strong> tab → <strong>Session Storage</strong> → <code>jouw.postnl.nl</code>.</li>
-    <li>Find the key:
-      <pre class="wizard-code copyable" onclick="navigator.clipboard.writeText(this.textContent.trim())">akamai:1e450c3d-5bbb-4f34-9264-dd51fa9fd066:oidc-tokens</pre>
-      <small class="form-help">Click the key name to copy it.</small>
-    </li>
-    <li>Copy the <code>access_token</code> and <code>refresh_token</code> values from the JSON value.</li>
-    <li>Paste them into the fields below and click <strong>Test connection</strong>.</li>
-  </ol>
-
   <div class="form-group">
-    <label for="access-token-{{ form_id }}">Access token</label>
-    <textarea id="access-token-{{ form_id }}" name="access_token" rows="4"
-      required spellcheck="false" autocomplete="off">{{ tokens.access_token or '' }}</textarea>
+    <label for="username-{{ form_id }}">PostNL e-mailadres</label>
+    <input type="email" id="username-{{ form_id }}" name="username"
+      value="{{ (account.username if account else '') or '' }}"
+      placeholder="you@example.com" autocomplete="email">
+    <small class="form-help">Your jouw.postnl.nl login email.</small>
   </div>
 
   <div class="form-group">
-    <label for="refresh-token-{{ form_id }}">Refresh token <span class="form-optional">(recommended)</span></label>
-    <textarea id="refresh-token-{{ form_id }}" name="refresh_token" rows="4"
-      spellcheck="false" autocomplete="off">{{ tokens.refresh_token or '' }}</textarea>
-    <small class="form-help">Without this, you'll need to re-paste tokens every ~5 minutes.</small>
+    <label for="password-{{ form_id }}">Wachtwoord</label>
+    <input type="password" id="password-{{ form_id }}" name="password"
+      placeholder="••••••••" autocomplete="current-password">
+    <small class="form-help">Stored securely. Used by the extension to auto-login and refresh your token.</small>
   </div>
 
   <div class="form-group">
@@ -79,7 +70,7 @@
       hx-target="#test-result-{{ form_id }}"
       hx-indicator="closest form"
       hx-on::after-request="this.closest('form').querySelector('.save-btn').disabled = !document.querySelector('#test-result-{{ form_id }} .test-result.ok')">
-      Test connection
+      Verify &amp; Save
       <span class="htmx-indicator" id="test-spinner-{{ form_id }}"><span class="spinner"></span></span>
     </button>
     <button type="button" class="btn btn-primary save-btn" {% if not account %}disabled{% endif %}

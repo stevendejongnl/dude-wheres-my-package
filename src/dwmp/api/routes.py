@@ -202,6 +202,32 @@ async def connect_manual_token(
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+class UpdateTokenRequest(BaseModel):
+    access_token: str
+    refresh_token: str | None = None
+    lookback_days: int | None = None
+
+
+@router.patch("/accounts/{account_id}/token", status_code=200)
+async def update_account_token(
+    account_id: int,
+    body: UpdateTokenRequest,
+    service: TrackingService = Depends(get_tracking_service),
+) -> dict:
+    account = await service.get_account(account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    try:
+        return await service.update_account_manual_token(
+            account_id, account["carrier"], body.access_token, body.refresh_token,
+            body.lookback_days or account.get("lookback_days", 30),
+        )
+    except CarrierAuthError as exc:
+        raise HTTPException(status_code=502, detail=exc.message)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @router.get("/accounts")
 async def list_accounts(
     service: TrackingService = Depends(get_tracking_service),

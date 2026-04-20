@@ -4,6 +4,8 @@ import {
   getAccountCredentials,
   isConfigured,
   listAccounts,
+  syncAccount,
+  updateAccountToken,
 } from "./lib/api.js";
 import { CARRIER_LOGIN_PATTERNS, CARRIER_SYNC_URLS } from "./lib/carriers.js";
 
@@ -133,6 +135,29 @@ async function syncCarrierViaTab(account) {
       await chrome.tabs.update(tabId, { url: urls.parcels });
       await waitForTabLoad(tabId);
       await waitForUrlStable(tabId);
+    }
+
+    // PostNL: extract the bearer token from sessionStorage and push it to the
+    // server, then trigger a server-side GraphQL sync. No HTML capture needed.
+    if (account.carrier === "postnl") {
+      const tokenResult = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => sessionStorage.getItem("poa.auth.access_token"),
+      });
+      const accessToken = tokenResult?.[0]?.result;
+      if (!accessToken) {
+        await storeSyncResult(account.id, false, "Could not extract PostNL token from session");
+        return;
+      }
+      const patchResult = await updateAccountToken(account.id, accessToken);
+      if (!patchResult.ok) {
+        await storeSyncResult(account.id, false, patchResult.error || "Failed to update PostNL token");
+        return;
+      }
+      const syncResult = await syncAccount(account.id);
+      const count = Array.isArray(syncResult.data) ? syncResult.data.length : 0;
+      await storeSyncResult(account.id, syncResult.ok, syncResult.ok ? null : syncResult.error, count);
+      return;
     }
 
     await sleep(RENDER_WAIT_MS);
@@ -319,6 +344,37 @@ function isCarrierLoginPage(carrier, url) {
   return patterns.some((p) => lower.includes(p));
 }
 
+async function handlePostNLLogin(tabId, username, password) {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    func: (email, pass) => {
+      // PostNL OIDC login form at login.postnl.nl — text + password inputs
+      const inputs = document.querySelectorAll(
+        "input[type='text'], input[type='email'], input:not([type])"
+      );
+      const passEl = document.querySelector("input[type='password']");
+      const emailEl = inputs[0];
+      if (emailEl) {
+        emailEl.value = email;
+        emailEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (passEl) {
+        passEl.value = pass;
+        passEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      const btn =
+        document.querySelector("button[type='submit']") ||
+        document.querySelector("input[type='submit']");
+      if (btn) btn.click();
+    },
+    args: [username, password],
+  });
+
+  await waitForUrlStable(tabId, 2000, 15000);
+  const info = await chrome.tabs.get(tabId);
+  return !isCarrierLoginPage("postnl", info.url);
+}
+
 async function handleCarrierLogin(tabId, account) {
   const result = await getAccountCredentials(account.id);
   if (!result.ok || !result.data?.has_credentials) return false;
@@ -327,6 +383,10 @@ async function handleCarrierLogin(tabId, account) {
 
   if (account.carrier === "amazon") {
     return handleAmazonLogin(tabId, username, password);
+  }
+
+  if (account.carrier === "postnl") {
+    return handlePostNLLogin(tabId, username, password);
   }
 
   // Generic Keycloak-style login (DPD)
