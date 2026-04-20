@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.45.1 (2026-04-20)
+
+### Bug Fixes
+
+- **postnl**: Poll sessionStorage until token is ready after login
+  ([`0b235c1`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/0b235c149dc4b1d620d9b3c9864a6ac7f3a0149f))
+
+
 ## v1.45.0 (2026-04-20)
 
 ### Features
