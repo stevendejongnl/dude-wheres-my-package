@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.45.0 (2026-04-20)
+
+### Features
+
+- **postnl**: Auto-login via extension with token extraction
+  ([`84a118f`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/84a118fa127082d34ad82a73d6205fc541d887d5))
+
+
 ## v1.44.3 (2026-04-17)
 
 ### Bug Fixes
