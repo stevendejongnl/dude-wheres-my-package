@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.45.2 (2026-04-20)
+
+### Bug Fixes
+
+- **postnl**: Wait for jouw.postnl.nl origin before reading sessionStorage
+  ([`df0fa28`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/df0fa2842c9e9b5a446f4cd35ba0a27a523d4676))
+
+
 ## v1.45.1 (2026-04-20)
 
 ### Bug Fixes
