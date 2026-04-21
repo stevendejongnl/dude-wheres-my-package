@@ -1,17 +1,43 @@
 import {
   browserPush,
+  browserPayload,
   checkForUpdate,
   getAccountCredentials,
   isConfigured,
   listAccounts,
-  syncAccount,
-  updateAccountToken,
 } from "./lib/api.js";
 import { CARRIER_LOGIN_PATTERNS, CARRIER_SYNC_URLS } from "./lib/carriers.js";
 
 const DEFAULT_SYNC_INTERVAL_MIN = 60;
 const RENDER_WAIT_MS = 5_000;
 const TAB_TIMEOUT_MS = 30_000;
+const POSTNL_GRAPHQL_URL = "https://jouw.postnl.nl/account/api/graphql";
+const POSTNL_TRACK_API_URL = "https://jouw.postnl.nl/track-and-trace/api/trackAndTrace";
+const POSTNL_SHIPMENTS_QUERY = `
+{
+  trackedShipments {
+    receiverShipments {
+      ...parcelShipment
+    }
+    senderShipments {
+      ...parcelShipment
+    }
+  }
+}
+
+fragment parcelShipment on TrackedShipmentResultType {
+  key
+  barcode
+  title
+  delivered
+  deliveredTimeStamp
+  deliveryWindowFrom
+  deliveryWindowTo
+  shipmentType
+  detailsUrl
+  creationDateTime
+}
+`;
 
 let syncInProgress = false;
 
@@ -137,12 +163,10 @@ async function syncCarrierViaTab(account) {
       await waitForUrlStable(tabId);
     }
 
-    // PostNL: extract the bearer token from sessionStorage and push it to the
-    // server, then trigger a server-side GraphQL sync. No HTML capture needed.
+    // PostNL: fetch the account list + detail payloads in the real browser tab
+    // and push the structured payload to the server. That keeps the same
+    // browser-authenticated view the user sees, including the richer timeline.
     if (account.carrier === "postnl") {
-      // Wait until the tab is on jouw.postnl.nl (not still on login.postnl.nl
-      // mid-OIDC-redirect), then poll until the token key is written by the
-      // page's JS (up to 15s total).
       let accessToken = null;
       const deadline = Date.now() + 15_000;
       while (Date.now() < deadline) {
@@ -169,12 +193,14 @@ async function syncCarrierViaTab(account) {
         await storeSyncResult(account.id, false, "Could not extract PostNL token from session");
         return;
       }
-      const patchResult = await updateAccountToken(account.id, accessToken);
-      if (!patchResult.ok) {
-        await storeSyncResult(account.id, false, patchResult.error || "Failed to update PostNL token");
+
+      const payloadResult = await fetchPostNLPayload(tabId, accessToken);
+      if (!payloadResult.ok) {
+        await storeSyncResult(account.id, false, payloadResult.error || "Failed to fetch PostNL data");
         return;
       }
-      const syncResult = await syncAccount(account.id);
+
+      const syncResult = await browserPayload(account.id, payloadResult.data);
       const count = Array.isArray(syncResult.data) ? syncResult.data.length : 0;
       await storeSyncResult(account.id, syncResult.ok, syncResult.ok ? null : syncResult.error, count);
       return;
@@ -330,6 +356,92 @@ async function captureTabHtml(tabId) {
     func: () => document.documentElement.outerHTML,
   });
   return results?.[0]?.result || null;
+}
+
+async function fetchPostNLPayload(tabId, accessToken) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: async (graphqlUrl, trackApiUrl, shipmentsQuery, token) => {
+        const toTrackKey = (detailsUrl) => {
+          if (!detailsUrl) return null;
+          try {
+            const pathname = new URL(detailsUrl, window.location.origin).pathname.replace(/\/+$/, "");
+            const prefix = "/track-and-trace/";
+            if (!pathname.includes(prefix)) return null;
+            const slug = pathname.split(prefix)[1];
+            const parts = slug.split("/");
+            if (parts.length >= 3) {
+              return `${parts[0]}-${parts[2].toUpperCase()}-${parts[1]}`;
+            }
+            return parts[0] || null;
+          } catch {
+            return null;
+          }
+        };
+
+        const graphResponse = await fetch(graphqlUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+            "Accept-Language": "nl-NL",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ variables: {}, query: shipmentsQuery }),
+          credentials: "include",
+        });
+        if (!graphResponse.ok) {
+          throw new Error(`PostNL GraphQL failed (${graphResponse.status})`);
+        }
+
+        const graphData = await graphResponse.json();
+        const tracked = graphData?.data?.trackedShipments || {};
+        const shipments = [
+          ...(tracked.receiverShipments || []),
+          ...(tracked.senderShipments || []),
+        ];
+
+        const details = [];
+        for (const shipment of shipments) {
+          if (!shipment?.detailsUrl) continue;
+          const trackKey = toTrackKey(shipment.detailsUrl);
+          if (!trackKey) continue;
+
+          const detailResponse = await fetch(
+            `${trackApiUrl}/${encodeURIComponent(trackKey)}?language=nl`,
+            {
+              headers: {
+                Accept: "application/json",
+                "Accept-Language": "nl-NL",
+              },
+              credentials: "include",
+            },
+          );
+          if (!detailResponse.ok) {
+            throw new Error(
+              `PostNL detail fetch failed for ${shipment.barcode || shipment.key} (${detailResponse.status})`,
+            );
+          }
+          details.push({
+            tracking_number: shipment.barcode || shipment.key,
+            data: await detailResponse.json(),
+          });
+        }
+
+        return { shipments, details };
+      },
+      args: [
+        POSTNL_GRAPHQL_URL,
+        POSTNL_TRACK_API_URL,
+        POSTNL_SHIPMENTS_QUERY,
+        accessToken,
+      ],
+    });
+    return { ok: true, data: results?.[0]?.result || { shipments: [], details: [] } };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
 }
 
 function isCloudflareChallenge(html) {

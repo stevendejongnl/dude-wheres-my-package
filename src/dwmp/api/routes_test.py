@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -7,6 +9,7 @@ from dwmp.carriers.base import (
     AuthTokens,
     AuthType,
     CarrierBase,
+    TrackingEvent,
     TrackingResult,
     TrackingStatus,
 )
@@ -26,6 +29,28 @@ class StubPostNLCarrier(CarrierBase):
     async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
         return [
             TrackingResult(tracking_number="SYNCED-1", carrier=self.name, status=TrackingStatus.IN_TRANSIT),
+        ]
+
+    def _parse_browser_payload(
+        self, payload: dict, lookback_days: int = 30
+    ) -> list[TrackingResult]:
+        if payload.get("mode") == "error":
+            raise RuntimeError("bad payload")
+        return [
+            TrackingResult(
+                tracking_number="BROWSER-1",
+                carrier=self.name,
+                status=TrackingStatus.OUT_FOR_DELIVERY,
+                postal_code="1234AB",
+                tracking_url="https://jouw.postnl.nl/track-and-trace/BROWSER-1-NL-1234AB",
+                events=[
+                    TrackingEvent(
+                        timestamp=datetime(2026, 4, 21, 9, 58, tzinfo=UTC),
+                        status=TrackingStatus.OUT_FOR_DELIVERY,
+                        description="Bezorger is onderweg",
+                    ),
+                ],
+            ),
         ]
 
 
@@ -256,6 +281,32 @@ async def test_sync_account(client: AsyncClient):
     assert len(packages) == 1
     assert packages[0]["tracking_number"] == "SYNCED-1"
     assert packages[0]["source"] == "account"
+
+
+async def test_browser_payload_sync_account(client: AsyncClient):
+    create_resp = await client.post(
+        "/api/v1/accounts/token",
+        json={"carrier": "postnl", "access_token": "tok"},
+    )
+    account_id = create_resp.json()["id"]
+
+    response = await client.post(
+        f"/api/v1/accounts/{account_id}/browser-payload",
+        json={"payload": {"shipments": [], "details": []}},
+    )
+    assert response.status_code == 200
+    packages = response.json()
+    assert len(packages) == 1
+    assert packages[0]["tracking_number"] == "BROWSER-1"
+    assert packages[0]["current_status"] == "out_for_delivery"
+
+
+async def test_browser_payload_sync_invalid_account_returns_400(client: AsyncClient):
+    response = await client.post(
+        "/api/v1/accounts/999/browser-payload",
+        json={"payload": {"shipments": [], "details": []}},
+    )
+    assert response.status_code == 400
 
 
 # --- Notification endpoint tests ---

@@ -9,6 +9,7 @@ from dwmp.carriers.base import (
     CarrierAuthError,
     CarrierBase,
     CarrierSyncError,
+    TrackingResult,
     TrackingStatus,
 )
 from dwmp.storage.repository import PackageRepository
@@ -357,6 +358,74 @@ class TrackingService:
     async def get_account(self, account_id: int) -> dict | None:
         return await self._repository.get_account(account_id)
 
+    async def _persist_account_results(
+        self,
+        account_id: int,
+        account: dict,
+        results: list[TrackingResult],
+    ) -> list[dict]:
+        """Persist sync results discovered from any account-backed source."""
+        await self._repository.update_account_status(
+            account_id, AccountStatus.CONNECTED
+        )
+        await self._repository.update_account_last_synced(account_id)
+
+        acct_postal = account.get("postal_code") or ""
+
+        synced: list[dict] = []
+        for result in results:
+            pkg_postal = result.postal_code or acct_postal or None
+
+            existing = await self._repository.find_package(
+                result.tracking_number, result.carrier
+            )
+            if existing:
+                pkg_id = existing["id"]
+            else:
+                pkg_id = await self._repository.add_package(
+                    tracking_number=result.tracking_number,
+                    carrier=result.carrier,
+                    postal_code=pkg_postal,
+                    account_id=account_id,
+                    source="account",
+                    tracking_url=result.tracking_url,
+                )
+
+            backfill_postal = (
+                pkg_postal if pkg_postal and existing and not existing.get("postal_code") else None
+            )
+            if backfill_postal:
+                await self._repository.update_package_postal_code(
+                    pkg_id, backfill_postal
+                )
+            if result.tracking_url and existing and not existing.get("tracking_url"):
+                await self._repository.update_package_tracking_url(
+                    pkg_id, result.tracking_url
+                )
+
+            latest_desc = result.events[-1].description if result.events else None
+            est = result.estimated_delivery.isoformat() if result.estimated_delivery else None
+            await self._update_package_status(
+                pkg_id, result.status.value, result.tracking_number,
+                result.carrier, existing.get("label") if existing else None,
+                description=latest_desc,
+                estimated_delivery=est,
+            )
+            for event in result.events:
+                await self._repository.add_event(
+                    package_id=pkg_id,
+                    timestamp=event.timestamp,
+                    status=event.status.value,
+                    description=event.description,
+                    location=event.location,
+                )
+
+            pkg = await self.get_package(pkg_id)
+            if pkg:
+                synced.append(pkg)
+
+        return synced
+
     async def delete_account(self, account_id: int) -> bool:
         return await self._repository.delete_account(account_id)
 
@@ -473,82 +542,13 @@ class TrackingService:
             )
             raise CarrierAuthError(account["carrier"], message) from exc
 
-        # Mark account as healthy
-        await self._repository.update_account_status(
-            account_id, AccountStatus.CONNECTED
-        )
-        await self._repository.update_account_last_synced(account_id)
-
         # Persist refreshed tokens (e.g. updated browser cookies)
         updated_tokens = carrier.get_updated_tokens()
         if updated_tokens:
             await self._repository.update_account_tokens(
                 account_id, asdict(updated_tokens)
             )
-
-        # The account's postal_code is the delivery address — apply it to
-        # every discovered package so public tracking (DPD verification,
-        # GLS lookup) works even after account cookies expire.
-        acct_postal = account.get("postal_code") or ""
-
-        synced: list[dict] = []
-        for result in results:
-            # Prefer carrier-provided postal code, fall back to account's
-            pkg_postal = result.postal_code or acct_postal or None
-
-            existing = await self._repository.find_package(
-                result.tracking_number, result.carrier
-            )
-            if existing:
-                pkg_id = existing["id"]
-            else:
-                pkg_id = await self._repository.add_package(
-                    tracking_number=result.tracking_number,
-                    carrier=result.carrier,
-                    postal_code=pkg_postal,
-                    account_id=account_id,
-                    source="account",
-                    tracking_url=result.tracking_url,
-                )
-
-            # Backfill postal_code / tracking_url onto pre-existing rows when
-            # discovery newly surfaces them or the account now has a postal_code
-            # that wasn't set before. Without this, packages added before the
-            # carrier started capturing these fields would never benefit from
-            # public-track fallback once they drop off the account list.
-            backfill_postal = pkg_postal if pkg_postal and existing and not existing.get("postal_code") else None
-            if backfill_postal:
-                await self._repository.update_package_postal_code(
-                    pkg_id, backfill_postal
-                )
-            if result.tracking_url and existing and not existing.get("tracking_url"):
-                await self._repository.update_package_tracking_url(
-                    pkg_id, result.tracking_url
-                )
-
-            # Latest event description for the notification
-            latest_desc = result.events[-1].description if result.events else None
-            est = result.estimated_delivery.isoformat() if result.estimated_delivery else None
-            await self._update_package_status(
-                pkg_id, result.status.value, result.tracking_number,
-                result.carrier, existing.get("label") if existing else None,
-                description=latest_desc,
-                estimated_delivery=est,
-            )
-            for event in result.events:
-                await self._repository.add_event(
-                    package_id=pkg_id,
-                    timestamp=event.timestamp,
-                    status=event.status.value,
-                    description=event.description,
-                    location=event.location,
-                )
-
-            pkg = await self.get_package(pkg_id)
-            if pkg:
-                synced.append(pkg)
-
-        return synced
+        return await self._persist_account_results(account_id, account, results)
 
     async def sync_account_from_html(
         self, account_id: int, html: str
@@ -585,60 +585,39 @@ class TrackingService:
             )
             raise
 
-        # Mark account healthy
-        await self._repository.update_account_status(
-            account_id, AccountStatus.CONNECTED
-        )
-        await self._repository.update_account_last_synced(account_id)
+        return await self._persist_account_results(account_id, account, results)
 
-        acct_postal = account.get("postal_code") or ""
+    async def sync_account_from_browser_payload(
+        self, account_id: int, payload: dict
+    ) -> list[dict]:
+        """Sync an account using structured data harvested in the browser."""
+        account = await self._repository.get_account(account_id)
+        if account is None:
+            raise ValueError(f"Account {account_id} not found")
 
-        synced: list[dict] = []
-        for result in results:
-            pkg_postal = result.postal_code or acct_postal or None
+        carrier = self._carriers.get(account["carrier"])
+        if carrier is None:
+            raise ValueError(f"Unknown carrier: {account['carrier']}")
 
-            existing = await self._repository.find_package(
-                result.tracking_number, result.carrier
+        if not hasattr(carrier, "_parse_browser_payload"):
+            raise ValueError(
+                f"{account['carrier']} does not support browser payload sync"
             )
-            if existing:
-                pkg_id = existing["id"]
-            else:
-                pkg_id = await self._repository.add_package(
-                    tracking_number=result.tracking_number,
-                    carrier=result.carrier,
-                    postal_code=pkg_postal,
-                    account_id=account_id,
-                    source="account",
-                    tracking_url=result.tracking_url,
-                )
 
-            if pkg_postal and existing and not existing.get("postal_code"):
-                await self._repository.update_package_postal_code(
-                    pkg_id, pkg_postal
-                )
-
-            latest_desc = result.events[-1].description if result.events else None
-            est = result.estimated_delivery.isoformat() if result.estimated_delivery else None
-            await self._update_package_status(
-                pkg_id, result.status.value, result.tracking_number,
-                result.carrier, existing.get("label") if existing else None,
-                description=latest_desc,
-                estimated_delivery=est,
+        try:
+            results = carrier._parse_browser_payload(payload, account["lookback_days"])
+        except CarrierAuthError:
+            await self._repository.update_account_status(
+                account_id, AccountStatus.AUTH_FAILED
             )
-            for event in result.events:
-                await self._repository.add_event(
-                    package_id=pkg_id,
-                    timestamp=event.timestamp,
-                    status=event.status.value,
-                    description=event.description,
-                    location=event.location,
-                )
+            raise
+        except CarrierSyncError:
+            await self._repository.update_account_status(
+                account_id, AccountStatus.ERROR
+            )
+            raise
 
-            pkg = await self.get_package(pkg_id)
-            if pkg:
-                synced.append(pkg)
-
-        return synced
+        return await self._persist_account_results(account_id, account, results)
 
     # --- Package management ---
 

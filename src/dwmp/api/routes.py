@@ -306,6 +306,10 @@ class UniversalBrowserPushRequest(BaseModel):
     url: str
 
 
+class BrowserPayloadRequest(BaseModel):
+    payload: dict
+
+
 # URL hostname → carrier name mapping for universal browser-push.
 _URL_CARRIER_MAP: list[tuple[str, str]] = [
     ("amazon.nl", "amazon"),
@@ -379,6 +383,24 @@ async def browser_push(
     """
     try:
         return await service.sync_account_from_html(account_id, body.html)
+    except CarrierAuthError as exc:
+        raise HTTPException(status_code=502, detail=exc.message)
+    except CarrierSyncError as exc:
+        raise HTTPException(status_code=502, detail=exc.message)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/accounts/{account_id}/browser-payload")
+async def browser_payload(
+    account_id: int,
+    body: BrowserPayloadRequest,
+    service: TrackingService = Depends(get_tracking_service),
+) -> list[dict]:
+    try:
+        return await service.sync_account_from_browser_payload(
+            account_id, body.payload
+        )
     except CarrierAuthError as exc:
         raise HTTPException(status_code=502, detail=exc.message)
     except CarrierSyncError as exc:

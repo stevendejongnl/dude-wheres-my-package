@@ -24,6 +24,7 @@ globalThis.chrome = {
 };
 
 const {
+  browserPayload,
   getConfig,
   saveConfig,
   clearConfig,
@@ -101,6 +102,24 @@ describe("apiCall error fallback", () => {
     const result = await browserPush("<html></html>", "https://dpdgroup.com/nl");
     expect(result.ok).toBe(false);
     expect(result.error).toBe("DPD is experiencing a technical issue");
+  });
+
+  it("posts structured browser payloads to the account endpoint", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ([]),
+    });
+
+    await browserPayload(42, { shipments: [], details: [] });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://dwmp.test/api/v1/accounts/42/browser-payload",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ payload: { shipments: [], details: [] } }),
+      }),
+    );
   });
 });
 
