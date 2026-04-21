@@ -1,5 +1,5 @@
-import pytest
 import httpx
+import pytest
 
 from dwmp.carriers.base import AuthTokens, AuthType, TrackingStatus
 from dwmp.carriers.postnl import PostNL, _parse_status
