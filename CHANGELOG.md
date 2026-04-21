@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.46.2 (2026-04-21)
+
+### Bug Fixes
+
+- **ci**: Sort PostNL test imports
+  ([`e17c4f6`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/e17c4f6c33f3b4d9cba9d8a0023486585934f644))
+
+- **postnl**: Sync browser-fetched tracking timelines
+  ([`a41f9d9`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/a41f9d9d61b22c2724d7e7a8a638fdb8bcf57d8d))
+
+
 ## v1.46.1 (2026-04-21)
 
 ### Bug Fixes
