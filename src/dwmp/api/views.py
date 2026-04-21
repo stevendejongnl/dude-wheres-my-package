@@ -260,8 +260,10 @@ _FORM_TEMPLATES = {
     "dpd": "account_form_browser_push.html",
     # DHL logs in directly from the server via credentials.
     "dhl": "account_form_credentials.html",
-    # PostNL uses a manual-token flow (pasted API token from the browser).
-    "postnl": "account_form_postnl.html",
+    # PostNL stores email+password; the extension logs in on jouw.postnl.nl,
+    # harvests the access token from sessionStorage, and pushes it back via
+    # PATCH /accounts/{id}/token. Server keeps using the GraphQL sync.
+    "postnl": "account_form_browser_push.html",
 }
 
 

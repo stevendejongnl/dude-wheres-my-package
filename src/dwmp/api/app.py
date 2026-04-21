@@ -1,3 +1,4 @@
+import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -15,6 +16,9 @@ from dwmp.api.routes import router
 from dwmp.api.views import _LoginRequired
 from dwmp.api.views import router as views_router
 from dwmp.services.scheduler import PackageScheduler
+from dwmp.services.telegram_notifier import TelegramNotifier
+
+_lifespan_logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -29,10 +33,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     scheduler.start()
 
-    yield
+    notifier = TelegramNotifier()
+    await notifier.send_startup(app.version)
 
-    scheduler.stop()
-    await repo.close()
+    shutdown_reason = "graceful"
+    try:
+        yield
+    except BaseException as exc:
+        shutdown_reason = f"error: {type(exc).__name__}"
+        try:
+            await notifier.send_crash(exc, app.version)
+        except Exception as notify_err:
+            _lifespan_logger.error("Failed to send crash notification: %s", notify_err)
+        raise
+    finally:
+        scheduler.stop()
+        await repo.close()
+        try:
+            await notifier.send_shutdown(app.version, reason=shutdown_reason)
+        except Exception as notify_err:
+            _lifespan_logger.error("Failed to send shutdown notification: %s", notify_err)
 
 
 OPEN_PATHS = {

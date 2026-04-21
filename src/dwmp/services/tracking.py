@@ -300,10 +300,13 @@ class TrackingService:
         tokens = await self.validate_account_manual_token(
             carrier_name, access_token, refresh_token, user_agent=user_agent,
         )
+        existing = await self._repository.get_account(account_id)
+        if existing is None:
+            raise ValueError(f"Account {account_id} not found")
         updated = await self._repository.update_account(
             account_id=account_id,
             tokens=asdict(tokens),
-            username=None,
+            username=existing.get("username"),
             lookback_days=lookback_days,
             postal_code=postal_code,
         )

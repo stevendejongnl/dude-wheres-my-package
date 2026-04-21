@@ -276,3 +276,39 @@ async def test_connect_manual_token_fails_when_token_invalid(repo):
 
     # Failed connect must not persist a broken account
     assert await repo.list_accounts() == []
+
+
+class ManualTokenStub(CarrierBase):
+    name = "mt-stub"
+    auth_type = AuthType.MANUAL_TOKEN
+
+    async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        return TrackingResult(tracking_number=tracking_number, carrier=self.name, status=TrackingStatus.UNKNOWN)
+
+    async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
+        return []
+
+
+async def test_update_manual_token_preserves_username(repo):
+    """Token refresh from the extension must not wipe the stored username.
+
+    Regression guard: PostNL (and future extension-driven carriers) persist
+    ``username`` on the account row; prior implementation passed
+    ``username=None`` on token refresh which NULL-ed that column.
+    """
+    service = TrackingService(repository=repo, carriers={"mt-stub": ManualTokenStub()})
+
+    account_id = await repo.add_account(
+        carrier="mt-stub", auth_type="browser_push",
+        tokens={"access_token": "old", "refresh_token": None},
+        username="remembered@example.com",
+    )
+
+    await service.update_account_manual_token(
+        account_id, "mt-stub", "refreshed-token",
+    )
+
+    account = await repo.get_account(account_id)
+    assert account is not None
+    assert account["username"] == "remembered@example.com"
+    assert (account["tokens"] or {}).get("access_token") == "refreshed-token"

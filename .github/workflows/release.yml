@@ -172,6 +172,23 @@ jobs:
               --tag "$IMAGE_TAG_VERSION" \
               .
 
+      - name: Notify Telegram on release success
+        if: steps.release.outputs.released == 'true'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VERSION: ${{ steps.release.outputs.version }}
+          BRANCH: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          scripts/send-telegram-notification.sh \
+            --type release_success \
+            --version "$VERSION" \
+            --branch "$BRANCH" \
+            --commit "$COMMIT" \
+            --run-url "$RUN_URL"
+
   # Open a PR in the HA addon repo to bump its Dockerfile to the new dwmp image tag.
   # Runs only when semantic-release actually published a new version.
   # Requires repo secret ADDON_REPO_TOKEN (PAT or GitHub App token) with
