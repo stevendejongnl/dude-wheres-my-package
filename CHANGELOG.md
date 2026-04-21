@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.46.0 (2026-04-21)
+
+### Features
+
+- Telegram notifications + postnl browser_push auth
+  ([`533f9b4`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/533f9b4ee255ec500878ba81ee9b1f41abb8d4da))
+
+
 ## v1.45.2 (2026-04-20)
 
 ### Bug Fixes
