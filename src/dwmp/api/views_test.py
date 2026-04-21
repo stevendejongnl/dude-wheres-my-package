@@ -326,3 +326,59 @@ async def test_track_package_save_rejects_duplicate(client: AsyncClient, repo):
     assert response.status_code == 200
     assert "test-result error" in response.text
     assert "already being tracked" in response.text
+
+
+async def test_edit_save_blank_password_keeps_existing_credentials(client: AsyncClient, repo):
+    """Editing non-credential fields (postal, lookback) must preserve the
+    stored credentials JSON when the user leaves password blank."""
+    stored_creds = '{"email": "u@test.com", "password": "p"}'
+    account_id = await repo.add_account(
+        carrier="amazon", auth_type="browser_push",
+        tokens={"access_token": "", "refresh_token": stored_creds},
+        username="u@test.com",
+    )
+
+    response = await client.post(
+        f"/accounts/{account_id}/edit/save",
+        data={
+            "username": "u@test.com", "password": "",
+            "lookback_days": "60", "postal_code": "1234AB",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers.get("HX-Refresh") == "true"
+
+    updated = await repo.get_account(account_id)
+    assert updated is not None
+    assert updated["lookback_days"] == 60
+    assert updated["postal_code"] == "1234AB"
+    # Credentials JSON must survive the settings-only edit.
+    assert (updated["tokens"] or {}).get("refresh_token") == stored_creds
+
+
+async def test_edit_save_blank_password_errors_when_credentials_missing(
+    client: AsyncClient, repo,
+):
+    """If stored credentials have been wiped, blank-password edit must
+    refuse rather than silently leaving the account un-credentialed."""
+    account_id = await repo.add_account(
+        carrier="amazon", auth_type="credentials",
+        tokens={"access_token": "bearer", "refresh_token": None},
+        username="u@test.com",
+    )
+
+    response = await client.post(
+        f"/accounts/{account_id}/edit/save",
+        data={
+            "username": "u@test.com", "password": "",
+            "lookback_days": "30",
+        },
+    )
+    assert response.status_code == 200
+    assert "test-result error" in response.text
+    assert "re-enter the password" in response.text
+
+    # Nothing should have changed — still no credentials stored.
+    unchanged = await repo.get_account(account_id)
+    assert unchanged is not None
+    assert (unchanged["tokens"] or {}).get("refresh_token") is None

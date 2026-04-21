@@ -11,7 +11,8 @@ from fastapi.templating import Jinja2Templates
 
 from dwmp.api.auth import login_response, logout_response, verify_password
 from dwmp.api.dependencies import get_tracking_service
-from dwmp.carriers.base import CarrierAuthError
+from dwmp.api.routes import _has_stored_credentials
+from dwmp.carriers.base import AuthType, CarrierAuthError
 from dwmp.services.tracking import TrackingService
 
 VERSION = pkg_version("dude-wheres-my-package")
@@ -274,6 +275,16 @@ def _form_template(carrier: str) -> str:
     return template
 
 
+def _uses_credentials_form(service: TrackingService, carrier_name: str) -> bool:
+    """True if the carrier's edit form collects username + password."""
+    carrier = service.get_carrier(carrier_name)
+    if carrier is None:
+        return False
+    return carrier.auth_type in (
+        AuthType.CREDENTIALS, AuthType.BROWSER_PUSH, AuthType.EXTENSION_TOKEN,
+    )
+
+
 @router.get("/accounts/add/{carrier}", response_class=HTMLResponse)
 async def add_account_form(
     request: Request,
@@ -356,6 +367,7 @@ async def edit_account_form(
     ctx = {
         "carrier": account["carrier"],
         "account": account,
+        "has_credentials": _has_stored_credentials(account.get("tokens")),
         "base_path": _base_path(request),
     }
     return templates.TemplateResponse(request, template, ctx)
@@ -410,6 +422,18 @@ async def edit_account_save(
                 refresh_token or None, lookback_days,
                 user_agent=user_agent or None,
                 postal_code=postal_code.strip() or None,
+            )
+        elif (
+            _uses_credentials_form(service, account["carrier"])
+            and not _has_stored_credentials(account.get("tokens"))
+        ):
+            # The form promises "leave password blank to keep" — but
+            # this account has no stored credentials to keep (earlier
+            # extension versions wiped them on PATCH /token). Force the
+            # user to re-enter rather than silently persisting nothing.
+            return _result_html(
+                False,
+                "Credentials missing — please re-enter the password to restore them.",
             )
         else:
             # Settings-only edit (e.g. lookback_days, postal_code) —

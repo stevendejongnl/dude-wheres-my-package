@@ -295,12 +295,21 @@ class TrackingService:
         postal_code: str | None = None,
     ) -> dict:
         """Re-validate a manual token and update an existing account in place."""
-        tokens = await self.validate_account_manual_token(
-            carrier_name, access_token, refresh_token, user_agent=user_agent,
-        )
         existing = await self._repository.get_account(account_id)
         if existing is None:
             raise ValueError(f"Account {account_id} not found")
+
+        # For extension-driven carriers (PostNL) refresh_token holds the
+        # stored credentials JSON the extension needs to auto-login. When a
+        # client PATCHes only a fresh access_token, keep the existing
+        # refresh_token so the credentials aren't wiped on every sync.
+        if refresh_token is None:
+            existing_tokens = existing.get("tokens") or {}
+            refresh_token = existing_tokens.get("refresh_token")
+
+        tokens = await self.validate_account_manual_token(
+            carrier_name, access_token, refresh_token, user_agent=user_agent,
+        )
         updated = await self._repository.update_account(
             account_id=account_id,
             tokens=asdict(tokens),

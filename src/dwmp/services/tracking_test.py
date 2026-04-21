@@ -314,6 +314,37 @@ async def test_update_manual_token_preserves_username(repo):
     assert (account["tokens"] or {}).get("access_token") == "refreshed-token"
 
 
+async def test_update_manual_token_preserves_existing_refresh_token(repo):
+    """Token refresh without a new refresh_token must keep the stored one.
+
+    Regression guard: older extension versions PATCHed /accounts/{id}/token
+    with only ``access_token``. The previous implementation overwrote
+    ``refresh_token`` with ``None`` — wiping the credentials JSON that
+    PostNL and other extension-driven carriers rely on for auto-login on
+    the next sync. Recovery required the user to re-enter their password.
+    """
+    service = TrackingService(repository=repo, carriers={"mt-stub": ManualTokenStub()})
+
+    stored_creds = '{"email": "u@example.com", "password": "p"}'
+    account_id = await repo.add_account(
+        carrier="mt-stub", auth_type="browser_push",
+        tokens={"access_token": "old", "refresh_token": stored_creds},
+        username="u@example.com",
+    )
+
+    # Caller passes refresh_token=None — emulates a PATCH body with only
+    # ``access_token`` (the old extension's sync flow).
+    await service.update_account_manual_token(
+        account_id, "mt-stub", "refreshed-token", refresh_token=None,
+    )
+
+    account = await repo.get_account(account_id)
+    assert account is not None
+    tokens = account["tokens"] or {}
+    assert tokens.get("access_token") == "refreshed-token"
+    assert tokens.get("refresh_token") == stored_creds
+
+
 class ExtensionTokenStub(CarrierBase):
     name = "ext-stub"
     auth_type = AuthType.EXTENSION_TOKEN

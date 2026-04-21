@@ -56,9 +56,14 @@
   <div class="form-group">
     <label for="password-{{ form_id }}">Password</label>
     <input type="password" id="password-{{ form_id }}" name="password"
-      {% if not account %}required{% endif %}
+      {% if not account or (account and not has_credentials) %}required{% endif %}
       autocomplete="current-password"
-      placeholder="{% if account %}(unchanged — leave blank to keep){% endif %}">
+      placeholder="{% if account and has_credentials %}(unchanged — leave blank to keep){% endif %}">
+    {% if account and not has_credentials %}
+    <small class="form-help form-warning">
+      No stored password — please re-enter it so the extension can log in on your next sync.
+    </small>
+    {% endif %}
   </div>
 
   {% if carrier == "amazon" %}
