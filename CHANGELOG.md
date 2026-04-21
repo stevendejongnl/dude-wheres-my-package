@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.46.3 (2026-04-21)
+
+### Bug Fixes
+
+- **accounts**: Preserve stored credentials when editing without a password
+  ([`55b98a6`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/55b98a6702c0218b5274c82a7b403b342c8eb837))
+
+
 ## v1.46.2 (2026-04-21)
 
 ### Bug Fixes
