@@ -87,7 +87,7 @@ def _parse_status(text: str) -> TrackingStatus:
 
 class PostNL(CarrierBase):
     name = "postnl"
-    auth_type = AuthType.BROWSER_PUSH
+    auth_type = AuthType.EXTENSION_TOKEN
 
     def __init__(self, http_client: httpx.AsyncClient | None = None) -> None:
         self._client = http_client

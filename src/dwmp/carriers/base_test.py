@@ -104,6 +104,9 @@ def test_tracking_status_values():
 def test_auth_type_values():
     assert AuthType.OAUTH == "oauth"
     assert AuthType.CREDENTIALS == "credentials"
+    assert AuthType.MANUAL_TOKEN == "manual_token"
+    assert AuthType.BROWSER_PUSH == "browser_push"
+    assert AuthType.EXTENSION_TOKEN == "extension_token"
 
 
 def test_tracking_event_is_immutable():

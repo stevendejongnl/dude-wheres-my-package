@@ -55,8 +55,8 @@ async def test_parse_json_response():
     assert result.estimated_delivery is not None
 
 
-def test_postnl_is_browser_push():
-    assert PostNL().auth_type == AuthType.BROWSER_PUSH
+def test_postnl_is_extension_token():
+    assert PostNL().auth_type == AuthType.EXTENSION_TOKEN
 
 
 async def test_postnl_rejects_oauth():
