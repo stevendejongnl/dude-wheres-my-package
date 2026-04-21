@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.46.1 (2026-04-21)
+
+### Bug Fixes
+
+- **postnl**: Add AuthType.EXTENSION_TOKEN so sync_account actually fetches shipments
+  ([`dc57426`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/dc574266361abf772d2a4358fda88e63e985f2b0))
+
+
 ## v1.46.0 (2026-04-21)
 
 ### Features
