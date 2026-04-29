@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.47.4 (2026-04-29)
+
+### Bug Fixes
+
+- **postnl**: Read session token before navigating to parcels page, restore localStorage clear
+  ([`1dc2d5e`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/1dc2d5effa41b7d8035deab3452c68b64c2a364b))
+
+
 ## v1.47.3 (2026-04-29)
 
 ### Bug Fixes

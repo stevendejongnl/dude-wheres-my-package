@@ -1,6 +1,6 @@
 [project]
 name = "dude-wheres-my-package"
-version = "1.47.3"
+version = "1.47.4"
 description = "Package tracking service for Amazon, PostNL, DHL, and DPD"
 authors = [{ name = "Steven de Jong", email = "steven@steven-dejong.nl" }]
 requires-python = ">=3.13"
