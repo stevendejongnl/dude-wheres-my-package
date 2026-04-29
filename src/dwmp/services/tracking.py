@@ -43,12 +43,15 @@ class TrackingService:
         label: str | None,
         description: str | None = None,
         estimated_delivery: str | None = None,
+        delivery_window_end: str | None = None,
     ) -> None:
         """Update package status and create a notification if it changed."""
         existing = await self._repository.get_package(pkg_id)
         old_status = existing["current_status"] if existing else "unknown"
         await self._repository.update_status(
-            pkg_id, new_status, estimated_delivery=estimated_delivery,
+            pkg_id, new_status,
+            estimated_delivery=estimated_delivery,
+            delivery_window_end=delivery_window_end,
         )
         if old_status != new_status:
             await self._repository.add_notification(
@@ -414,11 +417,13 @@ class TrackingService:
 
             latest_desc = result.events[-1].description if result.events else None
             est = result.estimated_delivery.isoformat() if result.estimated_delivery else None
+            win_end = result.delivery_window_end.isoformat() if result.delivery_window_end else None
             await self._update_package_status(
                 pkg_id, result.status.value, result.tracking_number,
                 result.carrier, existing.get("label") if existing else None,
                 description=latest_desc,
                 estimated_delivery=est,
+                delivery_window_end=win_end,
             )
             for event in result.events:
                 await self._repository.add_event(
@@ -697,11 +702,13 @@ class TrackingService:
 
         latest_desc = result.events[-1].description if result.events else None
         est = result.estimated_delivery.isoformat() if result.estimated_delivery else None
+        win_end = result.delivery_window_end.isoformat() if result.delivery_window_end else None
         await self._update_package_status(
             package_id, result.status.value,
             pkg["tracking_number"], pkg["carrier"], pkg.get("label"),
             description=latest_desc,
             estimated_delivery=est,
+            delivery_window_end=win_end,
         )
         for event in result.events:
             await self._repository.add_event(

@@ -242,11 +242,20 @@ class PostNL(CarrierBase):
             except ValueError:
                 pass
 
+        window_end = None
+        window_to = shipment.get("deliveryWindowTo")
+        if window_to:
+            try:
+                window_end = datetime.fromisoformat(window_to)
+            except ValueError:
+                pass
+
         return TrackingResult(
             tracking_number=barcode,
             carrier=self.name,
             status=status,
             estimated_delivery=estimated,
+            delivery_window_end=window_end,
             events=sorted(events, key=lambda e: e.timestamp),
             postal_code=postal_code,
             tracking_url=tracking_url,
@@ -299,6 +308,7 @@ class PostNL(CarrierBase):
         }.values())
 
         estimated = colli.get("expectedDeliveryDate") or colli.get("eta", {}).get("start")
+        window_end_raw = colli.get("eta", {}).get("end")
         postal_code = (
             colli.get("deliveryAddress", {})
             .get("address", {})
@@ -314,6 +324,7 @@ class PostNL(CarrierBase):
             carrier=self.name,
             status=status,
             estimated_delivery=_ensure_utc(datetime.fromisoformat(estimated)) if estimated else None,
+            delivery_window_end=_ensure_utc(datetime.fromisoformat(window_end_raw)) if window_end_raw else None,
             events=sorted(deduped_events, key=lambda e: e.timestamp),
             postal_code=postal_code,
             tracking_url=tracking_url,
@@ -385,6 +396,7 @@ class PostNL(CarrierBase):
             carrier=self.name,
             status=enriched.status,
             estimated_delivery=enriched.estimated_delivery or result.estimated_delivery,
+            delivery_window_end=enriched.delivery_window_end or result.delivery_window_end,
             events=enriched.events or result.events,
             postal_code=result.postal_code or enriched.postal_code,
             tracking_url=result.tracking_url or enriched.tracking_url,

@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS packages (
     source TEXT NOT NULL DEFAULT 'manual',
     current_status TEXT NOT NULL DEFAULT 'unknown',
     estimated_delivery TEXT,
+    delivery_window_end TEXT,
     last_refreshed_at TEXT,
     tracking_url TEXT,
     created_at TEXT NOT NULL,
@@ -112,6 +113,11 @@ class PackageRepository:
         # the authenticated orders page and must be captured at discovery time.
         cursor = await self.db.execute("PRAGMA table_info(packages)")
         cols = {col["name"] for col in await cursor.fetchall()}
+        if "delivery_window_end" not in cols:
+            await self.db.execute(
+                "ALTER TABLE packages ADD COLUMN delivery_window_end TEXT"
+            )
+            await self.db.commit()
         if "last_refreshed_at" not in cols:
             await self.db.execute(
                 "ALTER TABLE packages ADD COLUMN last_refreshed_at TEXT"
@@ -402,6 +408,7 @@ class PackageRepository:
         package_id: int,
         status: str,
         estimated_delivery: str | None = None,
+        delivery_window_end: str | None = None,
     ) -> None:
         """Update current_status, estimated_delivery, updated_at, and last_refreshed_at.
 
@@ -413,8 +420,8 @@ class PackageRepository:
         now = datetime.now(UTC).isoformat()
         await self.db.execute(
             "UPDATE packages SET current_status = ?, estimated_delivery = ?,"
-            " updated_at = ?, last_refreshed_at = ? WHERE id = ?",
-            (status, estimated_delivery, now, now, package_id),
+            " delivery_window_end = ?, updated_at = ?, last_refreshed_at = ? WHERE id = ?",
+            (status, estimated_delivery, delivery_window_end, now, now, package_id),
         )
         await self.db.commit()
 

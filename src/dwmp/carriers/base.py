@@ -92,6 +92,7 @@ class TrackingResult:
     carrier: str
     status: TrackingStatus
     estimated_delivery: datetime | None = None
+    delivery_window_end: datetime | None = None
     events: list[TrackingEvent] = field(default_factory=list)
     # Destination postal code discovered during an authenticated sync.
     # Persisted on the package row so that once the carrier's account list

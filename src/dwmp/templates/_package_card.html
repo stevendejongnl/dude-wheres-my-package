@@ -28,6 +28,15 @@
     </div>
     <div class="pkg-meta">
       <span class="status status-{{ pkg.current_status }}">{{ pkg.current_status | replace('_', ' ') }}</span>
+      {% if pkg.estimated_delivery %}
+      <span class="pkg-eta">
+        {%- if pkg.delivery_window_end %}
+          {{ pkg.estimated_delivery[11:16] }} – {{ pkg.delivery_window_end[11:16] }}
+        {%- else %}
+          {{ pkg.estimated_delivery[:10] }} {{ pkg.estimated_delivery[11:16] }}
+        {%- endif %}
+      </span>
+      {% endif %}
       <span class="pkg-date">{{ pkg.last_update }}</span>
       {% if pkg.last_synced %}
       <span class="pkg-date pkg-synced">Synced {{ pkg.last_synced }}</span>
@@ -80,10 +89,6 @@
         {% if pkg.account_id %}
         <span class="meta-label">Account</span>
         <span class="meta-value">#{{ pkg.account_id }}</span>
-        {% endif %}
-        {% if pkg.estimated_delivery %}
-        <span class="meta-label">ETA</span>
-        <span class="meta-value">{{ pkg.estimated_delivery[:16] | replace('T', ' ') }}</span>
         {% endif %}
         <span class="meta-label">Last refreshed</span>
         <span class="meta-value">{{ pkg.last_refreshed_at[:16] | replace('T', ' ') if pkg.last_refreshed_at else 'never' }}</span>
