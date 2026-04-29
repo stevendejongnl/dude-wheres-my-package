@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.48.0 (2026-04-29)
+
+### Bug Fixes
+
+- **extension**: Always open fresh tab for carriers with auto-login
+  ([`5d54d17`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/5d54d1716fda3b70bb8113f3649883ab029ccda2))
+
+### Features
+
+- **postnl**: Show delivery window in main card view
+  ([`7a9c914`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/7a9c91428818f2a9bed5127f59abbc45ec72d410))
+
+
 ## v1.47.6 (2026-04-29)
 
 ### Bug Fixes
