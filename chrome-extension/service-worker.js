@@ -164,19 +164,10 @@ async function syncCarrierViaTab(account) {
       await waitForUrlStable(tabId);
     }
 
-    // After login (or if already logged in), navigate to the parcels page
-    // so we capture the right HTML — the post-login redirect may land us
-    // on a dashboard instead of the parcels list.
-    const currentUrl = (await chrome.tabs.get(tabId)).url || "";
-    if (urls.login && !currentUrl.startsWith(urls.parcels)) {
-      await chrome.tabs.update(tabId, { url: urls.parcels });
-      await waitForTabLoad(tabId);
-      await waitForUrlStable(tabId);
-    }
-
-    // PostNL: fetch the account list + detail payloads in the real browser tab
-    // and push the structured payload to the server. That keeps the same
-    // browser-authenticated view the user sees, including the richer timeline.
+    // PostNL: read the access token from sessionStorage BEFORE navigating to
+    // the parcels page. The OIDC callback sets poa.auth.access_token while
+    // still on the jouw.postnl.nl callback URL — navigating away first would
+    // interrupt that callback and lose the token.
     if (account.carrier === "postnl") {
       let accessToken = null;
       const deadline = Date.now() + 30_000;
@@ -205,6 +196,14 @@ async function syncCarrierViaTab(account) {
         return;
       }
 
+      // Token secured — now navigate to the parcels page for the payload fetch.
+      const postnlUrl = (await chrome.tabs.get(tabId)).url || "";
+      if (!postnlUrl.startsWith(urls.parcels)) {
+        await chrome.tabs.update(tabId, { url: urls.parcels });
+        await waitForTabLoad(tabId);
+        await waitForUrlStable(tabId);
+      }
+
       const payloadResult = await fetchPostNLPayload(tabId, accessToken);
       if (!payloadResult.ok) {
         await storeSyncResult(account.id, false, payloadResult.error || "Failed to fetch PostNL data");
@@ -215,6 +214,16 @@ async function syncCarrierViaTab(account) {
       const count = Array.isArray(syncResult.data) ? syncResult.data.length : 0;
       await storeSyncResult(account.id, syncResult.ok, syncResult.ok ? null : syncResult.error, count);
       return;
+    }
+
+    // After login (or if already logged in), navigate to the parcels page
+    // so we capture the right HTML — the post-login redirect may land us
+    // on a dashboard instead of the parcels list.
+    const currentUrl = (await chrome.tabs.get(tabId)).url || "";
+    if (urls.login && !currentUrl.startsWith(urls.parcels)) {
+      await chrome.tabs.update(tabId, { url: urls.parcels });
+      await waitForTabLoad(tabId);
+      await waitForUrlStable(tabId);
     }
 
     await sleep(RENDER_WAIT_MS);
@@ -478,14 +487,12 @@ async function clearCarrierSiteData(carrier) {
     }),
   );
 
-  // Cache: browsingData has no domain-suffix filter, so use the explicit
-  // per-carrier origin list. localStorage is intentionally left intact —
-  // OIDC client libraries (e.g. PostNL) store discovery metadata there and
-  // clearing it forces a slow re-initialization that can outlast token timeouts.
+  // Storage / cache: browsingData has no domain-suffix filter, so use the
+  // explicit per-carrier origin list.
   if (config.storageOrigins?.length) {
     await chrome.browsingData.remove(
       { origins: config.storageOrigins },
-      { cache: true },
+      { cache: true, localStorage: true },
     );
   }
 }
