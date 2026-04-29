@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.47.2 (2026-04-29)
+
+### Bug Fixes
+
+- **extension**: Remove invalid sessionStorage key from browsingData.remove
+  ([`b85ba60`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/b85ba602074476968f337ab352d9ab09926ff8a3))
+
+
 ## v1.47.1 (2026-04-29)
 
 ### Bug Fixes
