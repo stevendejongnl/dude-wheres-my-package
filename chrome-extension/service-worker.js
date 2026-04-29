@@ -134,9 +134,13 @@ async function syncCarrierViaTab(account) {
       await clearCarrierSiteData(account.carrier);
     }
 
-    // Reuse an existing tab on this carrier domain if one is open
+    // When a login URL is configured we always clear site data and force a
+    // fresh login — reusing an existing tab would log the user out of their
+    // active browser session, so always open a dedicated tab in that case.
     const domain = new URL(startUrl).hostname;
-    const existing = await chrome.tabs.query({ url: `*://*.${domain}/*` });
+    const existing = urls.login
+      ? []
+      : await chrome.tabs.query({ url: `*://*.${domain}/*` });
     if (existing.length > 0) {
       tabId = existing[0].id;
       shouldCloseTab = false;
