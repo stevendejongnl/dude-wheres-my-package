@@ -483,7 +483,7 @@ async function clearCarrierSiteData(carrier) {
   if (config.storageOrigins?.length) {
     await chrome.browsingData.remove(
       { origins: config.storageOrigins },
-      { cache: true, localStorage: true, sessionStorage: true },
+      { cache: true, localStorage: true },
     );
   }
 }
