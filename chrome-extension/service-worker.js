@@ -529,30 +529,63 @@ function isCarrierLoginPage(carrier, url) {
 }
 
 async function handlePostNLLogin(tabId, username, password) {
-  await chrome.scripting.executeScript({
+  // PostNL uses a two-step OIDC form: email on step 1, password on step 2.
+  // When the remembered-email localStorage entry is present, the page skips
+  // straight to the password step. We handle both layouts: fill whatever
+  // fields are visible on the current step, submit, then check whether a
+  // second step (password-only) appeared and fill that too.
+  const fillStep = (email, pass) => {
+    const inputs = document.querySelectorAll(
+      "input[type='text'], input[type='email'], input:not([type])"
+    );
+    const passEl = document.querySelector("input[type='password']");
+    const emailEl = inputs[0];
+    if (emailEl) {
+      emailEl.value = email;
+      emailEl.dispatchEvent(new Event("input", { bubbles: true }));
+      emailEl.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    if (passEl) {
+      passEl.value = pass;
+      passEl.dispatchEvent(new Event("input", { bubbles: true }));
+      passEl.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    const btn =
+      document.querySelector("button[type='submit']") ||
+      document.querySelector("input[type='submit']");
+    if (btn) btn.click();
+    return !!passEl;
+  };
+
+  const [{ result: hadPasswordField }] = await chrome.scripting.executeScript({
     target: { tabId },
-    func: (email, pass) => {
-      // PostNL OIDC login form at login.postnl.nl — text + password inputs
-      const inputs = document.querySelectorAll(
-        "input[type='text'], input[type='email'], input:not([type])"
-      );
-      const passEl = document.querySelector("input[type='password']");
-      const emailEl = inputs[0];
-      if (emailEl) {
-        emailEl.value = email;
-        emailEl.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-      if (passEl) {
-        passEl.value = pass;
-        passEl.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-      const btn =
-        document.querySelector("button[type='submit']") ||
-        document.querySelector("input[type='submit']");
-      if (btn) btn.click();
-    },
+    func: fillStep,
     args: [username, password],
   });
+
+  if (!hadPasswordField) {
+    // Step 1 only had the email field — wait for the password step to load.
+    await sleep(3000);
+    const mid = await chrome.tabs.get(tabId);
+    if (isCarrierLoginPage("postnl", mid.url)) {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        func: (pass) => {
+          const passEl = document.querySelector("input[type='password']");
+          if (passEl) {
+            passEl.value = pass;
+            passEl.dispatchEvent(new Event("input", { bubbles: true }));
+            passEl.dispatchEvent(new Event("change", { bubbles: true }));
+            const btn =
+              document.querySelector("button[type='submit']") ||
+              document.querySelector("input[type='submit']");
+            if (btn) btn.click();
+          }
+        },
+        args: [password],
+      });
+    }
+  }
 
   await waitForUrlStable(tabId, 2000, 15000);
   const info = await chrome.tabs.get(tabId);

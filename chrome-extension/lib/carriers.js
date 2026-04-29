@@ -67,11 +67,12 @@ export const CARRIER_AUTH_CLEAR = {
   },
   postnl: {
     cookieDomain: "postnl.nl",
-    storageOrigins: [
-      "https://jouw.postnl.nl",
-      "https://login.postnl.nl",
-      "https://www.postnl.nl",
-    ],
+    // login.postnl.nl localStorage stores the remembered email address that
+    // PostNL pre-fills on the login form — clearing it causes the form to
+    // switch to a multi-step flow (email first, then password) which the
+    // login script can't handle. Cookies for login.postnl.nl are still wiped
+    // by the eTLD+1 cookie sweep above (cookieDomain: "postnl.nl").
+    storageOrigins: ["https://jouw.postnl.nl", "https://www.postnl.nl"],
   },
 };
 
