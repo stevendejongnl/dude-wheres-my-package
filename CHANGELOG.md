@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.47.0 (2026-04-29)
+
+### Features
+
+- **extension**: Clear carrier site data before every login sync
+  ([`125fb7e`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/125fb7e67c2a2330792e283b1c044e2f1a2b18f9))
+
+
 ## v1.46.3 (2026-04-21)
 
 ### Bug Fixes
