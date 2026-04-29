@@ -126,14 +126,14 @@ async function syncCarrierViaTab(account) {
   // hoping the parcels page redirects to login on cookie expiry.
   const startUrl = urls.login || urls.parcels;
 
-  // Wipe all carrier session data before every login-URL sync. Stale cookies
-  // and broken SSO state are the most common cause of silent login failures;
-  // credentials are always stored at this point so we can re-login cleanly.
-  if (urls.login) {
-    await clearCarrierSiteData(account.carrier);
-  }
-
   try {
+    // Wipe all carrier session data before every login-URL sync. Stale cookies
+    // and broken SSO state are the most common cause of silent login failures;
+    // credentials are always stored at this point so we can re-login cleanly.
+    if (urls.login) {
+      await clearCarrierSiteData(account.carrier);
+    }
+
     // Reuse an existing tab on this carrier domain if one is open
     const domain = new URL(startUrl).hostname;
     const existing = await chrome.tabs.query({ url: `*://*.${domain}/*` });
