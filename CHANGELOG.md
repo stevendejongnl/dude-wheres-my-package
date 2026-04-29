@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.47.3 (2026-04-29)
+
+### Bug Fixes
+
+- **extension**: Drop localStorage clear and extend PostNL token deadline to 30s
+  ([`e67f832`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/e67f832919be9583a30ad890f5c97fa145362ba5))
+
+
 ## v1.47.2 (2026-04-29)
 
 ### Bug Fixes
