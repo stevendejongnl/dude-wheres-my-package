@@ -179,7 +179,7 @@ async function syncCarrierViaTab(account) {
     // browser-authenticated view the user sees, including the richer timeline.
     if (account.carrier === "postnl") {
       let accessToken = null;
-      const deadline = Date.now() + 15_000;
+      const deadline = Date.now() + 30_000;
       while (Date.now() < deadline) {
         const tabUrl = (await chrome.tabs.get(tabId)).url || "";
         if (!tabUrl.includes("jouw.postnl.nl")) {
@@ -478,12 +478,14 @@ async function clearCarrierSiteData(carrier) {
     }),
   );
 
-  // Storage / cache: browsingData has no domain-suffix filter, so use the
-  // explicit per-carrier origin list.
+  // Cache: browsingData has no domain-suffix filter, so use the explicit
+  // per-carrier origin list. localStorage is intentionally left intact —
+  // OIDC client libraries (e.g. PostNL) store discovery metadata there and
+  // clearing it forces a slow re-initialization that can outlast token timeouts.
   if (config.storageOrigins?.length) {
     await chrome.browsingData.remove(
       { origins: config.storageOrigins },
-      { cache: true, localStorage: true },
+      { cache: true },
     );
   }
 }
