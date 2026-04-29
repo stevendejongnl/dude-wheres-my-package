@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.47.6 (2026-04-29)
+
+### Bug Fixes
+
+- **postnl**: Handle two-step login form and preserve login.postnl.nl localStorage
+  ([`410f21c`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/410f21cf91943ffeeabd3485a079d1e90e51a62b))
+
+
 ## v1.47.5 (2026-04-29)
 
 ### Bug Fixes
