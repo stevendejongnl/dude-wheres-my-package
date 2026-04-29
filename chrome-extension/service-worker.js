@@ -6,7 +6,11 @@ import {
   isConfigured,
   listAccounts,
 } from "./lib/api.js";
-import { CARRIER_LOGIN_PATTERNS, CARRIER_SYNC_URLS } from "./lib/carriers.js";
+import {
+  CARRIER_AUTH_CLEAR,
+  CARRIER_LOGIN_PATTERNS,
+  CARRIER_SYNC_URLS,
+} from "./lib/carriers.js";
 
 const DEFAULT_SYNC_INTERVAL_MIN = 60;
 const RENDER_WAIT_MS = 5_000;
@@ -122,6 +126,13 @@ async function syncCarrierViaTab(account) {
   // hoping the parcels page redirects to login on cookie expiry.
   const startUrl = urls.login || urls.parcels;
 
+  // Wipe all carrier session data before every login-URL sync. Stale cookies
+  // and broken SSO state are the most common cause of silent login failures;
+  // credentials are always stored at this point so we can re-login cleanly.
+  if (urls.login) {
+    await clearCarrierSiteData(account.carrier);
+  }
+
   try {
     // Reuse an existing tab on this carrier domain if one is open
     const domain = new URL(startUrl).hostname;
@@ -227,8 +238,7 @@ async function syncCarrierViaTab(account) {
     // Clear site data for the carrier domain and retry once with a fresh login —
     // stale cookies are the most common cause of DPD landing on its error page.
     if (isCarrierErrorPage(html)) {
-      const domain = new URL(startUrl).hostname;
-      await clearCarrierSiteData(domain);
+      await clearCarrierSiteData(account.carrier);
       await chrome.tabs.update(tabId, { url: startUrl });
       await waitForTabLoad(tabId);
       await waitForUrlStable(tabId);
@@ -453,11 +463,29 @@ function isCloudflareChallenge(html) {
   );
 }
 
-function clearCarrierSiteData(hostname) {
-  return chrome.browsingData.remove(
-    { origins: [`https://${hostname}`] },
-    { cookies: true, cache: true, localStorage: true, sessionStorage: true },
+async function clearCarrierSiteData(carrier) {
+  const config = CARRIER_AUTH_CLEAR[carrier];
+  if (!config) return;
+
+  // Cookies: enumerate by eTLD+1 — covers all subdomains via cookie-spec
+  // domain matching (e.g. Keycloak SSO cookies on .dpdgroup.com).
+  const cookies = await chrome.cookies.getAll({ domain: config.cookieDomain });
+  await Promise.all(
+    cookies.map((c) => {
+      const host = c.domain.replace(/^\./, "");
+      const url = `${c.secure ? "https" : "http"}://${host}${c.path}`;
+      return chrome.cookies.remove({ url, name: c.name, storeId: c.storeId });
+    }),
   );
+
+  // Storage / cache: browsingData has no domain-suffix filter, so use the
+  // explicit per-carrier origin list.
+  if (config.storageOrigins?.length) {
+    await chrome.browsingData.remove(
+      { origins: config.storageOrigins },
+      { cache: true, localStorage: true, sessionStorage: true },
+    );
+  }
 }
 
 function isCarrierErrorPage(html) {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  CARRIER_AUTH_CLEAR,
   CARRIER_LOGIN_PATTERNS,
+  CARRIER_SYNC_URLS,
   detectCarrier,
   isNewerVersion,
 } from "../lib/carriers.js";
@@ -70,6 +72,20 @@ describe("CARRIER_LOGIN_PATTERNS (amazon)", () => {
 
   it("does not match the post-login orders page", () => {
     expect(matches("https://www.amazon.nl/your-orders/orders")).toBe(false);
+  });
+});
+
+describe("CARRIER_AUTH_CLEAR", () => {
+  it("has an entry for every carrier with an auto-login URL", () => {
+    const autoLoginCarriers = Object.entries(CARRIER_SYNC_URLS)
+      .filter(([, urls]) => urls.login)
+      .map(([carrier]) => carrier);
+
+    for (const carrier of autoLoginCarriers) {
+      expect(CARRIER_AUTH_CLEAR, `missing CARRIER_AUTH_CLEAR entry for ${carrier}`).toHaveProperty(carrier);
+      expect(CARRIER_AUTH_CLEAR[carrier].cookieDomain).toBeTruthy();
+      expect(CARRIER_AUTH_CLEAR[carrier].storageOrigins?.length).toBeGreaterThan(0);
+    }
   });
 });
 

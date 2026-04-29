@@ -50,6 +50,31 @@ export const CARRIER_SYNC_URLS = {
   dhl: { parcels: "https://my.dhlecommerce.nl/" },
 };
 
+// What to wipe before a fresh login per carrier.
+//   cookieDomain   — eTLD+1 for chrome.cookies.getAll({ domain }), which
+//                    matches all subdomains via cookie-spec domain matching.
+//   storageOrigins — explicit origins for chrome.browsingData.remove;
+//                    localStorage / sessionStorage / cache can only be
+//                    filtered by full origin URL, not by domain suffix.
+export const CARRIER_AUTH_CLEAR = {
+  amazon: {
+    cookieDomain: "amazon.nl",
+    storageOrigins: ["https://www.amazon.nl"],
+  },
+  dpd: {
+    cookieDomain: "dpdgroup.com",
+    storageOrigins: ["https://www.dpdgroup.com", "https://login.dpdgroup.com"],
+  },
+  postnl: {
+    cookieDomain: "postnl.nl",
+    storageOrigins: [
+      "https://jouw.postnl.nl",
+      "https://login.postnl.nl",
+      "https://www.postnl.nl",
+    ],
+  },
+};
+
 // URL patterns that indicate a carrier login page (not yet authenticated).
 // Used as a fallback signal alongside DOM detection.
 //

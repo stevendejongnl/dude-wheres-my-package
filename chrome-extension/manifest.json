@@ -9,7 +9,8 @@
     "alarms",
     "tabs",
     "scripting",
-    "browsingData"
+    "browsingData",
+    "cookies"
   ],
   "host_permissions": [
     "<all_urls>"
