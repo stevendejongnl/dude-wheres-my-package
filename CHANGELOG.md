@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.47.5 (2026-04-29)
+
+### Bug Fixes
+
+- **postnl**: Handle delayed login redirect inside token reading loop
+  ([`e10ea3f`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/e10ea3fde8a6fb9c9f23c02b56340b77a0d4dbae))
+
+
 ## v1.47.4 (2026-04-29)
 
 ### Bug Fixes
