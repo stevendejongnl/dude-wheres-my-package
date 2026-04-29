@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.47.1 (2026-04-29)
+
+### Bug Fixes
+
+- **extension**: Move pre-login site data clear inside try/catch
+  ([`35a82bc`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/35a82bc47bf79a5bf1dbabb678f0b9e112955fa8))
+
+
 ## v1.47.0 (2026-04-29)
 
 ### Features
