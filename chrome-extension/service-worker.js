@@ -169,10 +169,25 @@ async function syncCarrierViaTab(account) {
     // still on the jouw.postnl.nl callback URL — navigating away first would
     // interrupt that callback and lose the token.
     if (account.carrier === "postnl") {
+      // After clearing localStorage, PostNL's JS-driven redirect to
+      // login.postnl.nl can arrive after waitForUrlStable already resolved
+      // on jouw.postnl.nl/account, causing the login block above to be
+      // skipped. Detect that here and handle it in the token loop instead.
+      let loginHandled = onLogin;
       let accessToken = null;
       const deadline = Date.now() + 30_000;
       while (Date.now() < deadline) {
         const tabUrl = (await chrome.tabs.get(tabId)).url || "";
+        if (isCarrierLoginPage("postnl", tabUrl) && !loginHandled) {
+          loginHandled = true;
+          const loggedIn = await handleCarrierLogin(tabId, account);
+          if (!loggedIn) {
+            await storeSyncResult(account.id, false, "Login failed -- check credentials");
+            return;
+          }
+          await waitForUrlStable(tabId);
+          continue;
+        }
         if (!tabUrl.includes("jouw.postnl.nl")) {
           await sleep(500);
           continue;
