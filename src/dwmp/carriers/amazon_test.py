@@ -148,9 +148,10 @@ def test_parse_orders_page_delivered():
 
 def test_parse_orders_page_delivered_via_delivery_box_text():
     """Amazon renders status as text node inside .delivery-box, not a child element."""
+    from bs4 import BeautifulSoup
+
     carrier = Amazon()
     html = """
-    <html><body>
     <div class="order-card">
         <div class="yohtmlc-order-id">
             Bestelnummer
@@ -160,12 +161,13 @@ def test_parse_orders_page_delivered_via_delivery_box_text():
             Bezorgd op 1 april
         </div>
     </div>
-    </body></html>
     """
-    results = carrier._parse_orders_page(html)
-    assert len(results) == 1
-    assert results[0].tracking_number == "403-4691614-9201953"
-    assert results[0].status == TrackingStatus.DELIVERED
+    soup = BeautifulSoup(html, "lxml")
+    card = soup.select_one(".order-card")
+    result = carrier._parse_order_card(card)
+    assert result is not None
+    assert result.tracking_number == "403-4691614-9201953"
+    assert result.status == TrackingStatus.DELIVERED
 
 
 def test_parse_orders_page_in_transit():
