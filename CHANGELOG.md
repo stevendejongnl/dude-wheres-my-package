@@ -2,6 +2,33 @@
 
 <!-- version list -->
 
+## v1.50.0 (2026-05-04)
+
+### Bug Fixes
+
+- **carriers**: Remove unused pytest import, fix import order in tracking_urls_test
+  ([`82bea9c`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/82bea9c87c48b2ea65fdc68d0cdab635538ecb6b))
+
+### Chores
+
+- **docs**: Add implementation plan for tracking URLs and login links
+  ([`03cd217`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/03cd21719476c9269ba0d0ed76273ec3578461c8))
+
+### Features
+
+- **carriers**: Add public_tracking_url fallback template helper
+  ([`fbcdd7a`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/fbcdd7a220f3f2d603ee0ba92c201fb4cc7c2d11))
+
+- **extension**: Add Login link per account in popup for manual auth before sync
+  ([`8889a2d`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/8889a2dbee2bc44816457b1c097b145875db826b))
+
+- **ui**: Show tracking-page link (↗) on every package card header
+  ([`8f7a980`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/8f7a9806808db6ae782dbc4b514cb586fa206bda))
+
+- **views**: Expose effective_tracking_url in _enrich_package
+  ([`5f11656`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/5f116561d5a68b45a88ec09ca18d635dcff19016))
+
+
 ## v1.49.0 (2026-05-04)
 
 ### Bug Fixes
