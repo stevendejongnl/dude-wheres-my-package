@@ -2,6 +2,18 @@
 
 <!-- version list -->
 
+## v1.50.3 (2026-05-04)
+
+### Bug Fixes
+
+- **notifications**: Persist last-seen count in localStorage to suppress repeat notifications on PWA
+  reopen
+  ([`e2fc31a`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/e2fc31a70f65f6b9db5999008efb7e12dbe64e97))
+
+- **trunkrs**: Convert delivery window to local timezone
+  ([`80a4f99`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/80a4f99e13c45af693df9f6d86fa4eaa6b401450))
+
+
 ## v1.50.2 (2026-05-04)
 
 ### Bug Fixes
