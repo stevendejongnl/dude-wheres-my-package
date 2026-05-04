@@ -160,6 +160,38 @@ curl -X POST https://dwmp.madebysteven.nl/api/v1/packages/<id>/refresh
 
 **Note:** GLS account sync is not supported. Parcels are tracked individually using the public API.
 
+### Trunkrs
+
+**Auth type:** public tracking — no account needed.
+
+Trunkrs provides public shipment tracking via `parcel.trunkrs.nl`. No login required — just the tracking number and delivery postal code.
+
+**Steps:**
+
+Add a Trunkrs parcel directly:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/packages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tracking_number": "<your Trunkrs tracking number>",
+    "carrier": "trunkrs",
+    "postal_code": "<delivery postal code>"
+  }'
+```
+
+**Important:** The `postal_code` field is **required** — Trunkrs redirects to an error page without it.
+
+Refresh to fetch the latest tracking status:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/packages/<id>/refresh
+```
+
+**API:** Trunkrs does not expose a public REST API. dwmp fetches the Next.js tracking page and extracts shipment state, delivery window, and scan events from the embedded `__NEXT_DATA__` JSON.
+
+**Note:** Trunkrs account sync is not supported. Parcels are tracked individually.
+
 ### Manual Tracking (any carrier)
 
 You can also track individual packages without an account:
@@ -258,6 +290,24 @@ doesn't slot into this server-side pipeline.
 The release workflow (`.github/workflows/release.yml`) runs the generator
 against the cloned `gh-pages` checkout on every released version, so the
 mockups stay byte-identical to production with zero manual upkeep.
+
+## PWA (Progressive Web App)
+
+dwmp ships a web app manifest so you can install it on your home screen and run it as a standalone app — no App Store required.
+
+**iOS (Safari):**
+
+1. Open the dwmp URL in Safari.
+2. Tap the **Share** button (bottom centre).
+3. Tap **Add to Home Screen** → **Add**.
+4. Launch the app from your home screen — it opens without browser chrome.
+
+**Android (Chrome):**
+
+1. Open the dwmp URL in Chrome.
+2. Tap the **⋮** menu → **Add to Home screen** (or accept the install banner).
+
+**Push notifications:** After installing, tap the bell icon in the top-right of the packages page and allow notifications when prompted. dwmp sends a native push notification whenever a tracked package changes status. Notifications are deduplicated across page reloads — you won't see the same alert twice on reopen.
 
 ## Web UI
 
@@ -371,6 +421,9 @@ docker run -p 8000:8000 -v dwmp-data:/app/data dwmp
 | `PLAYWRIGHT_BROWSER_CHANNEL` | `chrome` | Playwright browser channel used by the DPD guest-track flow (public tracking fallback). Set empty to use bundled Chromium. |
 | `DHL_API_KEY` | *(unset)* | Free API key from [developer.dhl.com](https://developer.dhl.com). Enables rich event timeline for DHL packages (6+ events). Without it, falls back to Playwright scraping. |
 | `DWMP_PUBLIC_URL` | *(unset)* | Public-facing URL (e.g. `https://dwmp.madebysteven.nl`). Used by the Chrome extension's service worker when DWMP sits behind a reverse proxy or Cloudflare and its origin differs from the one the extension's popup was opened against. |
+| `TELEGRAM_BOT_TOKEN` | *(unset)* | Telegram bot token (from `@BotFather`). When set together with `TELEGRAM_CHAT_ID`, dwmp sends a Telegram message for every package status change. |
+| `TELEGRAM_CHAT_ID` | *(unset)* | Telegram chat or user ID to deliver status-change notifications to. Obtain it from `@userinfobot` or by messaging your bot and calling `getUpdates`. |
+| `POD_NAME` | *(unset)* | Kubernetes Pod name (typically injected via the Downward API). When set, Telegram notifications include the pod name as context — useful in multi-replica deployments. |
 
 ## Kubernetes
 
