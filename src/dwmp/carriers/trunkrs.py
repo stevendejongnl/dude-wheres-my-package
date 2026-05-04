@@ -112,16 +112,20 @@ class Trunkrs(CarrierBase):
         shipment = data.get("props", {}).get("pageProps", {}).get("shipment") or {}
         events: list[TrackingEvent] = []
 
-        for log in shipment.get("auditLogs", []) or []:
-            state = log.get("stateName", "")
+        # Sender as a pre_transit event so _enrich_package() can extract it.
+        sender_name = shipment.get("senderName") or shipment.get("merchantName")
+        if sender_name:
             events.append(
                 TrackingEvent(
-                    timestamp=_parse_ts(log.get("setAt", "")),
-                    status=STATE_MAP.get(state, TrackingStatus.UNKNOWN),
-                    description=_humanise(state),
+                    timestamp=no_date_fallback(),
+                    status=TrackingStatus.PRE_TRANSIT,
+                    description=sender_name,
                     location=None,
                 )
             )
+
+        # auditLogs contain internal logistics notes (e.g. "[SORT]: Handsorted
+        # at center"), not user-facing state transitions — skip them.
 
         current = shipment.get("currentState") or {}
         if current.get("stateName"):
@@ -134,23 +138,26 @@ class Trunkrs(CarrierBase):
                 )
             )
 
-        seen: set[tuple] = set()
-        deduped: list[TrackingEvent] = []
-        for e in sorted(events, key=lambda x: x.timestamp):
-            key = (e.timestamp, e.status, e.description)
-            if key not in seen:
-                seen.add(key)
-                deduped.append(e)
-
         status = STATE_MAP.get(current.get("stateName", ""), TrackingStatus.UNKNOWN)
-        if status == TrackingStatus.UNKNOWN and deduped:
-            status = deduped[-1].status
+        if status == TrackingStatus.UNKNOWN and events:
+            status = events[-1].status
+
+        # Delivery window from timeSlot: from/to is the narrow ETA band.
+        estimated_delivery = None
+        delivery_window_end = None
+        time_slot = shipment.get("timeSlot") or {}
+        if time_slot.get("from"):
+            estimated_delivery = _parse_ts(time_slot["from"])
+        if time_slot.get("to"):
+            delivery_window_end = _parse_ts(time_slot["to"])
 
         return TrackingResult(
             tracking_number=tracking_number,
             carrier=self.name,
             status=status,
-            events=deduped,
+            events=events,
+            estimated_delivery=estimated_delivery,
+            delivery_window_end=delivery_window_end,
             tracking_url=tracking_url,
         )
 

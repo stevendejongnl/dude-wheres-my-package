@@ -59,12 +59,13 @@ def test_state_map_unknown_for_unmapped_state():
     assert STATE_MAP.get("EXCEPTION_SHIPMENT_LOST", TrackingStatus.UNKNOWN) == TrackingStatus.UNKNOWN
 
 
-def test_parse_tracking_response_pre_transit():
+def test_parse_tracking_response_current_state_only():
     carrier = Trunkrs()
     result = carrier._parse_tracking_response("418988883", _make_data("DATA_PROCESSED"))
     assert result.tracking_number == "418988883"
     assert result.carrier == "trunkrs"
     assert result.status == TrackingStatus.PRE_TRANSIT
+    # Only currentState event — auditLogs contain internal notes, not parsed.
     assert len(result.events) == 1
     assert result.events[0].status == TrackingStatus.PRE_TRANSIT
     assert result.events[0].description == "Data processed"
@@ -77,42 +78,75 @@ def test_parse_tracking_response_delivered():
             "pageProps": {
                 "shipment": {
                     "currentState": {"stateName": "SHIPMENT_DELIVERED", "setAt": "2026-05-04T14:30:00.000Z"},
-                    "auditLogs": [
-                        {"stateName": "DATA_PROCESSED", "setAt": "2026-05-04T06:57:04.000Z"},
-                        {"stateName": "PICKUP_PICKED_UP", "setAt": "2026-05-04T10:00:00.000Z"},
-                        {"stateName": "SHIPMENT_ACCEPTED_BY_DRIVER", "setAt": "2026-05-04T13:00:00.000Z"},
-                        {"stateName": "SHIPMENT_DELIVERED", "setAt": "2026-05-04T14:30:00.000Z"},
-                    ],
+                    # auditLogs are internal logistics notes — ignored by parser.
+                    "auditLogs": [{"source": "[SORT]: Handsorted at center", "createdAt": "2026-05-04T11:36:23.680Z"}],
                 }
             }
         }
     }
     result = carrier._parse_tracking_response("418988883", data)
     assert result.status == TrackingStatus.DELIVERED
-    assert len(result.events) == 4
-    assert result.events[0].status == TrackingStatus.PRE_TRANSIT
-    assert result.events[1].status == TrackingStatus.IN_TRANSIT
-    assert result.events[2].status == TrackingStatus.OUT_FOR_DELIVERY
-    assert result.events[3].status == TrackingStatus.DELIVERED
+    assert len(result.events) == 1
+    assert result.events[0].status == TrackingStatus.DELIVERED
 
 
-def test_parse_tracking_response_dedupes_currentstate_in_auditlogs():
+def test_parse_tracking_response_sender_becomes_pre_transit_event():
     carrier = Trunkrs()
     data = {
         "props": {
             "pageProps": {
                 "shipment": {
-                    "currentState": {"stateName": "SHIPMENT_SORTED", "setAt": "2026-05-04T12:00:00.000Z"},
-                    "auditLogs": [
-                        {"stateName": "PICKUP_PICKED_UP", "setAt": "2026-05-04T10:00:00.000Z"},
-                        {"stateName": "SHIPMENT_SORTED", "setAt": "2026-05-04T12:00:00.000Z"},
-                    ],
+                    "senderName": "Toplenzen.nl",
+                    "currentState": {"stateName": "SHIPMENT_SORTED", "setAt": "2026-05-04T11:36:23.695Z"},
+                    "auditLogs": [],
                 }
             }
         }
     }
-    result = carrier._parse_tracking_response("TRK1", data)
-    assert len(result.events) == 2
+    result = carrier._parse_tracking_response("418988883", data)
+    assert result.events[0].status == TrackingStatus.PRE_TRANSIT
+    assert result.events[0].description == "Toplenzen.nl"
+    assert result.events[1].status == TrackingStatus.IN_TRANSIT
+
+
+def test_parse_tracking_response_merchantname_fallback():
+    carrier = Trunkrs()
+    data = {
+        "props": {
+            "pageProps": {
+                "shipment": {
+                    "merchantName": "Some Shop",
+                    "currentState": {"stateName": "SHIPMENT_SORTED", "setAt": "2026-05-04T11:36:23.695Z"},
+                    "auditLogs": [],
+                }
+            }
+        }
+    }
+    result = carrier._parse_tracking_response("418988883", data)
+    assert result.events[0].description == "Some Shop"
+
+
+def test_parse_tracking_response_timeslot_sets_delivery_window():
+    carrier = Trunkrs()
+    data = {
+        "props": {
+            "pageProps": {
+                "shipment": {
+                    "currentState": {"stateName": "SHIPMENT_SORTED", "setAt": "2026-05-04T11:36:23.695Z"},
+                    "auditLogs": [],
+                    "timeSlot": {
+                        "from": "2026-05-04T15:54:26.141Z",
+                        "to": "2026-05-04T17:54:26.141Z",
+                    },
+                }
+            }
+        }
+    }
+    result = carrier._parse_tracking_response("418988883", data)
+    assert result.estimated_delivery is not None
+    assert result.delivery_window_end is not None
+    assert result.estimated_delivery.hour == 15
+    assert result.delivery_window_end.hour == 17
 
 
 def test_parse_tracking_response_empty_shipment():
