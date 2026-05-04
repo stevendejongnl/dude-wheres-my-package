@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.49.0 (2026-05-04)
+
+### Bug Fixes
+
+- **amazon**: Use _parse_order_card directly to avoid lookback cutoff in test
+  ([`6434491`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/6434491c5c257b3dccd82a0c34927c1fefca156a))
+
+### Features
+
+- **carriers**: Add Trunkrs tracking support
+  ([`90970d2`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/90970d2f8f7c1ea9c3734c7a050edcd5caa66e64))
+
+
 ## v1.48.0 (2026-04-29)
 
 ### Bug Fixes
