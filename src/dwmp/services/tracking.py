@@ -85,48 +85,6 @@ class TrackingService:
 
     # --- Account management ---
 
-    async def connect_account_oauth(
-        self, carrier_name: str, callback_url: str
-    ) -> dict:
-        carrier = self._carriers.get(carrier_name)
-        if carrier is None:
-            raise ValueError(f"Unknown carrier: {carrier_name}")
-        if carrier.auth_type != AuthType.OAUTH:
-            raise ValueError(f"{carrier_name} does not use OAuth")
-
-        auth_url = await carrier.get_auth_url(callback_url)
-        return {"auth_url": auth_url, "carrier": carrier_name}
-
-    async def handle_oauth_callback(
-        self,
-        carrier_name: str,
-        code: str,
-        callback_url: str,
-        lookback_days: int = 30,
-    ) -> dict:
-        carrier = self._carriers.get(carrier_name)
-        if carrier is None:
-            raise ValueError(f"Unknown carrier: {carrier_name}")
-
-        try:
-            tokens = await carrier.handle_callback(code, callback_url)
-        except Exception as exc:
-            raise CarrierAuthError(
-                carrier_name,
-                f"OAuth callback failed. The carrier's login flow may have changed. "
-                f"Try re-authenticating or check for API updates. ({exc})",
-            ) from exc
-
-        account_id = await self._repository.add_account(
-            carrier=carrier_name,
-            auth_type="oauth",
-            tokens=asdict(tokens),
-            lookback_days=lookback_days,
-        )
-        account = await self._repository.get_account(account_id)
-        assert account is not None
-        return account
-
     async def validate_account_credentials(
         self,
         carrier_name: str,

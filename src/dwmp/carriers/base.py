@@ -25,7 +25,6 @@ class TrackingStatus(StrEnum):
 
 
 class AuthType(StrEnum):
-    OAUTH = "oauth"
     CREDENTIALS = "credentials"
     MANUAL_TOKEN = "manual_token"
     # Server stores credentials (email / password / optional TOTP) but never
@@ -131,14 +130,6 @@ class CarrierBase(ABC):
         self, tokens: AuthTokens, lookback_days: int = 30
     ) -> list[TrackingResult]:
         """Fetch all packages from an authenticated account."""
-
-    async def get_auth_url(self, callback_url: str) -> str:
-        """Return OAuth redirect URL. Only for AuthType.OAUTH carriers."""
-        raise NotImplementedError(f"{self.name} does not use OAuth")
-
-    async def handle_callback(self, code: str, callback_url: str) -> AuthTokens:
-        """Exchange OAuth code for tokens. Only for AuthType.OAUTH carriers."""
-        raise NotImplementedError(f"{self.name} does not use OAuth")
 
     async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
         """Authenticate with credentials. Only for AuthType.CREDENTIALS carriers."""

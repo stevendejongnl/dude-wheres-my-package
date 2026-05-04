@@ -25,19 +25,6 @@ class AddPackageRequest(BaseModel):
     postal_code: str | None = None
 
 
-class OAuthStartRequest(BaseModel):
-    carrier: str
-    callback_url: str
-    lookback_days: int = 30
-
-
-class OAuthCallbackRequest(BaseModel):
-    carrier: str
-    code: str
-    callback_url: str
-    lookback_days: int = 30
-
-
 class CredentialsRequest(BaseModel):
     carrier: str
     username: str
@@ -111,32 +98,6 @@ async def list_carriers(
 
 
 # --- Account endpoints ---
-
-@router.post("/accounts/oauth/start")
-async def oauth_start(
-    body: OAuthStartRequest,
-    service: TrackingService = Depends(get_tracking_service),
-) -> dict:
-    try:
-        return await service.connect_account_oauth(body.carrier, body.callback_url)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-
-@router.post("/accounts/oauth/callback", status_code=201)
-async def oauth_callback(
-    body: OAuthCallbackRequest,
-    service: TrackingService = Depends(get_tracking_service),
-) -> dict:
-    try:
-        return await service.handle_oauth_callback(
-            body.carrier, body.code, body.callback_url, body.lookback_days
-        )
-    except CarrierAuthError as exc:
-        raise HTTPException(status_code=502, detail=exc.message)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
 
 @router.post("/accounts/test/credentials")
 async def test_credentials(

@@ -1,5 +1,3 @@
-import pytest
-
 from dwmp.carriers.base import AuthType, TrackingStatus
 from dwmp.carriers.dhl import DHL, _parse_status
 
@@ -166,7 +164,3 @@ async def test_track_uses_api_when_key_set(monkeypatch):
     assert len(result.events) == 1
 
 
-async def test_dhl_rejects_oauth():
-    carrier = DHL()
-    with pytest.raises(NotImplementedError):
-        await carrier.get_auth_url("http://callback")

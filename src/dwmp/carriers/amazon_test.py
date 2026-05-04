@@ -255,7 +255,3 @@ async def test_track_returns_unknown_without_tracking_url():
     assert result.status == TrackingStatus.UNKNOWN
 
 
-async def test_amazon_rejects_oauth():
-    carrier = Amazon()
-    with pytest.raises(NotImplementedError):
-        await carrier.get_auth_url("http://callback")

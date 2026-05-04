@@ -233,12 +233,6 @@ async def test_sync_packages_raises():
         await carrier.sync_packages(AuthTokens(access_token="unused"))
 
 
-async def test_trunkrs_rejects_oauth():
-    carrier = Trunkrs()
-    with pytest.raises(NotImplementedError):
-        await carrier.get_auth_url("http://callback")
-
-
 def test_humanise():
     assert _humanise("DATA_PROCESSED") == "Data processed"
     assert _humanise("SHIPMENT_DELIVERED") == "Shipment delivered"

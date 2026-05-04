@@ -195,12 +195,6 @@ async def test_validate_token_is_a_noop():
     await carrier.validate_token(AuthTokens(access_token="<html>", refresh_token="x"))
 
 
-async def test_dpd_rejects_oauth():
-    carrier = DPD()
-    with pytest.raises(NotImplementedError):
-        await carrier.get_auth_url("http://callback")
-
-
 # --- public (guest) tracking — still server-side, no login required ---
 
 

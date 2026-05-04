@@ -158,12 +158,6 @@ async def test_track_requires_postal_code():
     assert result.events == []
 
 
-async def test_gls_rejects_oauth():
-    carrier = GLS()
-    with pytest.raises(NotImplementedError):
-        await carrier.get_auth_url("http://callback")
-
-
 async def test_sync_not_supported():
     from dwmp.carriers.base import AuthTokens
 

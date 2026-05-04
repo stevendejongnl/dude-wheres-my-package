@@ -63,12 +63,6 @@ def test_postnl_is_extension_token():
     assert PostNL().auth_type == AuthType.EXTENSION_TOKEN
 
 
-async def test_postnl_rejects_oauth():
-    carrier = PostNL()
-    with pytest.raises(NotImplementedError):
-        await carrier.get_auth_url("http://callback")
-
-
 async def test_postnl_rejects_login():
     carrier = PostNL()
     with pytest.raises(NotImplementedError):
