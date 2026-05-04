@@ -1,4 +1,3 @@
-import pytest
 from dwmp.carriers.tracking_urls import public_tracking_url
 
 
