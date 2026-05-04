@@ -87,8 +87,11 @@ export function requestPermission(delayMs: number = 3000): void {
  * Wire up the htmx afterSwap listener that drives push notifications.
  * Returns a cleanup function that removes the listener.
  */
+const STORAGE_KEY = "dwmp-notif-last-count";
+
 export function initNotifications(): () => void {
-  let lastCount = 0;
+  const stored = parseInt(localStorage.getItem(STORAGE_KEY) ?? "", 10);
+  let lastCount = isNaN(stored) ? 0 : stored;
 
   requestPermission();
 
@@ -109,6 +112,7 @@ export function initNotifications(): () => void {
     }
 
     lastCount = count;
+    localStorage.setItem(STORAGE_KEY, String(count));
   };
 
   document.addEventListener("htmx:afterSwap", handler);

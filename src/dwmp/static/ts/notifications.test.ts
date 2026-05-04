@@ -176,6 +176,7 @@ describe("initNotifications", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    localStorage.clear();
     notifSpy = vi.fn();
     vi.stubGlobal("Notification", Object.assign(notifSpy, {
       permission: "granted",
@@ -186,6 +187,7 @@ describe("initNotifications", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    localStorage.clear();
   });
 
   function fireSwap(targetId: string, dataCount: string): void {
@@ -255,6 +257,21 @@ describe("initNotifications", () => {
 
     fireSwap("notif-badge", "5");
     expect(notifSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not re-fire on PWA reopen when count unchanged", () => {
+    // Simulate first session: count goes to 2, saves to localStorage
+    const cleanup1 = initNotifications();
+    fireSwap("notif-badge", "2");
+    expect(notifSpy).toHaveBeenCalledOnce();
+    cleanup1();
+
+    // Simulate reopen: new initNotifications() reads stored count=2
+    notifSpy.mockClear();
+    const cleanup2 = initNotifications();
+    fireSwap("notif-badge", "2");
+    expect(notifSpy).not.toHaveBeenCalled();
+    cleanup2();
   });
 
   it("fires notification for count going from 0 to 1", () => {
