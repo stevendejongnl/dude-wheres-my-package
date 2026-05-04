@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.50.2 (2026-05-04)
+
+### Bug Fixes
+
+- **trunkrs**: Parse sender and delivery window from __NEXT_DATA__, drop internal audit log events
+  ([`38f0366`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/38f03667fd0bbf256118ab49e7e2735b9d999bad))
+
+
 ## v1.50.1 (2026-05-04)
 
 ### Bug Fixes
