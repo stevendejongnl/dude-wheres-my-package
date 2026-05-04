@@ -91,6 +91,17 @@ def _format_time(ts_str: str) -> str:
         return ts_str[:16].replace("T", " ") if ts_str else ""
 
 
+def _format_time_hm(ts_str: str) -> str:
+    """Format ISO timestamp to HH:MM in the configured display timezone."""
+    try:
+        dt = datetime.fromisoformat(ts_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt.astimezone(_DISPLAY_TZ).strftime("%H:%M")
+    except (ValueError, TypeError):
+        return ts_str[11:16] if ts_str else ""
+
+
 def _enrich_package(pkg: dict) -> dict:
     """Add computed fields for display."""
     events = pkg.get("events", [])
@@ -151,6 +162,11 @@ def _enrich_package(pkg: dict) -> dict:
     pkg["first_event_date"] = first_event_date
     pkg["last_update"] = last_update
     pkg["last_synced"] = last_synced
+    if pkg.get("estimated_delivery"):
+        pkg["estimated_delivery_display"] = _format_time(pkg["estimated_delivery"])
+        pkg["estimated_delivery_hm"] = _format_time_hm(pkg["estimated_delivery"])
+    if pkg.get("delivery_window_end"):
+        pkg["delivery_window_end_hm"] = _format_time_hm(pkg["delivery_window_end"])
     pkg["effective_tracking_url"] = pkg.get("tracking_url") or public_tracking_url(
         pkg.get("carrier", ""),
         pkg.get("tracking_number", ""),

@@ -38,9 +38,9 @@
       {% if pkg.estimated_delivery %}
       <span class="pkg-eta">
         {%- if pkg.delivery_window_end %}
-          {{ pkg.estimated_delivery[11:16] }} – {{ pkg.delivery_window_end[11:16] }}
+          {{ pkg.estimated_delivery_hm }} – {{ pkg.delivery_window_end_hm }}
         {%- else %}
-          {{ pkg.estimated_delivery[:10] }} {{ pkg.estimated_delivery[11:16] }}
+          {{ pkg.estimated_delivery_display }}
         {%- endif %}
       </span>
       {% endif %}

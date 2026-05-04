@@ -1,6 +1,9 @@
+from zoneinfo import ZoneInfo
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+import dwmp.api.views as _views_module
 from dwmp.api.app import create_app
 from dwmp.api.dependencies import get_repository, get_tracking_service
 from dwmp.api.views import _enrich_package
@@ -447,6 +450,43 @@ def test_enrich_package_effective_url_none_for_unknown_carrier():
     }
     _enrich_package(pkg)
     assert pkg["effective_tracking_url"] is None
+
+
+def test_enrich_package_delivery_window_converts_utc_to_amsterdam():
+    original_tz = _views_module._DISPLAY_TZ
+    _views_module._DISPLAY_TZ = ZoneInfo("Europe/Amsterdam")
+    try:
+        pkg = {
+            "carrier": "trunkrs",
+            "tracking_number": "418988883",
+            "tracking_url": None,
+            "estimated_delivery": "2026-05-04T17:29:00+00:00",
+            "delivery_window_end": "2026-05-04T18:25:00+00:00",
+            "events": [],
+        }
+        _enrich_package(pkg)
+        assert pkg["estimated_delivery_hm"] == "19:29"
+        assert pkg["delivery_window_end_hm"] == "20:25"
+    finally:
+        _views_module._DISPLAY_TZ = original_tz
+
+
+def test_enrich_package_single_eta_uses_display_format():
+    original_tz = _views_module._DISPLAY_TZ
+    _views_module._DISPLAY_TZ = ZoneInfo("Europe/Amsterdam")
+    try:
+        pkg = {
+            "carrier": "postnl",
+            "tracking_number": "3STEST",
+            "tracking_url": None,
+            "estimated_delivery": "2026-05-04T17:29:00+00:00",
+            "events": [],
+        }
+        _enrich_package(pkg)
+        assert pkg["estimated_delivery_hm"] == "19:29"
+        assert pkg["estimated_delivery_display"] == "Today 19:29"
+    finally:
+        _views_module._DISPLAY_TZ = original_tz
 
 
 def test_enrich_package_dhl_uses_postal_code():
