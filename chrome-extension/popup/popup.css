@@ -236,6 +236,12 @@ body {
   border-color: var(--text-dim);
 }
 
+.login-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
 .btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;

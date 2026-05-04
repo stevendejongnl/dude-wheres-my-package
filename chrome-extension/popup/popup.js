@@ -7,7 +7,7 @@ import {
   listAccounts,
   listPackages,
 } from "../lib/api.js";
-import { CARRIER_LABELS, detectCarrier } from "../lib/carriers.js";
+import { CARRIER_LABELS, CARRIER_SYNC_URLS, detectCarrier } from "../lib/carriers.js";
 
 // ── DOM refs ───────────────────────────────────────────────────────
 
@@ -245,6 +245,22 @@ function renderAccountRow(account, autoSyncEnabled, syncResult) {
     syncBtn.disabled = true;
     syncBtn.title = "No credentials configured";
     meta.textContent = "Add credentials to enable extension sync";
+  }
+
+  // Login link: opens the carrier's login (or parcels) page in a new tab.
+  // Lets the user manually sign in before triggering sync, without having
+  // to remember the carrier URL.
+  const syncUrls = CARRIER_SYNC_URLS[carrier];
+  if (syncUrls) {
+    const loginUrl = syncUrls.login || syncUrls.parcels;
+    const loginLink = document.createElement("a");
+    loginLink.href = loginUrl;
+    loginLink.target = "_blank";
+    loginLink.rel = "noopener";
+    loginLink.className = "btn btn-ghost login-link";
+    loginLink.textContent = "Login";
+    loginLink.title = `Open ${label} login page`;
+    actions.appendChild(loginLink);
   }
 
   actions.appendChild(toggleLabel);
