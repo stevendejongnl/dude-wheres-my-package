@@ -434,7 +434,7 @@ def test_enrich_package_falls_back_to_template_when_no_db_url():
     }
     _enrich_package(pkg)
     assert pkg["effective_tracking_url"] == (
-        "https://tracking.dpd.de/status/nl_NL/parcel/01234567890123456789"
+        "https://www.dpd.com/nl/nl/ontvangen/track-en-trace/?shipmentNumber=01234567890123456789"
     )
 
 

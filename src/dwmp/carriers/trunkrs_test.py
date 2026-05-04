@@ -173,6 +173,26 @@ async def test_track_returns_unknown_when_next_data_missing():
     assert result.status == TrackingStatus.UNKNOWN
 
 
+async def test_track_sets_tracking_url():
+    import httpx
+
+    next_data = (
+        '{"props":{"pageProps":{"shipment":{'
+        '"currentState":{"stateName":"SHIPMENT_SORTED","setAt":"2026-05-04T10:00:00.000Z"},'
+        '"auditLogs":[]}}}}'
+    )
+
+    class MockTransport(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request):
+            script = f'<script id="__NEXT_DATA__" type="application/json">{next_data}</script>'
+            return httpx.Response(200, html=script)
+
+    client = httpx.AsyncClient(transport=MockTransport())
+    carrier = Trunkrs(http_client=client)
+    result = await carrier.track("418988883", postal_code="1431rz")
+    assert result.tracking_url == "https://parcel.trunkrs.nl/418988883/1431RZ"
+
+
 async def test_sync_packages_raises():
     carrier = Trunkrs()
     with pytest.raises(NotImplementedError, match="Trunkrs account sync is not supported"):

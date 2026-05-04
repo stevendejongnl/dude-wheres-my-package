@@ -1,11 +1,13 @@
 _TEMPLATES: dict[str, str] = {
-    "dpd": "https://tracking.dpd.de/status/nl_NL/parcel/{tn}",
+    "dpd": "https://www.dpd.com/nl/nl/ontvangen/track-en-trace/?shipmentNumber={tn}",
     "gls": "https://gls-group.com/app/service/open/rstt/NL/nl/{tn}",
-    "trunkrs": "https://parcel.trunkrs.nl/{tn}",
 }
 
 _DHL_DEEP = "https://my.dhlecommerce.nl/receiver/track-and-trace/{tn}/{postal_code}"
 _DHL_ROOT = "https://my.dhlecommerce.nl/"
+
+_TRUNKRS_DEEP = "https://parcel.trunkrs.nl/{tn}/{postal_code}"
+_TRUNKRS_ROOT = "https://parcel.trunkrs.nl/"
 
 
 def public_tracking_url(
@@ -22,6 +24,11 @@ def public_tracking_url(
         if postal_code:
             return _DHL_DEEP.format(tn=tracking_number, postal_code=postal_code)
         return _DHL_ROOT
+
+    if carrier == "trunkrs":
+        if postal_code:
+            return _TRUNKRS_DEEP.format(tn=tracking_number, postal_code=postal_code.upper())
+        return _TRUNKRS_ROOT
 
     template = _TEMPLATES.get(carrier)
     if template is None:

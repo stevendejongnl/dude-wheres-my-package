@@ -69,7 +69,8 @@ class Trunkrs(CarrierBase):
                 carrier=self.name,
                 status=TrackingStatus.UNKNOWN,
             )
-        url = f"{TRUNKRS_BASE_URL}/{tracking_number}/{postal_code.upper()}"
+        postal_code = postal_code.upper()
+        url = f"{TRUNKRS_BASE_URL}/{tracking_number}/{postal_code}"
         async with self._get_client() as client:
             response = await client.get(
                 url,
@@ -90,7 +91,7 @@ class Trunkrs(CarrierBase):
                 carrier=self.name,
                 status=TrackingStatus.UNKNOWN,
             )
-        return self._parse_tracking_response(tracking_number, json.loads(match.group(1)))
+        return self._parse_tracking_response(tracking_number, json.loads(match.group(1)), url)
 
     async def sync_packages(
         self, tokens: AuthTokens, lookback_days: int = 30
@@ -106,7 +107,7 @@ class Trunkrs(CarrierBase):
         return httpx.AsyncClient()
 
     def _parse_tracking_response(
-        self, tracking_number: str, data: dict
+        self, tracking_number: str, data: dict, tracking_url: str | None = None
     ) -> TrackingResult:
         shipment = data.get("props", {}).get("pageProps", {}).get("shipment") or {}
         events: list[TrackingEvent] = []
@@ -150,6 +151,7 @@ class Trunkrs(CarrierBase):
             carrier=self.name,
             status=status,
             events=deduped,
+            tracking_url=tracking_url,
         )
 
 
