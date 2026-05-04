@@ -12,7 +12,14 @@
     <div class="pkg-main">
       <span class="pkg-carrier {{ pkg.carrier }}">{{ pkg.carrier }}</span>
       <div class="pkg-info">
-        <div class="pkg-tracking">{{ pkg.tracking_number }}</div>
+        <div class="pkg-tracking">
+          {{ pkg.tracking_number }}
+          {% if pkg.effective_tracking_url %}
+          <a href="{{ pkg.effective_tracking_url }}" target="_blank" rel="noopener"
+             class="pkg-tracking-link" title="Open carrier tracking page"
+             onclick="event.stopPropagation()">↗</a>
+          {% endif %}
+        </div>
         <div class="pkg-details">
           {% if pkg.sender %}
           <span class="pkg-sender"><strong>From:</strong> {{ pkg.sender }}</span>
@@ -81,10 +88,6 @@
         {% else %}
         <span class="meta-label">Postal code</span>
         <span class="meta-value meta-missing">not set</span>
-        {% endif %}
-        {% if pkg.tracking_url %}
-        <span class="meta-label">Tracking URL</span>
-        <span class="meta-value"><a href="{{ pkg.tracking_url }}" target="_blank" rel="noopener">{{ pkg.tracking_url[:60] }}{% if pkg.tracking_url|length > 60 %}…{% endif %}</a></span>
         {% endif %}
         {% if pkg.account_id %}
         <span class="meta-label">Account</span>
