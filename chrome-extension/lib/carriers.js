@@ -98,6 +98,7 @@ export const CARRIER_LABELS = {
   dhl: "DHL",
   dpd: "DPD",
   gls: "GLS",
+  trunkrs: "Trunkrs",
 };
 
 /**

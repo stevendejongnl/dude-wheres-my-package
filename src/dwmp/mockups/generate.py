@@ -235,13 +235,14 @@ async def build_all(output_dir: Path) -> list[Path]:
         from dwmp.carriers.dpd import DPD
         from dwmp.carriers.gls import GLS
         from dwmp.carriers.postnl import PostNL
+        from dwmp.carriers.trunkrs import Trunkrs
         from dwmp.services.tracking import TrackingService
 
         tracking = TrackingService(
             repository=repo,
             carriers={
                 "amazon": Amazon(), "postnl": PostNL(), "dhl": DHL(),
-                "dpd": DPD(), "gls": GLS(),
+                "dpd": DPD(), "gls": GLS(), "trunkrs": Trunkrs(),
             },
         )
         app.dependency_overrides[get_repository] = lambda: repo

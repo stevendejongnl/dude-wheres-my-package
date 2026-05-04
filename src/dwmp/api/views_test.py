@@ -64,6 +64,17 @@ class StubGLS(CarrierBase):
         return []
 
 
+class StubTrunkrs(CarrierBase):
+    name = "trunkrs"
+    auth_type = AuthType.MANUAL_TOKEN
+
+    async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        return TrackingResult(tracking_number=tracking_number, carrier=self.name, status=TrackingStatus.UNKNOWN)
+
+    async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
+        return []
+
+
 @pytest.fixture
 async def repo(tmp_path):
     r = PackageRepository(db_path=tmp_path / "test.db")
@@ -79,7 +90,7 @@ def app(repo):
         repository=repo,
         carriers={
             "amazon": StubAmazon(), "postnl": StubPostNL(),
-            "dpd": StubDPD(), "gls": StubGLS(),
+            "dpd": StubDPD(), "gls": StubGLS(), "trunkrs": StubTrunkrs(),
         },
     )
     application.dependency_overrides[get_repository] = lambda: repo
@@ -103,8 +114,9 @@ async def test_accounts_page_lists_carriers_with_add_buttons(client: AsyncClient
     assert 'hx-get="/accounts/add/amazon"' in body
     assert 'hx-get="/accounts/add/postnl"' in body
     assert 'hx-get="/accounts/add/dpd"' in body
-    # GLS has no account and is intentionally hidden from this page
+    # GLS and Trunkrs have no account and are intentionally hidden from this page
     assert 'hx-get="/accounts/add/gls"' not in body
+    assert 'hx-get="/accounts/add/trunkrs"' not in body
     assert "No account needed" not in body
 
 
@@ -262,8 +274,9 @@ async def test_track_package_form_lists_all_carriers_including_gls(client: Async
     assert 'value="amazon"' in body
     assert 'value="postnl"' in body
     assert 'value="dpd"' in body
-    # GLS is intentionally offered here even though it has no account
+    # GLS and Trunkrs are intentionally offered here even though they have no account
     assert 'value="gls"' in body
+    assert 'value="trunkrs"' in body
 
 
 async def test_track_package_cancel_returns_empty(client: AsyncClient):
@@ -382,3 +395,19 @@ async def test_edit_save_blank_password_errors_when_credentials_missing(
     unchanged = await repo.get_account(account_id)
     assert unchanged is not None
     assert (unchanged["tokens"] or {}).get("refresh_token") is None
+
+
+async def test_add_form_trunkrs_returns_404(client: AsyncClient):
+    response = await client.get("/accounts/add/trunkrs")
+    assert response.status_code == 404
+
+
+async def test_track_package_save_trunkrs_requires_postal_code(client: AsyncClient, repo):
+    response = await client.post(
+        "/packages/add/save",
+        data={"tracking_number": "418988883", "carrier": "trunkrs", "postal_code": ""},
+    )
+    assert response.status_code == 200
+    assert "test-result error" in response.text
+    assert "postal code" in response.text.lower()
+    assert await repo.list_packages() == []

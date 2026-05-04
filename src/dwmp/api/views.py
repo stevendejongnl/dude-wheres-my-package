@@ -598,8 +598,8 @@ async def track_package_save(
         return _result_html(False, "Please select a carrier.")
     if service.get_carrier(carrier) is None:
         return _result_html(False, f"Unknown carrier: {carrier}")
-    if carrier == "gls" and not postal_code.strip():
-        return _result_html(False, "GLS requires a postal code to fetch tracking details.")
+    if carrier in ("gls", "trunkrs") and not postal_code.strip():
+        return _result_html(False, f"{carrier.upper()} requires a postal code to fetch tracking details.")
 
     try:
         await service.add_package(

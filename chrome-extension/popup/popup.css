@@ -175,6 +175,7 @@ body {
 .carrier-badge.dhl { background: #ffcc0020; color: #ffd93d; }
 .carrier-badge.dpd { background: #dc143c20; color: #ff6b81; }
 .carrier-badge.gls { background: #003e7e20; color: #4a90d9; }
+.carrier-badge.trunkrs { background: #00c89620; color: #00c896; }
 
 .account-info {
   flex: 1;

@@ -24,7 +24,7 @@
     <h2>Add a Carrier</h2>
   </div>
   {% for carrier in carriers %}
-  {% if carrier.name != "gls" %}
+  {% if carrier.name not in ("gls", "trunkrs") %}
   <div class="card">
     <div class="account">
       <div class="account-info">
