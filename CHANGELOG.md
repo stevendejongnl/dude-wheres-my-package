@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.50.1 (2026-05-04)
+
+### Bug Fixes
+
+- **carriers**: Correct Trunkrs and DPD tracking URL templates, set tracking_url on Trunkrs result
+  ([`e316c99`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/e316c9994a1d82cfb618d418b527992e76e075e6))
+
+### Chores
+
+- **dev**: Add tracked git hooks mirroring CI checks
+  ([`bdbf719`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/bdbf719c9493ce684ca81f0f289405cb79fa4ab4))
+
+
 ## v1.50.0 (2026-05-04)
 
 ### Bug Fixes
