@@ -13,6 +13,7 @@ from dwmp.api.auth import login_response, logout_response, verify_password
 from dwmp.api.dependencies import get_tracking_service
 from dwmp.api.routes import _has_stored_credentials
 from dwmp.carriers.base import AuthType, CarrierAuthError
+from dwmp.carriers.tracking_urls import public_tracking_url
 from dwmp.services.tracking import TrackingService
 
 VERSION = pkg_version("dude-wheres-my-package")
@@ -150,6 +151,11 @@ def _enrich_package(pkg: dict) -> dict:
     pkg["first_event_date"] = first_event_date
     pkg["last_update"] = last_update
     pkg["last_synced"] = last_synced
+    pkg["effective_tracking_url"] = pkg.get("tracking_url") or public_tracking_url(
+        pkg.get("carrier", ""),
+        pkg.get("tracking_number", ""),
+        pkg.get("postal_code"),
+    )
     return pkg
 
 

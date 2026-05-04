@@ -3,6 +3,7 @@ from httpx import ASGITransport, AsyncClient
 
 from dwmp.api.app import create_app
 from dwmp.api.dependencies import get_repository, get_tracking_service
+from dwmp.api.views import _enrich_package
 from dwmp.carriers.base import (
     AuthTokens,
     AuthType,
@@ -411,3 +412,52 @@ async def test_track_package_save_trunkrs_requires_postal_code(client: AsyncClie
     assert "test-result error" in response.text
     assert "postal code" in response.text.lower()
     assert await repo.list_packages() == []
+
+
+def test_enrich_package_sets_effective_tracking_url_from_db():
+    pkg = {
+        "carrier": "dpd",
+        "tracking_number": "01234567890123456789",
+        "tracking_url": "https://example.com/stored",
+        "events": [],
+    }
+    _enrich_package(pkg)
+    assert pkg["effective_tracking_url"] == "https://example.com/stored"
+
+
+def test_enrich_package_falls_back_to_template_when_no_db_url():
+    pkg = {
+        "carrier": "dpd",
+        "tracking_number": "01234567890123456789",
+        "tracking_url": None,
+        "events": [],
+    }
+    _enrich_package(pkg)
+    assert pkg["effective_tracking_url"] == (
+        "https://tracking.dpd.de/status/nl_NL/parcel/01234567890123456789"
+    )
+
+
+def test_enrich_package_effective_url_none_for_unknown_carrier():
+    pkg = {
+        "carrier": "fedex",
+        "tracking_number": "123",
+        "tracking_url": None,
+        "events": [],
+    }
+    _enrich_package(pkg)
+    assert pkg["effective_tracking_url"] is None
+
+
+def test_enrich_package_dhl_uses_postal_code():
+    pkg = {
+        "carrier": "dhl",
+        "tracking_number": "JD000123456",
+        "tracking_url": None,
+        "postal_code": "1234AB",
+        "events": [],
+    }
+    _enrich_package(pkg)
+    assert pkg["effective_tracking_url"] == (
+        "https://my.dhlecommerce.nl/receiver/track-and-trace/JD000123456/1234AB"
+    )
