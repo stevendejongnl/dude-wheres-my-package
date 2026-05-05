@@ -169,6 +169,15 @@ class PackageRepository:
         )
         await self.db.commit()
 
+        # v1.51: collapse extension_token → browser_payload. PostNL never
+        # used the PATCH /accounts/{id}/token flow in production — the
+        # extension always POSTs to /accounts/{id}/browser-payload.
+        await self.db.execute(
+            "UPDATE accounts SET auth_type = 'browser_payload' "
+            "WHERE auth_type = 'extension_token'"
+        )
+        await self.db.commit()
+
         # v1.42: clean up duplicate timeline events caused by datetime.now()
         # fallback timestamps. Keeps the earliest event per
         # (package_id, status, description) group.

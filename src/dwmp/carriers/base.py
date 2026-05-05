@@ -33,14 +33,13 @@ class AuthType(StrEnum):
     # the HTML back to ``/browser-push``. Used by carriers whose production
     # login flow rejects headless replay (Amazon CAPTCHA, DPD Cloudflare).
     BROWSER_PUSH = "browser_push"
-    # Hybrid flow: server stores credentials so the Chrome extension can
-    # auto-login. After login the extension harvests a bearer token from
-    # the authenticated page (e.g. ``sessionStorage``) and PATCHes it to
-    # ``/accounts/{id}/token``. Unlike ``BROWSER_PUSH``, the server then
-    # uses that token to call the carrier's API directly — so
-    # ``sync_packages()`` runs server-side. Used by PostNL (GraphQL at
-    # ``jouw.postnl.nl``).
-    EXTENSION_TOKEN = "extension_token"
+    # Extension POSTs a structured JSON payload to
+    # ``/accounts/{id}/browser-payload``; the server parses it via
+    # ``_parse_browser_payload()`` without ever calling the carrier's API
+    # directly. Used by PostNL, where the Chrome extension harvests the
+    # GraphQL response payload from the authenticated browser tab and
+    # submits it here for server-side parsing.
+    BROWSER_PAYLOAD = "browser_payload"
 
 
 class AccountStatus(StrEnum):

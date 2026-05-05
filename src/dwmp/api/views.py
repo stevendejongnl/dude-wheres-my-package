@@ -303,7 +303,7 @@ def _uses_credentials_form(service: TrackingService, carrier_name: str) -> bool:
     if carrier is None:
         return False
     return carrier.auth_type in (
-        AuthType.CREDENTIALS, AuthType.BROWSER_PUSH, AuthType.EXTENSION_TOKEN,
+        AuthType.CREDENTIALS, AuthType.BROWSER_PUSH, AuthType.BROWSER_PAYLOAD,
     )
 
 

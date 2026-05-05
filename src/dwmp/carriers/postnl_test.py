@@ -59,8 +59,8 @@ async def test_parse_json_response():
     assert result.tracking_url == "https://jouw.postnl.nl/track-and-trace/TEST123-NL-1234AB"
 
 
-def test_postnl_is_extension_token():
-    assert PostNL().auth_type == AuthType.EXTENSION_TOKEN
+def test_postnl_is_browser_payload():
+    assert PostNL().auth_type == AuthType.BROWSER_PAYLOAD
 
 
 async def test_postnl_rejects_login():

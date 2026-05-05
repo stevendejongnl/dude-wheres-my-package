@@ -345,46 +345,31 @@ async def test_update_manual_token_preserves_existing_refresh_token(repo):
     assert tokens.get("refresh_token") == stored_creds
 
 
-class ExtensionTokenStub(CarrierBase):
-    name = "ext-stub"
-    auth_type = AuthType.EXTENSION_TOKEN
+class BrowserPayloadStub(CarrierBase):
+    name = "bp-stub"
+    auth_type = AuthType.BROWSER_PAYLOAD
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
         return TrackingResult(tracking_number=tracking_number, carrier=self.name, status=TrackingStatus.UNKNOWN)
 
     async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
-        return [
-            TrackingResult(
-                tracking_number="EXT-001",
-                carrier=self.name,
-                status=TrackingStatus.IN_TRANSIT,
-                events=[
-                    TrackingEvent(
-                        timestamp=datetime(2026, 4, 20, 9, 0, tzinfo=UTC),
-                        status=TrackingStatus.IN_TRANSIT,
-                        description="Onderweg",
-                    ),
-                ],
-            ),
-        ]
+        return []
 
 
-async def test_sync_account_calls_sync_packages_for_extension_token(repo):
-    """EXTENSION_TOKEN carriers (PostNL) must hit sync_packages server-side.
+async def test_sync_account_skips_server_side_for_browser_payload(repo):
+    """BROWSER_PAYLOAD carriers (PostNL) must not call sync_packages server-side.
 
-    Regression guard: the BROWSER_PUSH short-circuit in ``sync_account``
-    previously swallowed PostNL too, causing the Chrome extension to
-    always report "0 packages synced."
+    PostNL is driven entirely via the Chrome extension POSTing to
+    ``/accounts/{id}/browser-payload`` — the scheduler and the account-row
+    "Sync" button must leave it alone and return an empty list.
     """
-    service = TrackingService(repository=repo, carriers={"ext-stub": ExtensionTokenStub()})
+    service = TrackingService(repository=repo, carriers={"bp-stub": BrowserPayloadStub()})
     account_id = await repo.add_account(
-        carrier="ext-stub", auth_type="extension_token",
-        tokens={"access_token": "bearer-xyz"},
+        carrier="bp-stub", auth_type="browser_payload",
+        tokens={"access_token": ""},
         username="u@example.com",
     )
 
     results = await service.sync_account(account_id)
 
-    assert len(results) == 1
-    assert results[0]["tracking_number"] == "EXT-001"
-    assert results[0]["current_status"] == "in_transit"
+    assert results == []

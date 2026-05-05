@@ -99,7 +99,7 @@ class TrackingService:
         upstream.
 
         For :class:`AuthType.BROWSER_PUSH` (Amazon, DPD) and
-        :class:`AuthType.EXTENSION_TOKEN` (PostNL) carriers the server never
+        :class:`AuthType.BROWSER_PAYLOAD` (PostNL) carriers the server never
         logs in itself — the Chrome extension uses the stored credentials in
         a real browser tab. So we just package the inputs into an
         :class:`AuthTokens` for the caller to persist. The credentials live
@@ -110,7 +110,7 @@ class TrackingService:
         if carrier is None:
             raise ValueError(f"Unknown carrier: {carrier_name}")
 
-        if carrier.auth_type in (AuthType.BROWSER_PUSH, AuthType.EXTENSION_TOKEN):
+        if carrier.auth_type in (AuthType.BROWSER_PUSH, AuthType.BROWSER_PAYLOAD):
             creds: dict[str, str] = {"email": username, "password": password}
             if totp_secret:
                 creds["totp_secret"] = totp_secret
@@ -472,14 +472,12 @@ class TrackingService:
         if carrier is None:
             raise ValueError(f"Unknown carrier: {account['carrier']}")
 
-        # Browser-push carriers (Amazon, DPD) are driven entirely by the
-        # Chrome extension — the extension scrapes the orders page and
-        # POSTs parsed HTML to ``/browser-push``, so the scheduler and the
-        # account-row "Sync" button never talk to the upstream. PostNL
-        # (``AuthType.EXTENSION_TOKEN``) is different: the extension pushes
-        # a bearer token and the server still calls ``sync_packages()`` with
-        # it — so it falls through to the real sync path below.
-        if carrier.auth_type == AuthType.BROWSER_PUSH:
+        # Browser-push and browser-payload carriers (Amazon, DPD, PostNL) are
+        # driven entirely by the Chrome extension — the extension scrapes the
+        # carrier site in a real browser tab and POSTs the result to the
+        # server, so the scheduler and the account-row "Sync" button never
+        # talk to the upstream directly.
+        if carrier.auth_type in (AuthType.BROWSER_PUSH, AuthType.BROWSER_PAYLOAD):
             logger.info(
                 "Skipping server-side sync for %s account %d — "
                 "browser-push carriers sync via the Chrome extension.",
