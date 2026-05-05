@@ -260,10 +260,8 @@ class TrackingService:
         if existing is None:
             raise ValueError(f"Account {account_id} not found")
 
-        # For extension-driven carriers (PostNL) refresh_token holds the
-        # stored credentials JSON the extension needs to auto-login. When a
-        # client PATCHes only a fresh access_token, keep the existing
-        # refresh_token so the credentials aren't wiped on every sync.
+        # Preserve the existing refresh_token when no new one is provided — it
+        # holds the stored credentials JSON the extension needs to auto-login.
         if refresh_token is None:
             existing_tokens = existing.get("tokens") or {}
             refresh_token = existing_tokens.get("refresh_token")
@@ -480,7 +478,7 @@ class TrackingService:
         if carrier.auth_type in (AuthType.BROWSER_PUSH, AuthType.BROWSER_PAYLOAD):
             logger.info(
                 "Skipping server-side sync for %s account %d — "
-                "browser-push carriers sync via the Chrome extension.",
+                "browser-driven carriers sync via the Chrome extension.",
                 account["carrier"], account_id,
             )
             await self._repository.update_account_status(
