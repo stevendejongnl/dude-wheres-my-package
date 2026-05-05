@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.50.5 (2026-05-05)
+
+### Bug Fixes
+
+- Skip waitForTabLoad on caller-supplied tab (already loaded)
+  ([`03b6d0b`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/03b6d0bb45bad2e83632952f3789549f198a6363))
+
+
 ## v1.50.4 (2026-05-05)
 
 ### Bug Fixes
