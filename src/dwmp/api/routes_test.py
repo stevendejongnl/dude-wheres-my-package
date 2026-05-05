@@ -268,21 +268,6 @@ async def test_delete_account(client: AsyncClient):
     assert response.status_code == 204
 
 
-async def test_sync_account(client: AsyncClient):
-    create_resp = await client.post(
-        "/api/v1/accounts/token",
-        json={"carrier": "postnl", "access_token": "tok"},
-    )
-    account_id = create_resp.json()["id"]
-
-    response = await client.post(f"/api/v1/accounts/{account_id}/sync")
-    assert response.status_code == 200
-    packages = response.json()
-    assert len(packages) == 1
-    assert packages[0]["tracking_number"] == "SYNCED-1"
-    assert packages[0]["source"] == "account"
-
-
 async def test_browser_payload_sync_account(client: AsyncClient):
     create_resp = await client.post(
         "/api/v1/accounts/token",
@@ -331,7 +316,10 @@ async def test_notifications_after_sync(client: AsyncClient):
         json={"carrier": "postnl", "access_token": "tok"},
     )
     account_id = create_resp.json()["id"]
-    await client.post(f"/api/v1/accounts/{account_id}/sync")
+    await client.post(
+        f"/api/v1/accounts/{account_id}/browser-payload",
+        json={"payload": {"shipments": [], "details": []}},
+    )
 
     # Check unread count
     count_resp = await client.get("/api/v1/notifications/unread-count")
@@ -341,8 +329,8 @@ async def test_notifications_after_sync(client: AsyncClient):
     list_resp = await client.get("/api/v1/notifications")
     notifications = list_resp.json()
     assert len(notifications) == 1
-    assert notifications[0]["tracking_number"] == "SYNCED-1"
-    assert notifications[0]["new_status"] == "in_transit"
+    assert notifications[0]["tracking_number"] == "BROWSER-1"
+    assert notifications[0]["new_status"] == "out_for_delivery"
 
 
 async def test_mark_notification_read(client: AsyncClient):
@@ -352,7 +340,10 @@ async def test_mark_notification_read(client: AsyncClient):
         json={"carrier": "postnl", "access_token": "tok"},
     )
     account_id = create_resp.json()["id"]
-    await client.post(f"/api/v1/accounts/{account_id}/sync")
+    await client.post(
+        f"/api/v1/accounts/{account_id}/browser-payload",
+        json={"payload": {"shipments": [], "details": []}},
+    )
 
     list_resp = await client.get("/api/v1/notifications")
     notifications = list_resp.json()

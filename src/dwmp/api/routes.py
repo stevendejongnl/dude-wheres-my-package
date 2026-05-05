@@ -220,19 +220,6 @@ async def delete_account(
     return Response(status_code=204)
 
 
-@router.post("/accounts/{account_id}/sync")
-async def sync_account(
-    account_id: int,
-    service: TrackingService = Depends(get_tracking_service),
-) -> list[dict]:
-    try:
-        return await service.sync_account(account_id)
-    except CarrierAuthError as exc:
-        raise HTTPException(status_code=502, detail=exc.message)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-
-
 class BrowserPushRequest(BaseModel):
     html: str
 
