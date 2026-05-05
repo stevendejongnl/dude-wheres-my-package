@@ -157,8 +157,12 @@ async function syncCarrierViaTab(account, opts = {}) {
       }
     }
 
-    await waitForTabLoad(tabId);
-    await waitForUrlStable(tabId);
+    // When reusing the caller's tab it's already loaded — skip the load wait
+    // (which only resolves on a new navigation event and would time out).
+    if (callerTabId === null) {
+      await waitForTabLoad(tabId);
+      await waitForUrlStable(tabId);
+    }
 
     // If the tab landed on a login page (URL match OR a login form is
     // visible in the DOM), fill credentials and submit.
