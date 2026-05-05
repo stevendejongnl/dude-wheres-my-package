@@ -2,6 +2,36 @@
 
 <!-- version list -->
 
+## v1.50.4 (2026-05-05)
+
+### Bug Fixes
+
+- Sync-current-tab dispatches per-carrier via syncCarrierViaTab
+  ([`8516657`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/8516657488396e398fffdc2632dfca9a4cec12ea))
+
+### Documentation
+
+- Add Trunkrs carrier section, Telegram env vars, and PWA install instructions
+  ([`319b7f7`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/319b7f7880c66f0856dba8959f04911e262044f2))
+
+### Refactoring
+
+- Collapse EXTENSION_TOKEN into BROWSER_PAYLOAD, drop PATCH-token surface
+  ([`8975120`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/897512052231928f11c04a8ccfc11b6af0c2b644))
+
+- Drop unused POST /accounts/{id}/sync route and syncAccount api.js export
+  ([`7a36bb6`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/7a36bb6610bae9ef42f7cea5c85300cfc4ceabaf))
+
+- Fix stale comment in routes_test after sync route removal
+  ([`3ad49b8`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/3ad49b8ef653d8d46ec3fd660e86a84684d527dd))
+
+- Fix stale comments after EXTENSION_TOKEN removal
+  ([`6066d99`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/6066d993ad63edc30c0b8d421e508fa1ab6fb1e8))
+
+- Remove unused OAuth surface (routes, service methods, base class)
+  ([`c343f33`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/c343f3397b4dd6f8bb2f9d49e23493ff8c97c269))
+
+
 ## v1.50.3 (2026-05-04)
 
 ### Bug Fixes
