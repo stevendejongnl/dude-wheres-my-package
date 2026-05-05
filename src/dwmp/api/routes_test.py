@@ -310,7 +310,7 @@ async def test_unread_count_zero(client: AsyncClient):
 
 
 async def test_notifications_after_sync(client: AsyncClient):
-    # Create account and sync to trigger status change (unknown -> in_transit)
+    # Create account and sync to trigger status change (unknown -> out_for_delivery)
     create_resp = await client.post(
         "/api/v1/accounts/token",
         json={"carrier": "postnl", "access_token": "tok"},
