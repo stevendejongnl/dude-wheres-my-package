@@ -10,6 +10,7 @@ import {
   CARRIER_AUTH_CLEAR,
   CARRIER_LOGIN_PATTERNS,
   CARRIER_SYNC_URLS,
+  detectCarrier,
 } from "./lib/carriers.js";
 
 const DEFAULT_SYNC_INTERVAL_MIN = 60;
@@ -99,7 +100,7 @@ async function runAutoSync() {
   }
 }
 
-async function syncCarrierViaTab(account) {
+async function syncCarrierViaTab(account, opts = {}) {
   const urls = CARRIER_SYNC_URLS[account.carrier];
   if (!urls?.parcels) {
     await storeSyncResult(account.id, false, `No sync URL for ${account.carrier}`);
@@ -117,8 +118,12 @@ async function syncCarrierViaTab(account) {
     return;
   }
 
-  let tabId = null;
-  let shouldCloseTab = true;
+  // opts.tabId: caller-supplied tab to reuse (current-tab sync path).
+  // When set we never close the tab, never wipe site data, and skip the
+  // tab-open/navigate-to-startUrl block entirely.
+  const callerTabId = opts.tabId ?? null;
+  let tabId = callerTabId;
+  let shouldCloseTab = callerTabId === null;
 
   // Always go through the login URL when one is configured. This guarantees
   // the carrier presents its sign-in form (or skips straight to the
@@ -127,27 +132,29 @@ async function syncCarrierViaTab(account) {
   const startUrl = urls.login || urls.parcels;
 
   try {
-    // Wipe all carrier session data before every login-URL sync. Stale cookies
-    // and broken SSO state are the most common cause of silent login failures;
-    // credentials are always stored at this point so we can re-login cleanly.
-    if (urls.login) {
-      await clearCarrierSiteData(account.carrier);
-    }
+    if (callerTabId === null) {
+      // Wipe all carrier session data before every login-URL sync. Stale cookies
+      // and broken SSO state are the most common cause of silent login failures;
+      // credentials are always stored at this point so we can re-login cleanly.
+      if (urls.login) {
+        await clearCarrierSiteData(account.carrier);
+      }
 
-    // When a login URL is configured we always clear site data and force a
-    // fresh login — reusing an existing tab would log the user out of their
-    // active browser session, so always open a dedicated tab in that case.
-    const domain = new URL(startUrl).hostname;
-    const existing = urls.login
-      ? []
-      : await chrome.tabs.query({ url: `*://*.${domain}/*` });
-    if (existing.length > 0) {
-      tabId = existing[0].id;
-      shouldCloseTab = false;
-      await chrome.tabs.update(tabId, { url: startUrl });
-    } else {
-      const tab = await chrome.tabs.create({ url: startUrl, active: false });
-      tabId = tab.id;
+      // When a login URL is configured we always clear site data and force a
+      // fresh login — reusing an existing tab would log the user out of their
+      // active browser session, so always open a dedicated tab in that case.
+      const domain = new URL(startUrl).hostname;
+      const existing = urls.login
+        ? []
+        : await chrome.tabs.query({ url: `*://*.${domain}/*` });
+      if (existing.length > 0) {
+        tabId = existing[0].id;
+        shouldCloseTab = false;
+        await chrome.tabs.update(tabId, { url: startUrl });
+      } else {
+        const tab = await chrome.tabs.create({ url: startUrl, active: false });
+        tabId = tab.id;
+      }
     }
 
     await waitForTabLoad(tabId);
@@ -265,7 +272,13 @@ async function syncCarrierViaTab(account) {
     // Detect carrier error/outage page (e.g. DPD "Technical issue occurred").
     // Clear site data for the carrier domain and retry once with a fresh login —
     // stale cookies are the most common cause of DPD landing on its error page.
+    // When reusing the caller's tab we skip site-data wipe to preserve the
+    // user's active session and surface the error instead.
     if (isCarrierErrorPage(html)) {
+      if (callerTabId !== null) {
+        await storeSyncResult(account.id, false, "Carrier site error -- try again later");
+        return;
+      }
       await clearCarrierSiteData(account.carrier);
       await chrome.tabs.update(tabId, { url: startUrl });
       await waitForTabLoad(tabId);
@@ -894,14 +907,23 @@ async function handleSyncCurrentTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id || !tab.url) return { ok: false, error: "No active tab" };
 
-  try {
-    const html = await captureTabHtml(tab.id);
-    if (!html) return { ok: false, error: "Could not capture page content" };
+  const carrier = detectCarrier(tab.url);
+  if (!carrier) return { ok: false, error: "Not on a carrier site" };
 
-    const result = await browserPush(html, tab.url);
-    return result;
-  } catch (err) {
-    return { ok: false, error: err.message };
+  const accounts = await listAccounts();
+  if (!accounts.ok) return accounts;
+
+  const account = accounts.data.find((a) => a.carrier === carrier);
+  if (!account) return { ok: false, error: `No ${carrier} account configured` };
+
+  if (syncInProgress) return { ok: false, error: "Sync already in progress" };
+  syncInProgress = true;
+  try {
+    await syncCarrierViaTab(account, { tabId: tab.id });
+    const { dwmp_sync_results } = await chrome.storage.local.get("dwmp_sync_results");
+    return dwmp_sync_results?.[account.id] || { ok: true };
+  } finally {
+    syncInProgress = false;
   }
 }
 
