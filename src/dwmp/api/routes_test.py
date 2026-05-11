@@ -498,3 +498,64 @@ async def test_extension_updates_xml_default_appid(client: AsyncClient):
     response = await client.get("/api/v1/extension/updates.xml")
     assert response.status_code == 200
     assert 'appid="extension"' in response.text
+
+
+# --- Push subscription routes ---
+
+@pytest.fixture
+def push_app(repo):
+    from dwmp.api.dependencies import get_web_push_notifier
+    from dwmp.services.web_push_notifier import WebPushNotifier
+    application = create_app()
+    service = TrackingService(
+        repository=repo,
+        carriers={"postnl": StubPostNLCarrier(), "dpd": StubCredCarrier()},
+    )
+    notifier = WebPushNotifier(
+        repository=repo,
+        vapid_private_key="fake-priv",
+        vapid_public_key="fake-pub",
+        vapid_subject="mailto:test@example.com",
+    )
+    application.dependency_overrides[get_repository] = lambda: repo
+    application.dependency_overrides[get_tracking_service] = lambda: service
+    application.dependency_overrides[get_web_push_notifier] = lambda: notifier
+    return application
+
+
+@pytest.fixture
+async def push_client(push_app):
+    transport = ASGITransport(app=push_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+
+
+async def test_get_vapid_public_key(push_client):
+    response = await push_client.get("/api/v1/push/vapid-public-key")
+    assert response.status_code == 200
+    assert response.json()["publicKey"] == "fake-pub"
+
+
+async def test_push_subscribe(push_client):
+    payload = {
+        "endpoint": "https://push.example.com/v1/test",
+        "p256dh": "dGVzdGtleQ==",
+        "auth": "dGVzdGF1dGg=",
+    }
+    response = await push_client.post("/api/v1/push/subscribe", json=payload)
+    assert response.status_code == 204
+
+
+async def test_push_unsubscribe(push_client):
+    payload = {
+        "endpoint": "https://push.example.com/v1/test",
+        "p256dh": "dGVzdGtleQ==",
+        "auth": "dGVzdGF1dGg=",
+    }
+    await push_client.post("/api/v1/push/subscribe", json=payload)
+    response = await push_client.request(
+        "DELETE",
+        "/api/v1/push/subscribe",
+        json={"endpoint": "https://push.example.com/v1/test"},
+    )
+    assert response.status_code == 204

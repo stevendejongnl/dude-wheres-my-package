@@ -7,9 +7,10 @@ from fastapi.responses import Response as RawResponse
 from pydantic import BaseModel
 
 from dwmp.api.auth import create_token, verify_password
-from dwmp.api.dependencies import get_tracking_service
+from dwmp.api.dependencies import get_tracking_service, get_web_push_notifier
 from dwmp.carriers.base import CarrierAuthError, CarrierSyncError
 from dwmp.services.tracking import TrackingService
+from dwmp.services.web_push_notifier import WebPushNotifier
 
 router = APIRouter(prefix="/api/v1")
 
@@ -43,6 +44,16 @@ class ManualTokenRequest(BaseModel):
 
 class AuthTokenRequest(BaseModel):
     password: str
+
+
+class PushSubscribeRequest(BaseModel):
+    endpoint: str
+    p256dh: str
+    auth: str
+
+
+class PushUnsubscribeRequest(BaseModel):
+    endpoint: str
 
 
 def _has_stored_credentials(tokens: dict | None) -> bool:
@@ -461,3 +472,29 @@ async def extension_update_xml(request: Request) -> RawResponse:
         "</gupdate>\n"
     )
     return RawResponse(content=xml, media_type="application/xml")
+
+
+# --- Push subscription endpoints ---
+
+
+@router.get("/push/vapid-public-key")
+async def get_vapid_public_key(
+    notifier: WebPushNotifier = Depends(get_web_push_notifier),
+) -> dict:
+    return {"publicKey": notifier.public_key}
+
+
+@router.post("/push/subscribe", status_code=204)
+async def push_subscribe(
+    body: PushSubscribeRequest,
+    notifier: WebPushNotifier = Depends(get_web_push_notifier),
+) -> None:
+    await notifier.add_subscription(body.endpoint, body.p256dh, body.auth)
+
+
+@router.delete("/push/subscribe", status_code=204)
+async def push_unsubscribe(
+    body: PushUnsubscribeRequest,
+    notifier: WebPushNotifier = Depends(get_web_push_notifier),
+) -> None:
+    await notifier.remove_subscription(body.endpoint)
