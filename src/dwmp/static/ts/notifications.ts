@@ -119,20 +119,33 @@ export async function subscribeToPush(): Promise<void> {
 }
 
 /**
- * Request notification permission after a delay.
- * No-op when the Notification API is unavailable or already decided.
+ * Show the push-banner if the user hasn't decided on notifications yet.
+ * If already granted, silently re-subscribe (handles re-installs / cleared subs).
+ * iOS requires Notification.requestPermission() inside a user gesture, so we
+ * never auto-prompt — the banner button provides the required gesture context.
  */
-export async function requestPermission(delayMs: number = 3000): Promise<void> {
+export async function requestPermission(): Promise<void> {
   if (typeof Notification === "undefined") return;
+  if (!("PushManager" in window)) return;
   if (Notification.permission === "granted") {
     await subscribeToPush();
     return;
   }
   if (Notification.permission !== "default") return;
-  setTimeout(async () => {
-    const result = await Notification.requestPermission();
-    if (result === "granted") await subscribeToPush();
-  }, delayMs);
+  const banner = document.getElementById("push-banner");
+  if (banner) banner.style.display = "flex";
+}
+
+/**
+ * Called when the user taps the push-banner enable button.
+ * Runs inside a user gesture so iOS allows the permission dialog.
+ */
+export async function enablePushFromBanner(): Promise<void> {
+  const banner = document.getElementById("push-banner");
+  if (banner) banner.style.display = "none";
+  if (typeof Notification === "undefined") return;
+  const result = await Notification.requestPermission();
+  if (result === "granted") await subscribeToPush();
 }
 
 /**

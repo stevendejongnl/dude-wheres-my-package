@@ -121,51 +121,48 @@ describe("parseBadgeCount", () => {
 // --- requestPermission ---
 
 describe("requestPermission", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
   afterEach(() => {
-    vi.useRealTimers();
     vi.restoreAllMocks();
+    document.getElementById("push-banner")?.remove();
   });
 
-  it("calls Notification.requestPermission after delay when default", () => {
-    const mockRequest = vi.fn().mockResolvedValue("granted");
-    vi.stubGlobal("Notification", {
-      permission: "default",
-      requestPermission: mockRequest,
-    });
+  it("shows the push-banner when permission is default and PushManager is available", async () => {
+    vi.stubGlobal("Notification", { permission: "default" });
+    vi.stubGlobal("PushManager", {});
+    const banner = document.createElement("div");
+    banner.id = "push-banner";
+    banner.style.display = "none";
+    document.body.appendChild(banner);
 
-    requestPermission(1000);
+    await requestPermission();
 
-    expect(mockRequest).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1000);
-    expect(mockRequest).toHaveBeenCalledOnce();
+    expect(banner.style.display).toBe("flex");
   });
 
-  it("does not call requestPermission when already granted", () => {
-    const mockRequest = vi.fn();
-    vi.stubGlobal("Notification", {
-      permission: "granted",
-      requestPermission: mockRequest,
-    });
+  it("does not show the banner when PushManager is unavailable", async () => {
+    vi.stubGlobal("Notification", { permission: "default" });
+    delete (window as unknown as Record<string, unknown>).PushManager;
+    const banner = document.createElement("div");
+    banner.id = "push-banner";
+    banner.style.display = "none";
+    document.body.appendChild(banner);
 
-    requestPermission(0);
-    vi.advanceTimersByTime(1000);
-    expect(mockRequest).not.toHaveBeenCalled();
+    await requestPermission();
+
+    expect(banner.style.display).toBe("none");
   });
 
-  it("does not call requestPermission when denied", () => {
-    const mockRequest = vi.fn();
-    vi.stubGlobal("Notification", {
-      permission: "denied",
-      requestPermission: mockRequest,
-    });
+  it("does not show the banner when permission is denied", async () => {
+    vi.stubGlobal("Notification", { permission: "denied" });
+    vi.stubGlobal("PushManager", {});
+    const banner = document.createElement("div");
+    banner.id = "push-banner";
+    banner.style.display = "none";
+    document.body.appendChild(banner);
 
-    requestPermission(0);
-    vi.advanceTimersByTime(1000);
-    expect(mockRequest).not.toHaveBeenCalled();
+    await requestPermission();
+
+    expect(banner.style.display).toBe("none");
   });
 });
 
