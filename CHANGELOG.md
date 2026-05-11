@@ -2,6 +2,56 @@
 
 <!-- version list -->
 
+## v1.51.0 (2026-05-11)
+
+### Bug Fixes
+
+- **postnl**: Target Capture email field by id instead of positional selector
+  ([`e4ff820`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/e4ff8206b0c54bf06f05af30d3fda9ee5e0f9621))
+
+- **pwa**: Cast Uint8Array to ArrayBuffer for pushManager.subscribe typecheck
+  ([`c67caee`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/c67caee3625b7802318d007bfaa7c36806031e1a))
+
+- **tests**: Compute date dynamically in eta display test; widen lookback in delivered test
+  ([`1e9265c`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/1e9265c71f6896a9f59ae9a4baef15191b347cda))
+
+### Documentation
+
+- Add web push notifications design spec
+  ([`eb59ec9`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/eb59ec9cd12615f6d0fb09484fc068496381a667))
+
+- Add web push notifications implementation plan
+  ([`6a099bd`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/6a099bd6aaf9fddc0e55215d0bad798dc70140d7))
+
+### Features
+
+- **db**: Add push_subscriptions table and repository methods
+  ([`9142c97`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/9142c9770b657c662868439885062dd0d31eb427))
+
+- **push**: Add /push/vapid-public-key, /push/subscribe, /push/unsubscribe routes
+  ([`3fadd01`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/3fadd01f6a5f1ee2d42ba896dc8ccd858de3298b))
+
+- **push**: Add VAPID env vars to k8s deployment
+  ([`dc753e3`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/dc753e312fa1d8b31c70d38012323cbade7d1169))
+
+- **push**: Add WebPushNotifier service with pywebpush
+  ([`f601dd9`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/f601dd9877282a5b510b3e40fb07b4e2afe39df4))
+
+- **push**: Wire WebPushNotifier into TrackingService
+  ([`4575565`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/4575565537fe3d9530b2d4dfaf1269787d9f5d29))
+
+- **pwa**: Add manifest.json and service worker with push notification support
+  ([`4397ecd`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/4397ecd41ef8fde23783c710cbd292853070e202))
+
+- **pwa**: Subscribe to Web Push after notification permission granted
+  ([`bd142af`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/bd142af804e08eaa93cfdd6fad1bf971fa7e2325))
+
+### Refactoring
+
+- **tests**: Use repo fixture in push subscription tests
+  ([`672b1d1`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/672b1d1b62067436d97a280265638cc415de62ad))
+
+
 ## v1.50.5 (2026-05-05)
 
 ### Bug Fixes
