@@ -126,7 +126,6 @@ export async function subscribeToPush(): Promise<void> {
  */
 export async function requestPermission(): Promise<void> {
   if (typeof Notification === "undefined") return;
-  if (!("PushManager" in window)) return;
   if (Notification.permission === "granted") {
     await subscribeToPush();
     return;

@@ -139,7 +139,7 @@ describe("requestPermission", () => {
     expect(banner.style.display).toBe("flex");
   });
 
-  it("does not show the banner when PushManager is unavailable", async () => {
+  it("shows the banner even when PushManager is unavailable (Safari without install)", async () => {
     vi.stubGlobal("Notification", { permission: "default" });
     delete (window as unknown as Record<string, unknown>).PushManager;
     const banner = document.createElement("div");
@@ -149,7 +149,7 @@ describe("requestPermission", () => {
 
     await requestPermission();
 
-    expect(banner.style.display).toBe("none");
+    expect(banner.style.display).toBe("flex");
   });
 
   it("does not show the banner when permission is denied", async () => {
