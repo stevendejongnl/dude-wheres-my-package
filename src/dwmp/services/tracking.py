@@ -12,6 +12,7 @@ from dwmp.carriers.base import (
     TrackingResult,
     TrackingStatus,
 )
+from dwmp.services.web_push_notifier import WebPushNotifier
 from dwmp.storage.repository import PackageRepository
 
 logger = logging.getLogger(__name__)
@@ -22,9 +23,11 @@ class TrackingService:
         self,
         repository: PackageRepository,
         carriers: dict[str, CarrierBase],
+        notifier: WebPushNotifier | None = None,
     ) -> None:
         self._repository = repository
         self._carriers = carriers
+        self._notifier = notifier
 
     def list_carriers(self) -> list[str]:
         return sorted(self._carriers.keys())
@@ -63,6 +66,11 @@ class TrackingService:
                 label=label,
                 description=description,
             )
+            if self._notifier:
+                display_carrier = carrier.upper()
+                title = f"{display_carrier} — {label or tracking_number}"
+                body = description or new_status
+                await self._notifier.send_all(title, body, "/")
 
     async def notify_auth_failure(self, carrier: str, message: str) -> None:
         """Create a notification when a carrier account fails to authenticate.

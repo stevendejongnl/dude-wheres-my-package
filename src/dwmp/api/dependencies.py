@@ -7,6 +7,7 @@ from dwmp.carriers.gls import GLS
 from dwmp.carriers.postnl import PostNL
 from dwmp.carriers.trunkrs import Trunkrs
 from dwmp.services.tracking import TrackingService
+from dwmp.services.web_push_notifier import WebPushNotifier
 from dwmp.storage.repository import PackageRepository
 
 
@@ -16,9 +17,15 @@ def get_repository() -> PackageRepository:
 
 
 @lru_cache
+def get_web_push_notifier() -> WebPushNotifier:
+    return WebPushNotifier(repository=get_repository())
+
+
+@lru_cache
 def get_tracking_service() -> TrackingService:
     return TrackingService(
         repository=get_repository(),
+        notifier=get_web_push_notifier(),
         carriers={
             "amazon": Amazon(),
             "postnl": PostNL(),
