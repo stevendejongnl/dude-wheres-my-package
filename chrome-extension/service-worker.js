@@ -556,15 +556,18 @@ async function handlePostNLLogin(tabId, username, password) {
   // fields are visible on the current step, submit, then check whether a
   // second step (password-only) appeared and fill that too.
   const fillStep = (email, pass) => {
-    const inputs = document.querySelectorAll(
-      "input[type='text'], input[type='email'], input:not([type])"
-    );
     const passEl = document.querySelector("input[type='password']");
-    const emailEl = inputs[0];
+    const emailEl =
+      document.querySelector("#capture_signIn_signInEmailAddress") ||
+      document.querySelector("[data-capturefield='signInEmailAddress']") ||
+      document.querySelector(
+        "input[type='text'], input[type='email'], input:not([type])"
+      );
     if (emailEl) {
       emailEl.value = email;
       emailEl.dispatchEvent(new Event("input", { bubbles: true }));
       emailEl.dispatchEvent(new Event("change", { bubbles: true }));
+      emailEl.dispatchEvent(new Event("blur", { bubbles: true }));
     }
     if (passEl) {
       passEl.value = pass;
