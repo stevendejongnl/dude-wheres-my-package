@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.51.2 (2026-05-11)
+
+### Bug Fixes
+
+- **pwa**: Show notification banner regardless of PushManager availability
+  ([`472d3a9`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/472d3a9768a09674953204f5e022387ab6f74c2b))
+
+
 ## v1.51.1 (2026-05-11)
 
 ### Bug Fixes
