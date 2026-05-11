@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.51.1 (2026-05-11)
+
+### Bug Fixes
+
+- **pwa**: Show opt-in banner instead of auto-prompting for push permission
+  ([`200658e`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/200658ea43139641ab3697f1e64c75ca523fda33))
+
+
 ## v1.51.0 (2026-05-11)
 
 ### Bug Fixes
