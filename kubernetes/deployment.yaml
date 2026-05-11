@@ -65,6 +65,20 @@ spec:
                   name: dwmp-telegram-secret
                   key: chat-id
                   optional: true
+            - name: VAPID_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dwmp-vapid-secret
+                  key: public-key
+                  optional: true
+            - name: VAPID_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dwmp-vapid-secret
+                  key: private-key
+                  optional: true
+            - name: VAPID_SUBJECT
+              value: "mailto:noreply@madebysteven.nl"
           resources:
             # Headless Chrome (Playwright) for Amazon + DPD sync needs
             # real memory and CPU during browser launch. The old
