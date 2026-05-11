@@ -552,13 +552,20 @@
   </style>
 </head>
 <body>
+  <div id="push-banner" style="display:none;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:var(--accent);color:#fff;font-size:0.85rem;">
+    <span>Enable push notifications to get delivery alerts on this device.</span>
+    <div style="display:flex;gap:8px;flex-shrink:0;">
+      <button onclick="dwmpEnablePush()" style="padding:5px 14px;border-radius:6px;border:none;background:#fff;color:var(--accent);font-weight:600;cursor:pointer;font-size:0.85rem;">Enable</button>
+      <button onclick="document.getElementById('push-banner').style.display='none'" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.5);background:transparent;color:#fff;cursor:pointer;font-size:0.85rem;">✕</button>
+    </div>
+  </div>
   <header>
     <div class="container">
       <h1>
         <img src="../assets/icon-128.png" alt="" style="width:48px;height:48px;vertical-align:middle;margin-right:12px;border-radius:10px;">
         <span class="app-title">Dude, Where's My Package?</span>
         <span class="app-title-short">DWMP</span>
-        <span class="version-badge">v1.51.0</span>
+        <span class="version-badge">v1.51.1</span>
       </h1>
       
       <nav>
@@ -622,7 +629,7 @@
           <span class="pkg-sender"><strong>From:</strong> Accepted at sorting centre</span>
           
           
-          <span class="pkg-first-event">Friday 11:28</span>
+          <span class="pkg-first-event">Friday 11:54</span>
           
           
           <span class="pkg-label">Book</span>
@@ -633,7 +640,7 @@
     <div class="pkg-meta">
       <span class="status status-out_for_delivery">out for delivery</span>
       
-      <span class="pkg-date">Today 11:28</span>
+      <span class="pkg-date">Today 11:54</span>
       
     </div>
   </div>
@@ -675,11 +682,11 @@
         
         
         <span class="meta-label">Last refreshed</span>
-        <span class="meta-value">2026-05-11 09:28</span>
+        <span class="meta-value">2026-05-11 09:54</span>
         <span class="meta-label">Created</span>
-        <span class="meta-value">2026-05-11 09:28</span>
+        <span class="meta-value">2026-05-11 09:54</span>
         <span class="meta-label">Updated</span>
-        <span class="meta-value">2026-05-11 09:28</span>
+        <span class="meta-value">2026-05-11 09:54</span>
       </div>
     </details>
 
@@ -691,7 +698,7 @@
         <div class="timeline-content">
           <div class="timeline-desc">Courier is on the way</div>
           <div class="timeline-details">
-            <span class="timeline-time">Today 11:28</span>
+            <span class="timeline-time">Today 11:54</span>
             
             <span class="timeline-loc">Amsterdam 1012</span>
             
@@ -704,7 +711,7 @@
         <div class="timeline-content">
           <div class="timeline-desc">Arrived at distribution centre</div>
           <div class="timeline-details">
-            <span class="timeline-time">Today 07:28</span>
+            <span class="timeline-time">Today 07:54</span>
             
             <span class="timeline-loc">PostNL Amsterdam</span>
             
@@ -717,7 +724,7 @@
         <div class="timeline-content">
           <div class="timeline-desc">Sorted — on its way</div>
           <div class="timeline-details">
-            <span class="timeline-time">Yesterday 07:28</span>
+            <span class="timeline-time">Yesterday 07:54</span>
             
             <span class="timeline-loc">PostNL Nieuwegein</span>
             
@@ -730,7 +737,7 @@
         <div class="timeline-content">
           <div class="timeline-desc">Accepted at sorting centre</div>
           <div class="timeline-details">
-            <span class="timeline-time">Saturday 07:28</span>
+            <span class="timeline-time">Saturday 07:54</span>
             
             <span class="timeline-loc">PostNL Gilze-Rijen</span>
             
@@ -743,7 +750,7 @@
         <div class="timeline-content">
           <div class="timeline-desc">Shipment announced to PostNL</div>
           <div class="timeline-details">
-            <span class="timeline-time">Friday 11:28</span>
+            <span class="timeline-time">Friday 11:54</span>
             
             <span class="timeline-loc">bol.com — Waalwijk</span>
             
@@ -782,7 +789,7 @@
     <div class="pkg-meta">
       <span class="status status-unknown">unknown</span>
       
-      <span class="pkg-date">Today 11:28</span>
+      <span class="pkg-date">Today 11:54</span>
       
     </div>
   </div>
@@ -817,9 +824,9 @@
         <span class="meta-label">Last refreshed</span>
         <span class="meta-value">never</span>
         <span class="meta-label">Created</span>
-        <span class="meta-value">2026-05-11 09:28</span>
+        <span class="meta-value">2026-05-11 09:54</span>
         <span class="meta-label">Updated</span>
-        <span class="meta-value">2026-05-11 09:28</span>
+        <span class="meta-value">2026-05-11 09:54</span>
       </div>
     </details>
 
@@ -855,7 +862,7 @@
     <div class="pkg-meta">
       <span class="status status-unknown">unknown</span>
       
-      <span class="pkg-date">Today 11:28</span>
+      <span class="pkg-date">Today 11:54</span>
       
     </div>
   </div>
@@ -899,9 +906,9 @@
         <span class="meta-label">Last refreshed</span>
         <span class="meta-value">never</span>
         <span class="meta-label">Created</span>
-        <span class="meta-value">2026-05-11 09:28</span>
+        <span class="meta-value">2026-05-11 09:54</span>
         <span class="meta-label">Updated</span>
-        <span class="meta-value">2026-05-11 09:28</span>
+        <span class="meta-value">2026-05-11 09:54</span>
       </div>
     </details>
 
@@ -933,7 +940,7 @@
     <div class="pkg-meta">
       <span class="status status-unknown">unknown</span>
       
-      <span class="pkg-date">Today 11:28</span>
+      <span class="pkg-date">Today 11:54</span>
       
     </div>
   </div>
@@ -968,9 +975,9 @@
         <span class="meta-label">Last refreshed</span>
         <span class="meta-value">never</span>
         <span class="meta-label">Created</span>
-        <span class="meta-value">2026-05-11 09:28</span>
+        <span class="meta-value">2026-05-11 09:54</span>
         <span class="meta-label">Updated</span>
-        <span class="meta-value">2026-05-11 09:28</span>
+        <span class="meta-value">2026-05-11 09:54</span>
       </div>
     </details>
 
