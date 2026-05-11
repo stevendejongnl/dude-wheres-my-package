@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -472,19 +473,22 @@ def test_enrich_package_delivery_window_converts_utc_to_amsterdam():
 
 
 def test_enrich_package_single_eta_uses_display_format():
+    tz = ZoneInfo("Europe/Amsterdam")
     original_tz = _views_module._DISPLAY_TZ
-    _views_module._DISPLAY_TZ = ZoneInfo("Europe/Amsterdam")
+    _views_module._DISPLAY_TZ = tz
     try:
+        now_utc = datetime.now(UTC).replace(second=0, microsecond=0)
         pkg = {
             "carrier": "postnl",
             "tracking_number": "3STEST",
             "tracking_url": None,
-            "estimated_delivery": "2026-05-04T17:29:00+00:00",
+            "estimated_delivery": now_utc.isoformat(),
             "events": [],
         }
         _enrich_package(pkg)
-        assert pkg["estimated_delivery_hm"] == "19:29"
-        assert pkg["estimated_delivery_display"] == "Today 19:29"
+        expected_hm = now_utc.astimezone(tz).strftime("%H:%M")
+        assert pkg["estimated_delivery_hm"] == expected_hm
+        assert pkg["estimated_delivery_display"] == f"Today {expected_hm}"
     finally:
         _views_module._DISPLAY_TZ = original_tz
 

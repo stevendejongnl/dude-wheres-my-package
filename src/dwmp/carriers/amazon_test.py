@@ -139,7 +139,7 @@ def test_parse_orders_page_delivered():
     </div>
     </body></html>
     """
-    results = carrier._parse_orders_page(html)
+    results = carrier._parse_orders_page(html, lookback_days=365)
     assert len(results) == 1
     assert results[0].tracking_number == "305-1234567-8901234"
     assert results[0].status == TrackingStatus.DELIVERED
