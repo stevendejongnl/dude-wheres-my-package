@@ -125,7 +125,21 @@ export async function subscribeToPush(): Promise<void> {
  * never auto-prompt — the banner button provides the required gesture context.
  */
 export async function requestPermission(): Promise<void> {
-  if (typeof Notification === "undefined") return;
+  // Notification API absent = regular Safari on iOS (not an installed home-screen app).
+  // Show a banner nudging the user to install via Share → Add to Home Screen.
+  if (typeof Notification === "undefined") {
+    // Only show the install nudge on iOS/iPadOS where the API is gated behind PWA install.
+    const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+    if (!isIOS) return;
+    const banner = document.getElementById("push-banner");
+    const msg = document.getElementById("push-banner-msg");
+    const btn = document.getElementById("push-banner-btn");
+    if (!banner) return;
+    if (msg) msg.textContent = "Add to Home Screen to enable push notifications.";
+    if (btn) btn.style.display = "none";
+    banner.style.display = "flex";
+    return;
+  }
   if (Notification.permission === "granted") {
     await subscribeToPush();
     return;

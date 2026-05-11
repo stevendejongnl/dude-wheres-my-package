@@ -553,9 +553,9 @@
 </head>
 <body>
   <div id="push-banner" style="display:none;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:var(--accent);color:#fff;font-size:0.85rem;">
-    <span>Enable notifications to get delivery alerts — open from your home screen for background push.</span>
+    <span id="push-banner-msg">Enable notifications to get delivery alerts.</span>
     <div style="display:flex;gap:8px;flex-shrink:0;">
-      <button onclick="dwmpEnablePush()" style="padding:5px 14px;border-radius:6px;border:none;background:#fff;color:var(--accent);font-weight:600;cursor:pointer;font-size:0.85rem;">Enable</button>
+      <button id="push-banner-btn" onclick="dwmpEnablePush()" style="padding:5px 14px;border-radius:6px;border:none;background:#fff;color:var(--accent);font-weight:600;cursor:pointer;font-size:0.85rem;">Enable</button>
       <button onclick="document.getElementById('push-banner').style.display='none'" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.5);background:transparent;color:#fff;cursor:pointer;font-size:0.85rem;">✕</button>
     </div>
   </div>
