@@ -74,13 +74,65 @@ export function parseBadgeCount(container: Element): number {
 }
 
 /**
+ * Convert a URL-safe base64 string to a Uint8Array (required by pushManager.subscribe).
+ */
+export function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+/**
+ * Subscribe this browser to Web Push and register the subscription with the server.
+ * No-op when service workers or push are unsupported.
+ */
+export async function subscribeToPush(): Promise<void> {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+
+  try {
+    const keyRes = await fetch(`${getBasePath()}/api/v1/push/vapid-public-key`);
+    if (!keyRes.ok) return;
+    const { publicKey } = await keyRes.json();
+
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+    }
+
+    const { endpoint, keys } = subscription.toJSON() as {
+      endpoint: string;
+      keys: { p256dh: string; auth: string };
+    };
+    await fetch(`${getBasePath()}/api/v1/push/subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint, p256dh: keys.p256dh, auth: keys.auth }),
+    });
+  } catch {
+    // Non-critical — push is optional
+  }
+}
+
+/**
  * Request notification permission after a delay.
  * No-op when the Notification API is unavailable or already decided.
  */
-export function requestPermission(delayMs: number = 3000): void {
+export async function requestPermission(delayMs: number = 3000): Promise<void> {
   if (typeof Notification === "undefined") return;
+  if (Notification.permission === "granted") {
+    await subscribeToPush();
+    return;
+  }
   if (Notification.permission !== "default") return;
-  setTimeout(() => Notification.requestPermission(), delayMs);
+  setTimeout(async () => {
+    const result = await Notification.requestPermission();
+    if (result === "granted") await subscribeToPush();
+  }, delayMs);
 }
 
 /**
