@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.51.3 (2026-05-11)
+
+### Bug Fixes
+
+- **pwa**: Show install-to-home-screen nudge when Notification API is absent on iOS
+  ([`97711da`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/97711dacb737ae6701939030db33fda39a5d67b5))
+
+
 ## v1.51.2 (2026-05-11)
 
 ### Bug Fixes
