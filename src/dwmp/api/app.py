@@ -1,7 +1,9 @@
+import asyncio
 import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from importlib.metadata import version as pkg_version
 from pathlib import Path
 
@@ -21,10 +23,42 @@ from dwmp.services.telegram_notifier import TelegramNotifier
 _lifespan_logger = logging.getLogger(__name__)
 
 
+class _DBLogHandler(logging.Handler):
+    """Writes dwmp.* log records into the extension_logs table (context='server').
+
+    emit() is called synchronously from within the asyncio event loop (the
+    scheduler and tracking service are all async), so we schedule the DB write
+    as a fire-and-forget task rather than awaiting it.
+    """
+
+    def __init__(self, repo) -> None:
+        super().__init__(level=logging.INFO)
+        self._repo = repo
+
+    def emit(self, record: logging.LogRecord) -> None:
+        entry = {
+            "ts": datetime.fromtimestamp(record.created, UTC).isoformat(),
+            "level": record.levelname.lower(),
+            "category": record.name,
+            "message": self.format(record),
+            "context": "server",
+        }
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self._repo.add_extension_log_entries([entry]))
+        except RuntimeError:
+            pass  # no running loop at startup/shutdown — drop silently
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     repo = get_repository()
     await repo.init()
+
+    db_handler = _DBLogHandler(repo)
+    db_handler.setFormatter(logging.Formatter("%(message)s"))
+    logging.getLogger("dwmp").setLevel(logging.INFO)
+    logging.getLogger("dwmp").addHandler(db_handler)
 
     interval = int(os.environ.get("POLL_INTERVAL_MINUTES", "30"))
     scheduler = PackageScheduler(
@@ -48,6 +82,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         raise
     finally:
         scheduler.stop()
+        logging.getLogger("dwmp").removeHandler(db_handler)
         await repo.close()
         try:
             await notifier.send_shutdown(app.version, reason=shutdown_reason)

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Extension Logs — DWMP{% endblock %}
+{% block title %}Logs — DWMP{% endblock %}
 {% block content %}
 <style>
   .log-toolbar {
@@ -60,7 +60,7 @@
 
 <div id="log-content">
 <div class="section-header">
-  <h2>Extension Logs</h2>
+  <h2>Logs</h2>
   <span class="log-auto-refresh" hx-get="{{ base_path }}/logs{% if filter_level or filter_context %}?{% if filter_level %}level={{ filter_level }}{% endif %}{% if filter_level and filter_context %}&{% endif %}{% if filter_context %}context={{ filter_context }}{% endif %}{% endif %}" hx-trigger="every 10s" hx-target="#log-content" hx-swap="innerHTML" hx-select="#log-content">auto-refresh 10s</span>
 </div>
 
@@ -78,6 +78,7 @@
     <a href="{{ base_path }}/logs{% if filter_level %}?level={{ filter_level }}{% endif %}" class="filter-btn {% if not filter_context %}active{% endif %}">All</a>
     <a href="{{ base_path }}/logs?context=sw{% if filter_level %}&level={{ filter_level }}{% endif %}" class="filter-btn {% if filter_context == 'sw' %}active{% endif %}">sw</a>
     <a href="{{ base_path }}/logs?context=popup{% if filter_level %}&level={{ filter_level }}{% endif %}" class="filter-btn {% if filter_context == 'popup' %}active{% endif %}">popup</a>
+    <a href="{{ base_path }}/logs?context=server{% if filter_level %}&level={{ filter_level }}{% endif %}" class="filter-btn {% if filter_context == 'server' %}active{% endif %}">server</a>
   </div>
   <span class="log-spacer"></span>
   <span class="log-count">{{ logs | length }} entries</span>
