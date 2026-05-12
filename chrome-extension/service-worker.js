@@ -221,6 +221,7 @@ async function syncCarrierViaTab(account, opts = {}) {
       // skipped. Detect that here and handle it in the token loop instead.
       let loginHandled = onLogin;
       let accessToken = null;
+      let storageDiagLogged = false;
       const deadline = Date.now() + 30_000;
       while (Date.now() < deadline) {
         const tabUrl = (await chrome.tabs.get(tabId)).url || "";
@@ -249,6 +250,17 @@ async function syncCarrierViaTab(account, opts = {}) {
           continue;
         }
         accessToken = tokenResult?.[0]?.result || null;
+        if (!accessToken && !storageDiagLogged) {
+          storageDiagLogged = true;
+          const diagResult = await chrome.scripting.executeScript({
+            target: { tabId },
+            func: () => ({
+              sessionKeys: Object.keys(sessionStorage),
+              localAuthKeys: Object.keys(localStorage).filter(k => k.includes("token") || k.includes("auth") || k.includes("poa")),
+            }),
+          }).catch(() => null);
+          log.info("postnl", "Token not found — storage keys", diagResult?.[0]?.result ?? {});
+        }
         if (accessToken) break;
         await sleep(500);
       }

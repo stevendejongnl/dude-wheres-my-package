@@ -47,7 +47,6 @@ export const CARRIER_SYNC_URLS = {
     login: "https://jouw.postnl.nl/account",
     parcels: "https://jouw.postnl.nl/",
   },
-  dhl: { parcels: "https://my.dhlecommerce.nl/" },
 };
 
 // What to wipe before a fresh login per carrier.

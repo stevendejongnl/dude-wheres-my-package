@@ -247,8 +247,15 @@ function renderAccountRow(account, autoSyncEnabled, syncResult) {
     }, 3000);
   });
 
-  // Carriers with login patterns (e.g. DPD) need stored credentials for
-  // the extension to auto-login. Disable sync controls when missing.
+  const syncUrls = CARRIER_SYNC_URLS[carrier];
+
+  if (!syncUrls) {
+    meta.textContent = "Synced by server";
+    row.appendChild(badge);
+    row.appendChild(info);
+    return row;
+  }
+
   const needsCredentials = ["dpd"].includes(carrier) && !account.has_credentials;
   if (needsCredentials) {
     toggleInput.disabled = true;
@@ -259,21 +266,15 @@ function renderAccountRow(account, autoSyncEnabled, syncResult) {
     meta.textContent = "Add credentials to enable extension sync";
   }
 
-  // Login link: opens the carrier's login (or parcels) page in a new tab.
-  // Lets the user manually sign in before triggering sync, without having
-  // to remember the carrier URL.
-  const syncUrls = CARRIER_SYNC_URLS[carrier];
-  if (syncUrls) {
-    const loginUrl = syncUrls.login || syncUrls.parcels;
-    const loginLink = document.createElement("a");
-    loginLink.href = loginUrl;
-    loginLink.target = "_blank";
-    loginLink.rel = "noopener";
-    loginLink.className = "btn btn-ghost login-link";
-    loginLink.textContent = "Login";
-    loginLink.title = `Open ${label} login page`;
-    actions.appendChild(loginLink);
-  }
+  const loginUrl = syncUrls.login || syncUrls.parcels;
+  const loginLink = document.createElement("a");
+  loginLink.href = loginUrl;
+  loginLink.target = "_blank";
+  loginLink.rel = "noopener";
+  loginLink.className = "btn btn-ghost login-link";
+  loginLink.textContent = "Login";
+  loginLink.title = `Open ${label} login page`;
+  actions.appendChild(loginLink);
 
   actions.appendChild(toggleLabel);
   actions.appendChild(syncBtn);
