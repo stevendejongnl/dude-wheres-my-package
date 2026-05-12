@@ -3,6 +3,7 @@ import pytest
 from dwmp.carriers.base import (
     AuthTokens,
     AuthType,
+    CarrierAuthError,
     CarrierBase,
     TrackingResult,
     TrackingStatus,
@@ -43,6 +44,7 @@ class StubCarrier(CarrierBase):
 
 
 class FailingCarrier(CarrierBase):
+    """Raises an unexpected RuntimeError — simulates a programmer/infra error."""
     name = "failing"
     auth_type = AuthType.CREDENTIALS
 
@@ -58,6 +60,25 @@ class FailingCarrier(CarrierBase):
 
     async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
         return AuthTokens(access_token="fail-token")
+
+
+class AuthFailCarrier(CarrierBase):
+    """Raises CarrierAuthError — simulates a genuine credential failure."""
+    name = "authfail"
+    auth_type = AuthType.CREDENTIALS
+
+    async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        return TrackingResult(
+            tracking_number=tracking_number, carrier="authfail", status=TrackingStatus.UNKNOWN
+        )
+
+    async def sync_packages(
+        self, tokens: AuthTokens, lookback_days: int = 30
+    ) -> list[TrackingResult]:
+        raise CarrierAuthError("authfail", "Password changed")
+
+    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+        raise CarrierAuthError("authfail", "Invalid credentials")
 
 
 @pytest.fixture
@@ -123,8 +144,9 @@ async def test_poll_skips_auth_failed_accounts(repo):
 
 
 async def test_poll_handles_sync_failure_gracefully(repo):
-    """When a carrier's API fails, the account is marked auth_failed
-    and a descriptive error message is stored."""
+    """An unexpected RuntimeError from a carrier does NOT flip the account to
+    auth_failed — it's treated as a transient failure so the account stays
+    connected and retries on the next cycle."""
     carrier = FailingCarrier()
     service = TrackingService(repository=repo, carriers={"failing": carrier})
     scheduler = PackageScheduler(tracking_service=service)
@@ -137,18 +159,35 @@ async def test_poll_handles_sync_failure_gracefully(repo):
     await scheduler._poll_all()
 
     account = await repo.get_account(account_id)
+    assert account["status"] == "connected"
+
+
+async def test_poll_marks_auth_failed_on_carrier_auth_error(repo):
+    """A genuine CarrierAuthError flips the account to auth_failed."""
+    carrier = AuthFailCarrier()
+    service = TrackingService(repository=repo, carriers={"authfail": carrier})
+    scheduler = PackageScheduler(tracking_service=service)
+
+    account_id = await repo.add_account(
+        carrier="authfail", auth_type="credentials",
+        tokens={"access_token": "tok"}, username="user",
+    )
+
+    await scheduler._poll_all()
+
+    account = await repo.get_account(account_id)
     assert account["status"] == "auth_failed"
     assert "login flow may have changed" in account["status_message"]
 
 
 async def test_poll_creates_auth_failure_notification(repo):
-    """When sync fails, a notification is created so the user sees it."""
-    carrier = FailingCarrier()
-    service = TrackingService(repository=repo, carriers={"failing": carrier})
+    """When a CarrierAuthError fires, a notification is created for the user."""
+    carrier = AuthFailCarrier()
+    service = TrackingService(repository=repo, carriers={"authfail": carrier})
     scheduler = PackageScheduler(tracking_service=service)
 
     await repo.add_account(
-        carrier="failing", auth_type="credentials",
+        carrier="authfail", auth_type="credentials",
         tokens={"access_token": "tok"}, username="user",
     )
 
@@ -156,7 +195,7 @@ async def test_poll_creates_auth_failure_notification(repo):
 
     notifications = await repo.list_notifications()
     assert len(notifications) == 1
-    assert notifications[0]["carrier"] == "failing"
+    assert notifications[0]["carrier"] == "authfail"
     assert notifications[0]["old_status"] == "connected"
     assert notifications[0]["new_status"] == "auth_failed"
     assert notifications[0]["package_id"] is None

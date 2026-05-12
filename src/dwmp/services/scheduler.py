@@ -1,9 +1,10 @@
+import asyncio
 import logging
 from datetime import UTC, datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from dwmp.carriers.base import CarrierAuthError
+from dwmp.carriers.base import CarrierAuthError, CarrierTransientError
 from dwmp.services.tracking import TrackingService
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,13 @@ class PackageScheduler:
             "interval",
             minutes=self._interval,
             id="poll_packages",
+            replace_existing=True,
+        )
+        self._scheduler.add_job(
+            self._reauth_probe,
+            "interval",
+            hours=24,
+            id="reauth_probe",
             replace_existing=True,
         )
         self._scheduler.start()
@@ -78,6 +86,13 @@ class PackageScheduler:
                     carrier=account["carrier"],
                     message=exc.message,
                 )
+            except CarrierTransientError as exc:
+                logger.info(
+                    "Transient failure syncing account %s (%s): %s — will retry next cycle",
+                    account["id"],
+                    account["carrier"],
+                    exc.message,
+                )
             except Exception:
                 logger.exception(
                     "Failed to sync account %s (%s)",
@@ -107,11 +122,38 @@ class PackageScheduler:
                 await self._service.refresh_package(pkg["id"])
             except Exception:
                 logger.exception("Failed to refresh package %s", pkg["id"])
+            await asyncio.sleep(0.5)
 
         # 3. Clean up old notifications
         deleted = await self._service.delete_old_notifications(days=30)
         if deleted:
             logger.info("Cleaned up %d old notifications", deleted)
+
+    async def _reauth_probe(self) -> None:
+        """Once per day, probe auth_failed accounts to see if they can recover.
+
+        Attempts a lightweight credential validation for each stuck account.
+        On success the account transitions back to CONNECTED without any
+        user action, covering accounts that were bricked by transient network
+        failures rather than genuine credential problems.
+        """
+        accounts = await self._service.list_accounts()
+        stuck = [a for a in accounts if a.get("status") == "auth_failed"]
+        if not stuck:
+            return
+        logger.info("Re-auth probe: checking %d stuck account(s)", len(stuck))
+        for account in stuck:
+            try:
+                await self._service.validate_account_credentials_by_id(account["id"])
+                logger.info(
+                    "Account %s (%s) recovered from auth_failed",
+                    account["id"], account["carrier"],
+                )
+            except Exception as exc:
+                logger.debug(
+                    "Account %s (%s) still auth_failed: %s",
+                    account["id"], account["carrier"], exc,
+                )
 
 
 def _refreshed_since(last_refreshed_at: str | None, cycle_start: datetime) -> bool:

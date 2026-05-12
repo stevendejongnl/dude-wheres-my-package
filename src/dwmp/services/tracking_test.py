@@ -7,6 +7,7 @@ from dwmp.carriers.base import (
     AuthType,
     CarrierAuthError,
     CarrierBase,
+    CarrierTransientError,
     TrackingEvent,
     TrackingResult,
     TrackingStatus,
@@ -373,3 +374,85 @@ async def test_sync_account_skips_server_side_for_browser_payload(repo):
     results = await service.sync_account(account_id)
 
     assert results == []
+
+
+# --- CarrierTransientError handling ---
+
+class TransientCarrier(CarrierBase):
+    name = "transient"
+    auth_type = AuthType.CREDENTIALS
+
+    async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        raise CarrierTransientError("transient", "connect timeout")
+
+    async def sync_packages(
+        self, tokens: AuthTokens, lookback_days: int = 30
+    ) -> list[TrackingResult]:
+        raise CarrierTransientError("transient", "connect timeout")
+
+    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+        return AuthTokens(access_token="tok")
+
+
+async def test_sync_account_does_not_set_auth_failed_on_transient_error(repo):
+    """Transient carrier errors must NOT flip the account to auth_failed."""
+    service = TrackingService(repository=repo, carriers={"transient": TransientCarrier()})
+    account_id = await repo.add_account(
+        carrier="transient", auth_type="credentials",
+        tokens={"access_token": "tok"}, username="u",
+    )
+    with pytest.raises(CarrierTransientError):
+        await service.sync_account(account_id)
+
+    account = await repo.get_account(account_id)
+    assert account["status"] == "connected"
+
+
+async def test_refresh_package_swallows_transient_error(repo):
+    """refresh_package should mark the package refreshed and NOT raise on transient errors."""
+    service = TrackingService(repository=repo, carriers={"transient": TransientCarrier()})
+    pkg_id = await repo.add_package(tracking_number="TRK1", carrier="transient")
+
+    result = await service.refresh_package(pkg_id)
+    assert result is not None
+
+    # Package should be marked as refreshed (last_refreshed_at set)
+    pkg = await repo.get_package(pkg_id)
+    assert pkg["last_refreshed_at"] is not None
+
+
+# --- Re-auth probe ---
+
+class RecoveringCarrier(CarrierBase):
+    """Carrier whose login succeeds (simulates recovered network)."""
+    name = "recovering"
+    auth_type = AuthType.CREDENTIALS
+
+    async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        return TrackingResult(tracking_number=tracking_number, carrier="recovering", status=TrackingStatus.UNKNOWN)
+
+    async def sync_packages(
+        self, tokens: AuthTokens, lookback_days: int = 30
+    ) -> list[TrackingResult]:
+        return []
+
+    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+        return AuthTokens(access_token=f"{username}:{password}")
+
+
+async def test_validate_account_credentials_by_id_recovers_auth_failed(repo):
+    """A stuck auth_failed account transitions back to connected when login succeeds."""
+    carrier = RecoveringCarrier()
+    service = TrackingService(repository=repo, carriers={"recovering": carrier})
+
+    account_id = await repo.add_account(
+        carrier="recovering", auth_type="credentials",
+        tokens={"access_token": "user@test.com:secret"},
+        username="user@test.com",
+    )
+    await repo.update_account_status(account_id, "auth_failed", "Transient failure")
+
+    await service.validate_account_credentials_by_id(account_id)
+
+    account = await repo.get_account(account_id)
+    assert account["status"] == "connected"

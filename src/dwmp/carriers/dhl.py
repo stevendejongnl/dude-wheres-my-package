@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 
+from dwmp.carriers._retry import with_retries
 from dwmp.carriers.base import (
     AuthTokens,
     AuthType,
@@ -160,24 +161,29 @@ class DHL(CarrierBase):
 
     async def _track_via_api(self, tracking_number: str) -> TrackingResult:
         """DHL Unified Tracking API — returns full event timeline as JSON."""
-        async with self._get_client() as client:
-            response = await client.get(
-                DHL_UNIFIED_API,
-                params={"trackingNumber": tracking_number},
-                headers={
-                    "DHL-API-Key": DHL_API_KEY,
-                    "Accept": "application/json",
-                },
-                timeout=15,
-            )
-            if response.status_code == 404:
-                return TrackingResult(
-                    tracking_number=tracking_number,
-                    carrier=self.name,
-                    status=TrackingStatus.UNKNOWN,
+        async def _do_request() -> httpx.Response:
+            async with self._get_client() as client:
+                resp = await client.get(
+                    DHL_UNIFIED_API,
+                    params={"trackingNumber": tracking_number},
+                    headers={
+                        "DHL-API-Key": DHL_API_KEY,
+                        "Accept": "application/json",
+                    },
+                    timeout=httpx.Timeout(connect=10.0, read=20.0, write=10.0, pool=10.0),
                 )
-            response.raise_for_status()
+                if resp.status_code == 404:
+                    return resp
+                resp.raise_for_status()
+                return resp
 
+        response = await with_retries(_do_request, carrier=self.name)
+        if response.status_code == 404:
+            return TrackingResult(
+                tracking_number=tracking_number,
+                carrier=self.name,
+                status=TrackingStatus.UNKNOWN,
+            )
         return self._parse_unified_response(tracking_number, response.json())
 
     async def _track_via_playwright(self, tracking_number: str) -> TrackingResult:

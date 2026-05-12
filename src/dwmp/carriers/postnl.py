@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from dwmp.carriers._retry import with_retries
 from dwmp.carriers.base import (
     AuthTokens,
     AuthType,
@@ -119,19 +120,22 @@ class PostNL(CarrierBase):
     async def sync_packages(
         self, tokens: AuthTokens, lookback_days: int = 30
     ) -> list[TrackingResult]:
-        async with self._get_client() as client:
-            response = await client.post(
-                POSTNL_GRAPHQL_URL,
-                json={"variables": {}, "query": SHIPMENTS_QUERY},
-                headers={
-                    "Authorization": f"Bearer {tokens.access_token}",
-                    "Accept": "application/json",
-                    "Accept-Language": "nl-NL",
-                    "Content-Type": "application/json",
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
+        async def _do_request() -> dict:
+            async with self._get_client() as client:
+                resp = await client.post(
+                    POSTNL_GRAPHQL_URL,
+                    json={"variables": {}, "query": SHIPMENTS_QUERY},
+                    headers={
+                        "Authorization": f"Bearer {tokens.access_token}",
+                        "Accept": "application/json",
+                        "Accept-Language": "nl-NL",
+                        "Content-Type": "application/json",
+                    },
+                )
+                resp.raise_for_status()
+                return resp.json()
+
+        data = await with_retries(_do_request, carrier=self.name)
 
         results: list[TrackingResult] = []
         cutoff = datetime.now(UTC) - timedelta(days=lookback_days)
@@ -172,24 +176,27 @@ class PostNL(CarrierBase):
         key = f"{tracking_number}-{country}-{postal_code}"
         url = f"{POSTNL_TRACK_API_URL}/{key}"
 
-        async with self._get_client() as client:
-            response = await client.get(
-                url,
-                headers={
-                    "User-Agent": "Mozilla/5.0",
-                    "Accept": "application/json",
-                    "Accept-Language": "nl-NL",
-                },
-                params={"language": "nl"},
-            )
-            response.raise_for_status()
+        async def _do_request() -> httpx.Response:
+            async with self._get_client() as client:
+                resp = await client.get(
+                    url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0",
+                        "Accept": "application/json",
+                        "Accept-Language": "nl-NL",
+                    },
+                    params={"language": "nl"},
+                )
+                resp.raise_for_status()
+                return resp
 
+        response = await with_retries(_do_request, carrier=self.name)
         return self._parse_response(tracking_number, response)
 
     def _get_client(self):
         if self._client:
             return _noop_ctx(self._client)
-        return httpx.AsyncClient()
+        return httpx.AsyncClient(timeout=httpx.Timeout(connect=10.0, read=20.0, write=10.0, pool=10.0))
 
     def _parse_response(
         self, tracking_number: str, response: httpx.Response

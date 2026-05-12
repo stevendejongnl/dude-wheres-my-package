@@ -76,6 +76,21 @@ class CarrierSyncError(Exception):
         super().__init__(f"[{carrier}] Sync error: {message}")
 
 
+class CarrierTransientError(Exception):
+    """Raised when a carrier request fails due to a transient condition.
+
+    Covers network timeouts, connection errors, 429 rate-limits, and 5xx
+    responses after retries are exhausted.  The service layer should NOT
+    mark the account as ``auth_failed`` — it should leave status as
+    ``connected`` and let the next scheduler tick retry naturally.
+    """
+
+    def __init__(self, carrier: str, message: str) -> None:
+        self.carrier = carrier
+        self.message = message
+        super().__init__(f"[{carrier}] Transient error: {message}")
+
+
 @dataclass(frozen=True)
 class TrackingEvent:
     timestamp: datetime

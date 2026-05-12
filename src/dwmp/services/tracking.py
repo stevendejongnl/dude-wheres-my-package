@@ -9,6 +9,7 @@ from dwmp.carriers.base import (
     CarrierAuthError,
     CarrierBase,
     CarrierSyncError,
+    CarrierTransientError,
     TrackingResult,
     TrackingStatus,
 )
@@ -335,6 +336,54 @@ class TrackingService:
                 return acct
         return None
 
+    async def validate_account_credentials_by_id(self, account_id: int) -> None:
+        """Probe a stuck auth_failed account with its stored credentials.
+
+        For CREDENTIALS carriers (e.g. DHL): re-attempts ``carrier.login()``
+        with the stored email/password.  On success the account transitions
+        back to CONNECTED so the next sync cycle picks it up normally.
+
+        For browser-driven carriers (BROWSER_PUSH / BROWSER_PAYLOAD) there
+        are no server-side credentials to test — skip silently so the
+        scheduler doesn't waste time on DPD / PostNL accounts.
+        """
+        account = await self._repository.get_account(account_id)
+        if account is None:
+            raise ValueError(f"Account {account_id} not found")
+
+        carrier = self._carriers.get(account["carrier"])
+        if carrier is None:
+            raise ValueError(f"Unknown carrier: {account['carrier']}")
+
+        if carrier.auth_type in (AuthType.BROWSER_PUSH, AuthType.BROWSER_PAYLOAD):
+            return
+
+        tokens_dict = account.get("tokens") or {}
+        username, password = "", ""
+
+        # Try refresh_token first (browser-push format: JSON {"email":…,"password":…})
+        refresh = tokens_dict.get("refresh_token")
+        if refresh and isinstance(refresh, str):
+            try:
+                creds = json.loads(refresh)
+                if isinstance(creds, dict):
+                    username = creds.get("email") or creds.get("username", "")
+                    password = creds.get("password", "")
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        # CREDENTIALS carriers store "email:password" in access_token
+        if not username:
+            access = tokens_dict.get("access_token", "")
+            if access and ":" in access:
+                username, _, password = access.partition(":")
+
+        if not username:
+            return
+
+        await carrier.login(username, password)
+        await self._repository.update_account_status(account_id, AccountStatus.CONNECTED)
+
     async def list_accounts(self) -> list[dict]:
         return await self._repository.list_accounts()
 
@@ -513,17 +562,29 @@ class TrackingService:
             results = await carrier.sync_packages(
                 tokens, lookback_days=account["lookback_days"]
             )
-        except Exception as exc:
+        except CarrierAuthError:
             message = (
                 f"Sync failed for {account['carrier']}. "
                 f"The carrier's API or login flow may have changed. "
-                f"Try re-authenticating your account. ({exc})"
+                f"Try re-authenticating your account."
             )
             logger.warning(message)
             await self._repository.update_account_status(
                 account_id, AccountStatus.AUTH_FAILED, message
             )
-            raise CarrierAuthError(account["carrier"], message) from exc
+            raise
+        except CarrierTransientError as exc:
+            logger.info(
+                "Transient sync failure for account %d (%s): %s",
+                account_id, account["carrier"], exc,
+            )
+            raise
+        except Exception as exc:
+            logger.exception(
+                "Unexpected sync error for account %d (%s)",
+                account_id, account["carrier"],
+            )
+            raise CarrierTransientError(account["carrier"], str(exc)) from exc
 
         # Persist refreshed tokens (e.g. updated browser cookies)
         updated_tokens = carrier.get_updated_tokens()
@@ -645,11 +706,19 @@ class TrackingService:
             events = await self._repository.get_events(package_id)
             return {**pkg, "events": events}
 
-        result = await carrier.track(
-            pkg["tracking_number"],
-            postal_code=pkg.get("postal_code") or "",
-            tracking_url=pkg.get("tracking_url") or "",
-        )
+        try:
+            result = await carrier.track(
+                pkg["tracking_number"],
+                postal_code=pkg.get("postal_code") or "",
+                tracking_url=pkg.get("tracking_url") or "",
+            )
+        except CarrierTransientError as exc:
+            logger.info(
+                "Transient error refreshing package %s (%s): %s — skipping this cycle",
+                package_id, pkg["carrier"], exc,
+            )
+            await self._repository.mark_refreshed(package_id)
+            return await self.get_package(package_id)
 
         # Downgrade safeguard: a public track() that returns UNKNOWN with no
         # events means the carrier couldn't resolve the package (missing

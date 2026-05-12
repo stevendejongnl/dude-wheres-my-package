@@ -5,6 +5,7 @@ from dwmp.carriers.base import (
     AuthType,
     CarrierAuthError,
     CarrierSyncError,
+    CarrierTransientError,
     TrackingStatus,
 )
 from dwmp.carriers.dpd import DPD, _is_error_page, _is_guest_page, _parse_status
@@ -284,3 +285,11 @@ def test_parse_parcels_page_raises_on_guest_page():
     html = "<html><body><h2>Guest User Login</h2></body></html>"
     with pytest.raises(CarrierAuthError, match="session expired"):
         carrier._parse_parcels_page(html)
+
+
+def test_parse_parcels_page_raises_transient_in_track_context():
+    """In guest-track context, a guest-login page is a transient failure, not an auth error."""
+    carrier = DPD()
+    html = "<html><body><h2>Guest User Login</h2></body></html>"
+    with pytest.raises(CarrierTransientError, match="guest verification"):
+        carrier._parse_parcels_page(html, context="track")

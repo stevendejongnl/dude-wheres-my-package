@@ -14,6 +14,7 @@ state came from an account sync that's no longer active.
 import logging
 import re
 from datetime import UTC, datetime
+from typing import Literal
 
 import httpx
 from bs4 import BeautifulSoup
@@ -24,6 +25,7 @@ from dwmp.carriers.base import (
     CarrierAuthError,
     CarrierBase,
     CarrierSyncError,
+    CarrierTransientError,
     TrackingEvent,
     TrackingResult,
     TrackingStatus,
@@ -171,7 +173,7 @@ class DPD(CarrierBase):
         # The guest-verified page has the same DOM as the authenticated
         # parcels page, so reuse _parse_parcels_page (which handles both
         # the parcel list and the inline detail section).
-        results = self._parse_parcels_page(html)
+        results = self._parse_parcels_page(html, context="track")
         for r in results:
             if r.tracking_number == tracking_number:
                 return r
@@ -179,7 +181,10 @@ class DPD(CarrierBase):
         return self._parse_tracking_page(tracking_number, html)
 
     def _parse_parcels_page(
-        self, html: str, lookback_days: int = 30
+        self,
+        html: str,
+        lookback_days: int = 30,
+        context: Literal["sync", "track"] = "sync",
     ) -> list[TrackingResult]:
         if _is_error_page(html):
             raise CarrierSyncError(
@@ -187,6 +192,11 @@ class DPD(CarrierBase):
                 "DPD is experiencing a technical issue — try again later",
             )
         if _is_guest_page(html):
+            if context == "track":
+                raise CarrierTransientError(
+                    self.name,
+                    "DPD guest verification did not complete — postal code may be wrong or DPD is unavailable",
+                )
             raise CarrierAuthError(
                 self.name,
                 "DPD session expired — the extension will re-login on the next sync",
