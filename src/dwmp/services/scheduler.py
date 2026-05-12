@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -110,12 +110,15 @@ class PackageScheduler:
         stale = [
             p for p in packages
             if not _refreshed_since(p.get("last_refreshed_at"), cycle_start)
+            and not _should_skip(p)
         ]
+        skipped = sum(1 for p in packages if _should_skip(p))
         logger.info(
-            "Synced %d accounts, refreshing %d of %d packages via public track()",
+            "Synced %d accounts, refreshing %d of %d packages via public track() (%d skipped as stale)",
             len(accounts),
             len(stale),
             len(packages),
+            skipped,
         )
         for pkg in stale:
             try:
@@ -154,6 +157,37 @@ class PackageScheduler:
                     "Account %s (%s) still auth_failed: %s",
                     account["id"], account["carrier"], exc,
                 )
+
+
+_DELIVERED_CUTOFF_DAYS = 14
+_MAX_CONSECUTIVE_FAILURES = 5
+
+
+def _should_skip(pkg: dict) -> bool:
+    """Return True if a package should be excluded from the refresh loop.
+
+    Two conditions trigger a skip:
+    - Delivered and last updated more than 14 days ago — the carrier page is
+      stale, nothing new will appear.
+    - 5+ consecutive tracking failures — the carrier can no longer resolve this
+      package (too old, archived, never existed on the public API).
+    """
+    if pkg.get("consecutive_failures", 0) >= _MAX_CONSECUTIVE_FAILURES:
+        return True
+
+    if pkg.get("current_status") == "delivered":
+        updated = pkg.get("updated_at")
+        if updated:
+            try:
+                ts = datetime.fromisoformat(updated)
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=UTC)
+                if datetime.now(UTC) - ts > timedelta(days=_DELIVERED_CUTOFF_DAYS):
+                    return True
+            except ValueError:
+                pass
+
+    return False
 
 
 def _refreshed_since(last_refreshed_at: str | None, cycle_start: datetime) -> bool:

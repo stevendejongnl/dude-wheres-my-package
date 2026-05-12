@@ -5,6 +5,7 @@ from dwmp.carriers.base import (
     AuthType,
     CarrierAuthError,
     CarrierBase,
+    CarrierTransientError,
     TrackingResult,
     TrackingStatus,
 )
@@ -60,6 +61,20 @@ class FailingCarrier(CarrierBase):
 
     async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
         return AuthTokens(access_token="fail-token")
+
+
+class TransientCarrier(CarrierBase):
+    name = "transient"
+    auth_type = AuthType.CREDENTIALS
+
+    async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        raise CarrierTransientError("transient", "connect timeout")
+
+    async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
+        raise CarrierTransientError("transient", "connect timeout")
+
+    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+        return AuthTokens(access_token="tok")
 
 
 class AuthFailCarrier(CarrierBase):
@@ -246,3 +261,75 @@ async def test_poll_handles_empty(repo):
     service = TrackingService(repository=repo, carriers={})
     scheduler = PackageScheduler(tracking_service=service)
     await scheduler._poll_all()  # Should not raise
+
+
+# --- Staleness / skip tests ---
+
+async def test_poll_skips_delivered_package_older_than_14_days(repo):
+    from datetime import UTC, datetime, timedelta
+    carrier = StubCarrier()
+    service = TrackingService(repository=repo, carriers={"stub": carrier})
+    scheduler = PackageScheduler(tracking_service=service)
+
+    pkg_id = await repo.add_package(tracking_number="OLD1", carrier="stub")
+    old_ts = (datetime.now(UTC) - timedelta(days=15)).isoformat()
+    await repo.update_status(pkg_id, "delivered")
+    # Backdate updated_at so it looks 15 days old
+    await repo.db.execute(
+        "UPDATE packages SET updated_at = ? WHERE id = ?", (old_ts, pkg_id)
+    )
+    await repo.db.commit()
+
+    await scheduler._poll_all()
+    assert carrier.track_count == 0
+
+
+async def test_poll_does_not_skip_delivered_package_within_14_days(repo):
+    carrier = StubCarrier()
+    service = TrackingService(repository=repo, carriers={"stub": carrier})
+    scheduler = PackageScheduler(tracking_service=service)
+
+    pkg_id = await repo.add_package(tracking_number="NEW1", carrier="stub")
+    await repo.update_status(pkg_id, "delivered")
+
+    await scheduler._poll_all()
+    assert carrier.track_count == 1
+
+
+async def test_poll_skips_package_with_max_consecutive_failures(repo):
+    carrier = StubCarrier()
+    service = TrackingService(repository=repo, carriers={"stub": carrier})
+    scheduler = PackageScheduler(tracking_service=service)
+
+    pkg_id = await repo.add_package(tracking_number="FAIL1", carrier="stub")
+    await repo.db.execute(
+        "UPDATE packages SET consecutive_failures = 5 WHERE id = ?", (pkg_id,)
+    )
+    await repo.db.commit()
+
+    await scheduler._poll_all()
+    assert carrier.track_count == 0
+
+
+async def test_consecutive_failures_incremented_on_transient_error(repo):
+    service = TrackingService(repository=repo, carriers={"transient": TransientCarrier()})
+    pkg_id = await repo.add_package(tracking_number="TRK1", carrier="transient")
+
+    await service.refresh_package(pkg_id)
+
+    pkg = await repo.get_package(pkg_id)
+    assert pkg["consecutive_failures"] == 1
+
+
+async def test_consecutive_failures_reset_on_success(repo):
+    service = TrackingService(repository=repo, carriers={"stub": StubCarrier()})
+    pkg_id = await repo.add_package(tracking_number="RST1", carrier="stub")
+    await repo.db.execute(
+        "UPDATE packages SET consecutive_failures = 3 WHERE id = ?", (pkg_id,)
+    )
+    await repo.db.commit()
+
+    await service.refresh_package(pkg_id)
+
+    pkg = await repo.get_package(pkg_id)
+    assert pkg["consecutive_failures"] == 0

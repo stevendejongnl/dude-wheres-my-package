@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS packages (
     delivery_window_end TEXT,
     last_refreshed_at TEXT,
     tracking_url TEXT,
+    consecutive_failures INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE(tracking_number, carrier)
@@ -188,6 +189,16 @@ class PackageRepository:
             "AND auth_type IN ('credentials', 'manual_token')"
         )
         await self.db.commit()
+
+        # v1.53: add packages.consecutive_failures for staleness detection —
+        # packages that repeatedly return nothing are skipped by the scheduler.
+        cursor = await self.db.execute("PRAGMA table_info(packages)")
+        pkg_cols = {col["name"] for col in await cursor.fetchall()}
+        if "consecutive_failures" not in pkg_cols:
+            await self.db.execute(
+                "ALTER TABLE packages ADD COLUMN consecutive_failures INTEGER NOT NULL DEFAULT 0"
+            )
+            await self.db.commit()
 
         # v1.51: collapse extension_token → browser_payload. PostNL never
         # used the PATCH /accounts/{id}/token flow in production — the
@@ -449,7 +460,8 @@ class PackageRepository:
         now = datetime.now(UTC).isoformat()
         await self.db.execute(
             "UPDATE packages SET current_status = ?, estimated_delivery = ?,"
-            " delivery_window_end = ?, updated_at = ?, last_refreshed_at = ? WHERE id = ?",
+            " delivery_window_end = ?, updated_at = ?, last_refreshed_at = ?,"
+            " consecutive_failures = 0 WHERE id = ?",
             (status, estimated_delivery, delivery_window_end, now, now, package_id),
         )
         await self.db.commit()
@@ -481,19 +493,30 @@ class PackageRepository:
         )
         await self.db.commit()
 
-    async def mark_refreshed(self, package_id: int) -> None:
+    async def mark_refreshed(self, package_id: int, *, failure: bool = False) -> None:
         """Bump last_refreshed_at without changing status.
 
         Used when a carrier returned a result but status didn't warrant an
         update (e.g. track() returned UNKNOWN and we chose to preserve the
         existing status). Still counts as 'refreshed this cycle' so the
         scheduler won't retry it immediately.
+
+        Pass ``failure=True`` when the refresh yielded nothing useful (transient
+        error, empty UNKNOWN result). Increments ``consecutive_failures`` so the
+        scheduler can stop polling packages that are permanently unavailable.
         """
         now = datetime.now(UTC).isoformat()
-        await self.db.execute(
-            "UPDATE packages SET last_refreshed_at = ?, updated_at = ? WHERE id = ?",
-            (now, now, package_id),
-        )
+        if failure:
+            await self.db.execute(
+                "UPDATE packages SET last_refreshed_at = ?, updated_at = ?,"
+                " consecutive_failures = consecutive_failures + 1 WHERE id = ?",
+                (now, now, package_id),
+            )
+        else:
+            await self.db.execute(
+                "UPDATE packages SET last_refreshed_at = ?, updated_at = ? WHERE id = ?",
+                (now, now, package_id),
+            )
         await self.db.commit()
 
     # --- Event methods ---

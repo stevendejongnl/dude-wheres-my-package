@@ -717,7 +717,7 @@ class TrackingService:
                 "Transient error refreshing package %s (%s): %s — skipping this cycle",
                 package_id, pkg["carrier"], exc,
             )
-            await self._repository.mark_refreshed(package_id)
+            await self._repository.mark_refreshed(package_id, failure=True)
             return await self.get_package(package_id)
 
         # Downgrade safeguard: a public track() that returns UNKNOWN with no
@@ -731,7 +731,7 @@ class TrackingService:
         )
         stored_status = pkg.get("current_status", TrackingStatus.UNKNOWN.value)
         if is_empty_result and stored_status != TrackingStatus.UNKNOWN.value:
-            await self._repository.mark_refreshed(package_id)
+            await self._repository.mark_refreshed(package_id, failure=True)
             logger.debug(
                 "Preserved status for package %s (%s): track() returned empty UNKNOWN",
                 package_id, pkg["carrier"],
