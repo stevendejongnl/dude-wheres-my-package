@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from dwmp.api import _log_stream
 from dwmp.api.auth import is_authenticated
 from dwmp.api.dependencies import get_repository, get_tracking_service
 from dwmp.api.routes import router
@@ -43,11 +44,12 @@ class _DBLogHandler(logging.Handler):
             "message": self.format(record),
             "context": "server",
         }
+        _log_stream.publish(entry)
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(self._repo.add_extension_log_entries([entry]))
         except RuntimeError:
-            pass  # no running loop at startup/shutdown — drop silently
+            pass
 
 
 @asynccontextmanager

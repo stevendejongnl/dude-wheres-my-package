@@ -1,11 +1,15 @@
+import asyncio
 import json
+from collections.abc import AsyncIterator
 from importlib.metadata import version as pkg_version
 from urllib.parse import parse_qs
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import Response as RawResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from dwmp.api import _log_stream
 from dwmp.api.auth import create_token, verify_password
 from dwmp.api.dependencies import get_repository, get_tracking_service, get_web_push_notifier
 from dwmp.carriers.base import CarrierAuthError, CarrierSyncError
@@ -522,9 +526,34 @@ async def get_extension_logs(
     limit: int = 500,
     level: str | None = None,
     context: str | None = None,
+    since: str | None = None,
     repo: PackageRepository = Depends(get_repository),
 ) -> list[dict]:
-    return await repo.list_extension_logs(limit=limit, level=level, context=context)
+    return await repo.list_extension_logs(limit=limit, level=level, context=context, since=since)
+
+
+@router.get("/logs/stream")
+async def stream_logs(request: Request) -> StreamingResponse:
+    queue = _log_stream.subscribe()
+
+    async def generate() -> AsyncIterator[str]:
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    entry = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    yield f"data: {json.dumps(entry)}\n\n"
+                except TimeoutError:
+                    yield ": keepalive\n\n"
+        finally:
+            _log_stream.unsubscribe(queue)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.delete("/logs", status_code=204)

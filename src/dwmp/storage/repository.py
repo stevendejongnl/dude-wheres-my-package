@@ -682,6 +682,7 @@ class PackageRepository:
         limit: int = 500,
         level: str | None = None,
         context: str | None = None,
+        since: str | None = None,
     ) -> list[dict]:
         clauses: list[str] = []
         params: list = []
@@ -691,6 +692,9 @@ class PackageRepository:
         if context:
             clauses.append("context = ?")
             params.append(context)
+        if since:
+            clauses.append("ts > ?")
+            params.append(since)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         params.append(limit)
         cursor = await self.db.execute(
