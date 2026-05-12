@@ -224,7 +224,7 @@ async function syncCarrierViaTab(account, opts = {}) {
       const deadline = Date.now() + 30_000;
       while (Date.now() < deadline) {
         const tabUrl = (await chrome.tabs.get(tabId)).url || "";
-        if (isCarrierLoginPage("postnl", tabUrl) && !loginHandled) {
+        if ((isCarrierLoginPage("postnl", tabUrl) || (await hasLoginForm(tabId))) && !loginHandled) {
           loginHandled = true;
           const loggedIn = await handleCarrierLogin(tabId, account);
           if (!loggedIn) {
@@ -438,6 +438,13 @@ async function hasLoginForm(tabId) {
       func: () => {
         // Fast path: Amazon's login forms have stable IDs on the <form>.
         if (document.querySelector("#ap_login_form, form#signIn")) return true;
+        // PostNL Capture (CDC) screenset — present on triggerlogin and login.postnl.nl.
+        if (
+          document.querySelector(
+            "#capture_signIn_signInEmailAddress, [data-capturefield='signInEmailAddress']",
+          )
+        )
+          return true;
         const u = document.querySelector(
           "#username, #ap_email, #ap_email_login, input[name='username'], input[name='email']",
         );
@@ -735,7 +742,9 @@ async function handleCarrierLogin(tabId, account) {
     func: (email, pass) => {
       const emailEl =
         document.querySelector("#username") ||
-        document.querySelector("input[name='username']");
+        document.querySelector("input[name='username']") ||
+        document.querySelector("input[name='email']") ||
+        document.querySelector("input[type='email']");
       const passEl =
         document.querySelector("#password") ||
         document.querySelector("input[name='password']");

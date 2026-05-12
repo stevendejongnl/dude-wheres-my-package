@@ -318,6 +318,13 @@ class TrackingService:
             except (json.JSONDecodeError, TypeError):
                 pass
 
+        # DHL stores credentials as "email:password" in access_token (refresh_token is None).
+        if account.get("carrier") == "dhl":
+            access = tokens.get("access_token", "")
+            if access and ":" in access:
+                email, _, password = access.partition(":")
+                return {"has_credentials": True, "username": email, "password": password}
+
         return {"has_credentials": False}
 
     async def find_account_by_carrier(self, carrier_name: str) -> dict | None:
