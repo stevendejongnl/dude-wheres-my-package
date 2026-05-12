@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.51.4 (2026-05-12)
+
+### Bug Fixes
+
+- **postnl**: Wait for CDC form to render before filling login fields
+  ([`1584c92`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/1584c92954008915b5c7c7e44c768b3ad83dc0ce))
+
+
 ## v1.51.3 (2026-05-11)
 
 ### Bug Fixes
