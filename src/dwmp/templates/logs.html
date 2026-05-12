@@ -58,9 +58,10 @@
   .log-auto-refresh { font-size: 0.75rem; color: var(--text-dim); }
 </style>
 
+<div id="log-content">
 <div class="section-header">
   <h2>Extension Logs</h2>
-  <span class="log-auto-refresh" hx-get="{{ base_path }}/logs{% if filter_level or filter_context %}?{% if filter_level %}level={{ filter_level }}{% endif %}{% if filter_level and filter_context %}&{% endif %}{% if filter_context %}context={{ filter_context }}{% endif %}{% endif %}" hx-trigger="every 10s" hx-target="body" hx-swap="outerHTML" hx-select="body">auto-refresh 10s</span>
+  <span class="log-auto-refresh" hx-get="{{ base_path }}/logs{% if filter_level or filter_context %}?{% if filter_level %}level={{ filter_level }}{% endif %}{% if filter_level and filter_context %}&{% endif %}{% if filter_context %}context={{ filter_context }}{% endif %}{% endif %}" hx-trigger="every 10s" hx-target="#log-content" hx-swap="innerHTML" hx-select="#log-content">auto-refresh 10s</span>
 </div>
 
 <div class="log-toolbar">
@@ -125,5 +126,6 @@
     <p style="margin-top:6px;font-size:0.8rem;">Install the native messaging host and reload the extension to start logging.</p>
   </div>
   {% endif %}
+</div>
 </div>
 {% endblock %}
