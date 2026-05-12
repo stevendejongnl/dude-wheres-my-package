@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.56.0 (2026-05-12)
+
+### Features
+
+- **logs**: SSE stream endpoint and since param on REST API
+  ([`0be5ee1`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/0be5ee19c33cff1ff7ae655d7b2a4ab9e615a638))
+
+
 ## v1.55.1 (2026-05-12)
 
 ### Bug Fixes
