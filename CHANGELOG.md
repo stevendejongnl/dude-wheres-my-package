@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.55.1 (2026-05-12)
+
+### Bug Fixes
+
+- **extension**: Remove DHL browser sync, add PostNL token storage diagnostic
+  ([`35f1ef0`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/35f1ef0e8e1aae6f47ddde484390908f93a655bb))
+
+- **extension**: Remove DHL from URL carrier map and dead tests
+  ([`54fb0b7`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/54fb0b73af1d8baebb46910755114568dcd48e6d))
+
+
 ## v1.55.0 (2026-05-12)
 
 ### Features
