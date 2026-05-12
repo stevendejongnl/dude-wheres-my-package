@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.54.0 (2026-05-12)
+
+### Features
+
+- **scheduler**: Skip stale packages — delivered >14d or 5 consecutive failures
+  ([`6488d18`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/6488d183a7237af0e7ca027e86613f3612acb578))
+
+
 ## v1.53.0 (2026-05-12)
 
 ### Features
