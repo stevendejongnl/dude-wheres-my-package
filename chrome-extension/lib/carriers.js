@@ -8,9 +8,6 @@ export const URL_CARRIER_MAP = [
   ["dpdgroup.com", "dpd"],
   ["dpd.nl", "dpd"],
   ["postnl.nl", "postnl"],
-  ["dhlecommerce.nl", "dhl"],
-  ["dhl.nl", "dhl"],
-  ["dhl.com", "dhl"],
 ];
 
 // Carrier -> { login, parcels } URLs for auto-sync tab navigation.

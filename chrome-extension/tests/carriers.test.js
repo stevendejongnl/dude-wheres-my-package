@@ -24,14 +24,6 @@ describe("detectCarrier", () => {
     expect(detectCarrier("https://jouw.postnl.nl/track-and-trace")).toBe("postnl");
   });
 
-  it("detects DHL ecommerce", () => {
-    expect(detectCarrier("https://my.dhlecommerce.nl/home")).toBe("dhl");
-  });
-
-  it("detects DHL NL", () => {
-    expect(detectCarrier("https://www.dhl.nl/tracking")).toBe("dhl");
-  });
-
   it("detects DPD", () => {
     expect(detectCarrier("https://www.dpdgroup.com/nl/mydpd/my-parcels")).toBe("dpd");
   });
