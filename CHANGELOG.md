@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.52.1 (2026-05-12)
+
+### Bug Fixes
+
+- **logs**: Prevent black-page flash on auto-refresh by targeting inner container
+  ([`c7b6511`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/c7b6511567fe040281f5c78e90825e30f30c313d))
+
+
 ## v1.52.0 (2026-05-12)
 
 ### Features
