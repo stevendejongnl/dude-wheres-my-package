@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.53.0 (2026-05-12)
+
+### Features
+
+- **sync**: Add transient error taxonomy and retry resilience
+  ([`99dcf4a`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/99dcf4a454111b98f6a3a5b41fdb39104f30ec4b))
+
+
 ## v1.52.3 (2026-05-12)
 
 ### Bug Fixes
