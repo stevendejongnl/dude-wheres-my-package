@@ -6,7 +6,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from dwmp.api.auth import login_response, logout_response, verify_password
@@ -813,9 +813,9 @@ async def extension_logs_view(
     )
 
 
-@router.post("/logs/clear", response_class=HTMLResponse)
+@router.post("/logs/clear")
 async def clear_logs_view(
     repo: PackageRepository = Depends(get_repository),
 ):
     await repo.clear_extension_logs()
-    return HTMLResponse("", headers={"HX-Redirect": "/logs"})
+    return RedirectResponse(url="/logs", status_code=303)
