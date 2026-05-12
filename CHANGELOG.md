@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.52.0 (2026-05-12)
+
+### Features
+
+- **logging**: Add extension logging system with server-side log viewer
+  ([`b5dec91`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/b5dec9140003d900d4a32c61237669d1f82ff6fa))
+
+
 ## v1.51.4 (2026-05-12)
 
 ### Bug Fixes
