@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.52.3 (2026-05-12)
+
+### Bug Fixes
+
+- **logs**: Redirect to /logs after clearing instead of returning blank page
+  ([`e432944`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/e432944abac1794edfbf33bde16f5c9689ccd402))
+
+
 ## v1.52.2 (2026-05-12)
 
 ### Bug Fixes
