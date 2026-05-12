@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.55.0 (2026-05-12)
+
+### Features
+
+- **logs**: Write server-side scheduler logs to /logs endpoint
+  ([`37a403a`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/37a403a7cb32cbd1fbcc9a2f1df16912ca84172b))
+
+
 ## v1.54.0 (2026-05-12)
 
 ### Features
