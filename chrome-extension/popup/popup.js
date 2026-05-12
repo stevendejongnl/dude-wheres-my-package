@@ -8,6 +8,7 @@ import {
   listPackages,
 } from "../lib/api.js";
 import { CARRIER_LABELS, CARRIER_SYNC_URLS, detectCarrier } from "../lib/carriers.js";
+import { log } from "../lib/logger.js";
 
 // ── DOM refs ───────────────────────────────────────────────────────
 
@@ -35,13 +36,17 @@ const syncInterval = document.getElementById("sync-interval");
 const openDashboard = document.getElementById("open-dashboard");
 const disconnect = document.getElementById("disconnect");
 const checkUpdateBtn = document.getElementById("check-update-btn");
+const diagOpenBtn = document.getElementById("diag-open-btn");
+const diagCopyBtn = document.getElementById("diag-copy-btn");
 
 // ── Init ───────────────────────────────────────────────────────────
 
 async function init() {
+  log.info("popup", "Popup opened");
   if (await isConfigured()) {
     showMainView();
   } else {
+    log.info("popup", "Not configured — showing setup view");
     showSetupView();
   }
 }
@@ -88,9 +93,11 @@ async function loadConnectionStatus(url) {
     statusDot.className = "status-dot connected";
     const host = new URL(url).hostname;
     statusText.textContent = host;
+    log.info("popup", "Server health check passed", { host });
   } catch {
     statusDot.className = "status-dot error";
     statusText.textContent = "Cannot reach server";
+    log.error("popup", "Server health check failed", { url });
   }
 }
 
@@ -101,6 +108,7 @@ async function loadCurrentTab() {
   if (!tab?.url) return;
 
   const carrier = detectCarrier(tab.url);
+  log.info("popup", "Current tab detection", { carrier: carrier || null, url: tab.url });
   if (carrier) {
     const label = CARRIER_LABELS[carrier] || carrier;
     syncPageBtn.disabled = false;
@@ -113,6 +121,7 @@ async function loadCurrentTab() {
 async function loadAccounts() {
   const result = await listAccounts();
   if (!result.ok) {
+    log.error("popup", "Failed to load accounts", { status: result.status, error: result.error });
     setEmptyMessage(
       accountsList,
       result.status === 401 ? "Token expired -- please reconnect" : result.error,
@@ -130,6 +139,7 @@ async function loadAccounts() {
     return;
   }
 
+  log.info("popup", "Accounts loaded", { count: accounts.length });
   const { dwmp_auto_sync, dwmp_sync_results } = await chrome.storage.local.get([
     "dwmp_auto_sync",
     "dwmp_sync_results",
@@ -197,6 +207,7 @@ function renderAccountRow(account, autoSyncEnabled, syncResult) {
   toggleLabel.appendChild(toggleSlider);
 
   toggleInput.addEventListener("change", () => {
+    log.info("popup", "Auto-sync toggle", { accountId: account.id, carrier, enabled: toggleInput.checked });
     chrome.runtime.sendMessage({
       type: "update-auto-sync",
       accountId: account.id,
@@ -210,6 +221,7 @@ function renderAccountRow(account, autoSyncEnabled, syncResult) {
   syncBtn.textContent = "Sync";
 
   syncBtn.addEventListener("click", async () => {
+    log.info("popup", "Sync button clicked", { accountId: account.id, carrier });
     syncBtn.disabled = true;
     syncBtn.textContent = "";
     const spinner = document.createElement("span");
@@ -322,6 +334,7 @@ setupConnect.addEventListener("click", async () => {
   if (!url) return showSetupError("Server URL is required");
   if (!password) return showSetupError("Password is required");
 
+  log.info("popup", "Connect attempt", { url });
   setupConnect.disabled = true;
   setupConnect.textContent = "Connecting...";
   hideSetupError();
@@ -329,8 +342,10 @@ setupConnect.addEventListener("click", async () => {
   try {
     await healthCheck(url);
     await authenticate(url, password);
+    log.info("popup", "Connected successfully", { url });
     showMainView();
   } catch (err) {
+    log.error("popup", "Connect failed", { url, error: err.message });
     showSetupError(err.message);
   } finally {
     setupConnect.disabled = false;
@@ -358,6 +373,7 @@ function hideSetupError() {
 // ── Sync current page ──────────────────────────────────────────────
 
 syncPageBtn.addEventListener("click", async () => {
+  log.info("popup", "Sync current page clicked");
   syncPageBtn.disabled = true;
   syncPageText.textContent = "Syncing...";
   syncPageBtn.className = "sync-page-btn";
@@ -384,6 +400,7 @@ syncPageBtn.addEventListener("click", async () => {
 // ── Settings ───────────────────────────────────────────────────────
 
 syncInterval.addEventListener("change", () => {
+  log.info("popup", "Sync interval changed", { interval: Number(syncInterval.value) });
   chrome.runtime.sendMessage({
     type: "update-sync-interval",
     interval: Number(syncInterval.value),
@@ -416,6 +433,8 @@ checkUpdateBtn.addEventListener("click", async () => {
 
 disconnect.addEventListener("click", async (e) => {
   e.preventDefault();
+  log.info("popup", "Disconnecting");
+  await log.flush();
   await clearConfig();
   chrome.action.setBadgeText({ text: "" });
   showSetupView();
@@ -441,6 +460,29 @@ function setEmptyMessage(container, text) {
   div.textContent = text;
   container.appendChild(div);
 }
+
+// ── Diagnostics ────────────────────────────────────────────────────
+
+diagOpenBtn.addEventListener("click", async () => {
+  log.info("popup", "Open log viewer clicked");
+  await log.flush();
+  const { dwmp_url } = await chrome.storage.local.get("dwmp_url");
+  if (dwmp_url) {
+    chrome.tabs.create({ url: `${dwmp_url}/logs` });
+  }
+});
+
+diagCopyBtn.addEventListener("click", async () => {
+  const swBuffer = await chrome.runtime.sendMessage({ type: "get-log-buffer" }) || [];
+  const localBuffer = log.getBuffer();
+  const all = [...swBuffer, ...localBuffer].sort((a, b) => a.ts.localeCompare(b.ts));
+  const text = all.map((e) => JSON.stringify(e)).join("\n");
+  await navigator.clipboard.writeText(text);
+  log.info("popup", "Copied log buffer", { entries: all.length });
+  const orig = diagCopyBtn.textContent;
+  diagCopyBtn.textContent = `Copied ${all.length}`;
+  setTimeout(() => { diagCopyBtn.textContent = orig; }, 2000);
+});
 
 // ── Boot ───────────────────────────────────────────────────────────
 

@@ -480,6 +480,13 @@ body {
   font-size: 12px;
 }
 
+/* ── Diagnostics section ─────────────────────── */
+
+.diag-actions {
+  display: flex;
+  gap: 6px;
+}
+
 /* ── Hidden ──────────────────────────────────── */
 
 .hidden { display: none !important; }

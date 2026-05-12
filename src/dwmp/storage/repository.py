@@ -71,6 +71,18 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
     auth       TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS extension_logs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts         TEXT NOT NULL,
+    level      TEXT NOT NULL,
+    category   TEXT NOT NULL,
+    message    TEXT NOT NULL,
+    data       TEXT,
+    context    TEXT NOT NULL DEFAULT 'sw',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_extension_logs_ts ON extension_logs (ts DESC);
 """
 
 
@@ -614,3 +626,57 @@ class PackageRepository:
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+
+    # --- Extension log methods ---
+
+    async def add_extension_log_entries(self, entries: list[dict]) -> None:
+        now = datetime.now(UTC).isoformat()
+        await self.db.executemany(
+            """INSERT INTO extension_logs (ts, level, category, message, data, context, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            [
+                (
+                    e.get("ts", now),
+                    e.get("level", "info"),
+                    e.get("category", ""),
+                    e.get("message", ""),
+                    json.dumps(e["data"]) if e.get("data") is not None else None,
+                    e.get("context", "sw"),
+                    now,
+                )
+                for e in entries
+            ],
+        )
+        # Retain only the most recent 2000 entries
+        await self.db.execute(
+            """DELETE FROM extension_logs WHERE id NOT IN (
+               SELECT id FROM extension_logs ORDER BY ts DESC LIMIT 2000)"""
+        )
+        await self.db.commit()
+
+    async def list_extension_logs(
+        self,
+        limit: int = 500,
+        level: str | None = None,
+        context: str | None = None,
+    ) -> list[dict]:
+        clauses: list[str] = []
+        params: list = []
+        if level:
+            clauses.append("level = ?")
+            params.append(level)
+        if context:
+            clauses.append("context = ?")
+            params.append(context)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        params.append(limit)
+        cursor = await self.db.execute(
+            f"SELECT * FROM extension_logs {where} ORDER BY ts DESC LIMIT ?",
+            params,
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+    async def clear_extension_logs(self) -> int:
+        cursor = await self.db.execute("DELETE FROM extension_logs")
+        await self.db.commit()
+        return cursor.rowcount

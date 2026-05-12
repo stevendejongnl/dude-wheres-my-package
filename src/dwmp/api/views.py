@@ -10,11 +10,12 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from dwmp.api.auth import login_response, logout_response, verify_password
-from dwmp.api.dependencies import get_tracking_service
+from dwmp.api.dependencies import get_repository, get_tracking_service
 from dwmp.api.routes import _has_stored_credentials
 from dwmp.carriers.base import AuthType, CarrierAuthError
 from dwmp.carriers.tracking_urls import public_tracking_url
 from dwmp.services.tracking import TrackingService
+from dwmp.storage.repository import PackageRepository
 
 VERSION = pkg_version("dude-wheres-my-package")
 
@@ -779,3 +780,42 @@ async def mark_all_read_view(
 ):
     await service.mark_all_notifications_read()
     return HTMLResponse("", headers={"HX-Refresh": "true"})
+
+
+# --- Extension log viewer ---
+
+
+@router.get("/logs", response_class=HTMLResponse)
+async def extension_logs_view(
+    request: Request,
+    level: str | None = None,
+    context: str | None = None,
+    repo: PackageRepository = Depends(get_repository),
+):
+    logs = await repo.list_extension_logs(limit=500, level=level or None, context=context or None)
+    for entry in logs:
+        if entry.get("data"):
+            try:
+                entry["data"] = json.loads(entry["data"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+    return templates.TemplateResponse(
+        request,
+        "logs.html",
+        {
+            "active_nav": "logs",
+            "logs": logs,
+            "filter_level": level or "",
+            "filter_context": context or "",
+            "version": VERSION,
+            "base_path": _base_path(request),
+        },
+    )
+
+
+@router.post("/logs/clear", response_class=HTMLResponse)
+async def clear_logs_view(
+    repo: PackageRepository = Depends(get_repository),
+):
+    await repo.clear_extension_logs()
+    return HTMLResponse("", headers={"HX-Redirect": "/logs"})

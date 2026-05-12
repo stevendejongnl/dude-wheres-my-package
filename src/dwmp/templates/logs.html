@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Extension Logs — DWMP{% endblock %}
+{% block content %}
+<style>
+  .log-toolbar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .log-filter-group { display: flex; gap: 6px; align-items: center; }
+  .log-filter-label { font-size: 0.75rem; color: var(--text-dim); }
+  .filter-btn {
+    padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border);
+    background: transparent; color: var(--text-dim); cursor: pointer;
+    font-size: 0.75rem; transition: all 0.15s;
+  }
+  .filter-btn:hover { color: var(--text); border-color: var(--text-dim); }
+  .filter-btn.active { background: var(--surface2); color: var(--text); border-color: var(--text-dim); }
+  .filter-btn.lvl-debug.active { color: var(--text-dim); border-color: var(--text-dim); }
+  .filter-btn.lvl-info.active  { color: var(--blue);     border-color: var(--blue); }
+  .filter-btn.lvl-warn.active  { color: var(--yellow);   border-color: var(--yellow); }
+  .filter-btn.lvl-error.active { color: var(--red);      border-color: var(--red); }
+  .log-spacer { flex: 1; }
+  .log-count { font-size: 0.75rem; color: var(--text-dim); }
+  .log-table-wrap { overflow-x: auto; }
+  .log-table {
+    width: 100%; border-collapse: collapse; font-size: 0.8rem;
+  }
+  .log-table th {
+    text-align: left; padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-dim); white-space: nowrap;
+  }
+  .log-table td {
+    padding: 7px 10px; border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .log-table tr:last-child td { border-bottom: none; }
+  .log-table tr:hover td { background: var(--surface2); }
+  .log-ts { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; }
+  .log-level { font-weight: 700; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+  .log-level.debug { color: var(--text-dim); }
+  .log-level.info  { color: var(--blue); }
+  .log-level.warn  { color: var(--yellow); }
+  .log-level.error { color: var(--red); }
+  .log-ctx { font-size: 0.7rem; color: var(--text-dim); white-space: nowrap; }
+  .log-cat { color: var(--accent); white-space: nowrap; }
+  .log-msg { word-break: break-word; }
+  .log-data {
+    font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.7rem;
+    color: var(--text-dim); white-space: pre-wrap; word-break: break-all;
+    max-width: 260px; max-height: 120px; overflow: auto;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px; padding: 4px 6px; margin: 0;
+  }
+  .log-data-empty { color: var(--border); }
+  .log-empty { text-align: center; padding: 48px 20px; color: var(--text-dim); }
+  .log-auto-refresh { font-size: 0.75rem; color: var(--text-dim); }
+</style>
+
+<div class="section-header">
+  <h2>Extension Logs</h2>
+  <span class="log-auto-refresh" hx-get="{{ base_path }}/logs{% if filter_level or filter_context %}?{% if filter_level %}level={{ filter_level }}{% endif %}{% if filter_level and filter_context %}&{% endif %}{% if filter_context %}context={{ filter_context }}{% endif %}{% endif %}" hx-trigger="every 10s" hx-target="body" hx-swap="outerHTML" hx-select="body">auto-refresh 10s</span>
+</div>
+
+<div class="log-toolbar">
+  <div class="log-filter-group">
+    <span class="log-filter-label">Level:</span>
+    <a href="{{ base_path }}/logs{% if filter_context %}?context={{ filter_context }}{% endif %}" class="filter-btn {% if not filter_level %}active{% endif %}">All</a>
+    <a href="{{ base_path }}/logs?level=debug{% if filter_context %}&context={{ filter_context }}{% endif %}" class="filter-btn lvl-debug {% if filter_level == 'debug' %}active{% endif %}">debug</a>
+    <a href="{{ base_path }}/logs?level=info{% if filter_context %}&context={{ filter_context }}{% endif %}" class="filter-btn lvl-info {% if filter_level == 'info' %}active{% endif %}">info</a>
+    <a href="{{ base_path }}/logs?level=warn{% if filter_context %}&context={{ filter_context }}{% endif %}" class="filter-btn lvl-warn {% if filter_level == 'warn' %}active{% endif %}">warn</a>
+    <a href="{{ base_path }}/logs?level=error{% if filter_context %}&context={{ filter_context }}{% endif %}" class="filter-btn lvl-error {% if filter_level == 'error' %}active{% endif %}">error</a>
+  </div>
+  <div class="log-filter-group">
+    <span class="log-filter-label">Context:</span>
+    <a href="{{ base_path }}/logs{% if filter_level %}?level={{ filter_level }}{% endif %}" class="filter-btn {% if not filter_context %}active{% endif %}">All</a>
+    <a href="{{ base_path }}/logs?context=sw{% if filter_level %}&level={{ filter_level }}{% endif %}" class="filter-btn {% if filter_context == 'sw' %}active{% endif %}">sw</a>
+    <a href="{{ base_path }}/logs?context=popup{% if filter_level %}&level={{ filter_level }}{% endif %}" class="filter-btn {% if filter_context == 'popup' %}active{% endif %}">popup</a>
+  </div>
+  <span class="log-spacer"></span>
+  <span class="log-count">{{ logs | length }} entries</span>
+  <form method="post" action="{{ base_path }}/logs/clear" onsubmit="return confirm('Clear all extension logs?')">
+    <button type="submit" class="btn btn-danger btn-sm">Clear logs</button>
+  </form>
+</div>
+
+<div class="card">
+  {% if logs %}
+  <div class="log-table-wrap">
+    <table class="log-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Lvl</th>
+          <th>Ctx</th>
+          <th>Category</th>
+          <th>Message</th>
+          <th>Data</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in logs %}
+        <tr>
+          <td class="log-ts">{{ entry.ts[:19].replace('T', ' ') }}</td>
+          <td><span class="log-level {{ entry.level }}">{{ entry.level }}</span></td>
+          <td class="log-ctx">{{ entry.context }}</td>
+          <td class="log-cat">{{ entry.category }}</td>
+          <td class="log-msg">{{ entry.message }}</td>
+          <td>
+            {% if entry.data is not none and entry.data != '' %}
+            <pre class="log-data">{{ entry.data | tojson(indent=2) if entry.data is mapping else entry.data }}</pre>
+            {% else %}
+            <span class="log-data-empty">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="log-empty">
+    <p>No log entries yet.</p>
+    <p style="margin-top:6px;font-size:0.8rem;">Install the native messaging host and reload the extension to start logging.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

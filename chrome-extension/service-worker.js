@@ -12,6 +12,7 @@ import {
   CARRIER_SYNC_URLS,
   detectCarrier,
 } from "./lib/carriers.js";
+import { log } from "./lib/logger.js";
 
 const DEFAULT_SYNC_INTERVAL_MIN = 60;
 const RENDER_WAIT_MS = 5_000;
@@ -53,9 +54,9 @@ chrome.runtime.onStartup.addListener(setupAlarms);
 
 async function setupAlarms() {
   const { dwmp_sync_interval } = await chrome.storage.local.get("dwmp_sync_interval");
-  chrome.alarms.create("dwmp-auto-sync", {
-    periodInMinutes: dwmp_sync_interval || DEFAULT_SYNC_INTERVAL_MIN,
-  });
+  const interval = dwmp_sync_interval || DEFAULT_SYNC_INTERVAL_MIN;
+  log.info("sw", "Service worker started, registering alarms", { syncIntervalMin: interval });
+  chrome.alarms.create("dwmp-auto-sync", { periodInMinutes: interval });
   chrome.alarms.create("dwmp-update-check", { periodInMinutes: 360 });
 
   // Run an immediate update check on install
@@ -63,6 +64,7 @@ async function setupAlarms() {
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {
+  log.info("alarm", `Alarm fired: ${alarm.name}`);
   if (alarm.name === "dwmp-auto-sync") runAutoSync();
   if (alarm.name === "dwmp-update-check") runUpdateCheck();
 });
@@ -70,20 +72,37 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // ── Auto-sync ──────────────────────────────────────────────────────
 
 async function runAutoSync() {
-  if (syncInProgress) return;
-  if (!(await isConfigured())) return;
+  log.info("sync", "Auto-sync triggered");
+  if (syncInProgress) {
+    log.warn("sync", "Auto-sync skipped: sync already in progress");
+    return;
+  }
+  if (!(await isConfigured())) {
+    log.warn("sync", "Auto-sync skipped: not configured");
+    return;
+  }
 
   const { dwmp_auto_sync } = await chrome.storage.local.get("dwmp_auto_sync");
-  if (!dwmp_auto_sync) return;
+  if (!dwmp_auto_sync) {
+    log.warn("sync", "Auto-sync skipped: auto-sync disabled");
+    return;
+  }
 
   const enabledIds = Object.entries(dwmp_auto_sync)
     .filter(([, v]) => v)
     .map(([k]) => Number(k));
-  if (enabledIds.length === 0) return;
+  if (enabledIds.length === 0) {
+    log.warn("sync", "Auto-sync skipped: no enabled accounts");
+    return;
+  }
 
   const result = await listAccounts();
-  if (!result.ok) return;
+  if (!result.ok) {
+    log.error("sync", "Auto-sync: failed to list accounts", { error: result.error });
+    return;
+  }
 
+  log.info("sync", "Auto-sync starting", { enabledAccounts: enabledIds.length });
   syncInProgress = true;
   try {
     // Deduplicate by carrier -- one tab per carrier, not per account
@@ -95,14 +114,22 @@ async function runAutoSync() {
 
       await syncCarrierViaTab(account);
     }
+    log.info("sync", "Auto-sync completed", { carriers: [...carriersDone] });
   } finally {
     syncInProgress = false;
   }
 }
 
 async function syncCarrierViaTab(account, opts = {}) {
+  const _syncStart = Date.now();
+  log.info("sync", `syncCarrierViaTab: ${account.carrier}`, {
+    accountId: account.id,
+    reusingTab: opts.tabId != null,
+  });
+
   const urls = CARRIER_SYNC_URLS[account.carrier];
   if (!urls?.parcels) {
+    log.error("sync", `No sync URL configured for ${account.carrier}`);
     await storeSyncResult(account.id, false, `No sync URL for ${account.carrier}`);
     return;
   }
@@ -110,6 +137,7 @@ async function syncCarrierViaTab(account, opts = {}) {
   // Carriers with a login URL require stored credentials so the extension
   // can fill in the login form automatically.
   if (urls.login && !account.has_credentials) {
+    log.warn("sync", `${account.carrier}: no credentials configured`);
     await storeSyncResult(
       account.id,
       false,
@@ -170,12 +198,15 @@ async function syncCarrierViaTab(account, opts = {}) {
     const onLogin =
       isCarrierLoginPage(account.carrier, tabInfo.url) ||
       (await hasLoginForm(tabId));
+    log.info("sync", `${account.carrier}: login page detected: ${onLogin}`, { url: tabInfo.url });
     if (onLogin) {
       const loggedIn = await handleCarrierLogin(tabId, account);
       if (!loggedIn) {
+        log.error("sync", `${account.carrier}: login failed`);
         await storeSyncResult(account.id, false, "Login failed -- check credentials");
         return;
       }
+      log.info("sync", `${account.carrier}: login succeeded`);
       await waitForUrlStable(tabId);
     }
 
@@ -234,11 +265,17 @@ async function syncCarrierViaTab(account, opts = {}) {
         await waitForUrlStable(tabId);
       }
 
+      log.info("postnl", "Token acquired, fetching payload", { tabId });
       const payloadResult = await fetchPostNLPayload(tabId, accessToken);
       if (!payloadResult.ok) {
+        log.error("postnl", "Payload fetch failed", { error: payloadResult.error });
         await storeSyncResult(account.id, false, payloadResult.error || "Failed to fetch PostNL data");
         return;
       }
+      log.info("postnl", "Payload fetched", {
+        shipments: payloadResult.data?.shipments?.length ?? 0,
+        details: payloadResult.data?.details?.length ?? 0,
+      });
 
       const syncResult = await browserPayload(account.id, payloadResult.data);
       const count = Array.isArray(syncResult.data) ? syncResult.data.length : 0;
@@ -260,12 +297,15 @@ async function syncCarrierViaTab(account, opts = {}) {
 
     let html = await captureTabHtml(tabId);
     if (!html) {
+      log.error("sync", `${account.carrier}: captureTabHtml returned empty`);
       await storeSyncResult(account.id, false, "Could not capture page content");
       return;
     }
+    log.debug("sync", `${account.carrier}: captured HTML`, { htmlBytes: html.length });
 
     // Detect Cloudflare challenge page
     if (isCloudflareChallenge(html)) {
+      log.warn("sync", `${account.carrier}: Cloudflare challenge detected`);
       // Make the tab visible so the user can solve the captcha
       await chrome.tabs.update(tabId, { active: true });
       shouldCloseTab = false;
@@ -279,6 +319,7 @@ async function syncCarrierViaTab(account, opts = {}) {
     // When reusing the caller's tab we skip site-data wipe to preserve the
     // user's active session and surface the error instead.
     if (isCarrierErrorPage(html)) {
+      log.warn("sync", `${account.carrier}: carrier error page detected`);
       if (callerTabId !== null) {
         await storeSyncResult(account.id, false, "Carrier site error -- try again later");
         return;
@@ -321,14 +362,19 @@ async function syncCarrierViaTab(account, opts = {}) {
     }
 
     const pageUrl = (await chrome.tabs.get(tabId)).url;
+    log.info("sync", `${account.carrier}: pushing HTML to DWMP`, { htmlBytes: html.length, url: pageUrl });
     const pushResult = await browserPush(html, pageUrl);
 
     if (pushResult.ok) {
-      await storeSyncResult(account.id, true, null, pushResult.data?.length || 0);
+      const count = pushResult.data?.length || 0;
+      log.info("sync", `${account.carrier}: browser-push succeeded`, { packages: count, durationMs: Date.now() - _syncStart });
+      await storeSyncResult(account.id, true, null, count);
     } else {
+      log.error("sync", `${account.carrier}: browser-push failed`, { error: pushResult.error });
       await storeSyncResult(account.id, false, pushResult.error);
     }
   } catch (err) {
+    log.error("sync", `${account.carrier}: unhandled error`, { error: err.message, stack: err.stack });
     await storeSyncResult(account.id, false, err.message);
   } finally {
     if (shouldCloseTab && tabId !== null) {
@@ -414,6 +460,7 @@ async function captureTabHtml(tabId) {
 }
 
 async function fetchPostNLPayload(tabId, accessToken) {
+  log.info("postnl", "Injecting payload fetch script", { tabId });
   try {
     const results = await chrome.scripting.executeScript({
       target: { tabId },
@@ -493,8 +540,11 @@ async function fetchPostNLPayload(tabId, accessToken) {
         accessToken,
       ],
     });
-    return { ok: true, data: results?.[0]?.result || { shipments: [], details: [] } };
+    const data = results?.[0]?.result || { shipments: [], details: [] };
+    log.info("postnl", "Injected fetch complete", { shipments: data.shipments?.length ?? 0, details: data.details?.length ?? 0 });
+    return { ok: true, data };
   } catch (err) {
+    log.error("postnl", "Injected fetch threw", { error: err.message });
     return { ok: false, error: err.message };
   }
 }
@@ -509,6 +559,7 @@ function isCloudflareChallenge(html) {
 }
 
 async function clearCarrierSiteData(carrier) {
+  log.info("sync", `Clearing site data for ${carrier}`);
   const config = CARRIER_AUTH_CLEAR[carrier];
   if (!config) return;
 
@@ -555,6 +606,7 @@ function isCarrierLoginPage(carrier, url) {
  * the password field is visible (remembered-email flow), or null on timeout.
  */
 async function waitForPostNLLoginForm(tabId, maxMs = 10_000) {
+  log.debug("login", "Waiting for PostNL login form", { tabId });
   const deadline = Date.now() + maxMs;
   while (Date.now() < deadline) {
     try {
@@ -591,6 +643,7 @@ async function handlePostNLLogin(tabId, username, password) {
   // The SAP CDC screenset renders asynchronously after URL stabilisation —
   // wait for the form to actually appear before attempting to fill it.
   const formLayout = await waitForPostNLLoginForm(tabId);
+  log.info("login", `PostNL login form layout: ${formLayout ?? "not found"}`, { tabId });
   if (!formLayout) return false;
 
   const fillStep = (email, pass) => {
@@ -651,12 +704,18 @@ async function handlePostNLLogin(tabId, username, password) {
 
   await waitForUrlStable(tabId, 2000, 15000);
   const info = await chrome.tabs.get(tabId);
-  return !isCarrierLoginPage("postnl", info.url);
+  const success = !isCarrierLoginPage("postnl", info.url);
+  log.info("login", `PostNL login ${success ? "succeeded" : "failed"}`, { finalUrl: info.url });
+  return success;
 }
 
 async function handleCarrierLogin(tabId, account) {
+  log.info("login", `handleCarrierLogin: ${account.carrier}`, { accountId: account.id, tabId });
   const result = await getAccountCredentials(account.id);
-  if (!result.ok || !result.data?.has_credentials) return false;
+  if (!result.ok || !result.data?.has_credentials) {
+    log.warn("login", `No credentials available for ${account.carrier}`, { accountId: account.id });
+    return false;
+  }
 
   const { username, password } = result.data;
 
@@ -724,6 +783,7 @@ async function handleCarrierLogin(tabId, account) {
  * terminal for automation — we surface the tab so the user can solve it.
  */
 async function handleAmazonLogin(tabId, email, password) {
+  log.info("login", "Amazon login started", { tabId });
   // Dismiss the EU cookie consent banner up front (it can overlay the form).
   await dismissAmazonCookieBanner(tabId);
 
@@ -731,7 +791,10 @@ async function handleAmazonLogin(tabId, email, password) {
   for (let step = 0; step < MAX_STEPS; step++) {
     const state = await detectAmazonLoginState(tabId);
 
+    log.info("login", `Amazon login step ${step}: state=${state}`, { tabId });
+
     if (state === "captcha" || state === "mfa") {
+      log.warn("login", `Amazon login requires manual action: ${state}`);
       await chrome.tabs.update(tabId, { active: true });
       return false;
     }
@@ -740,12 +803,15 @@ async function handleAmazonLogin(tabId, email, password) {
     // destination, or we're stuck on a page we don't know how to fill.
     if (state === "none") {
       const info = await chrome.tabs.get(tabId);
-      return !isCarrierLoginPage("amazon", info.url);
+      const success = !isCarrierLoginPage("amazon", info.url);
+      log.info("login", `Amazon login state=none, ${success ? "succeeded" : "failed"}`, { url: info.url });
+      return success;
     }
 
     const nav = waitForTabNavigation(tabId, TAB_TIMEOUT_MS);
     const submitted = await fillAndSubmitAmazonStep(tabId, state, email, password);
     if (!submitted) {
+      log.error("login", `Amazon login: fillAndSubmit failed for state=${state}`);
       await chrome.tabs.update(tabId, { active: true });
       return false;
     }
@@ -755,6 +821,7 @@ async function handleAmazonLogin(tabId, email, password) {
     await dismissAmazonCookieBanner(tabId);
   }
 
+  log.warn("login", "Amazon login: ran out of steps");
   // Ran out of steps — probably looping on the same form. Surface for the user.
   await chrome.tabs.update(tabId, { active: true });
   return false;
@@ -888,6 +955,12 @@ function waitForTabNavigation(tabId, timeout) {
 }
 
 async function storeSyncResult(accountId, ok, error, count) {
+  log.info("sync-result", `Account ${accountId}: ${ok ? "ok" : "failed"}`, {
+    accountId,
+    ok,
+    error: error || null,
+    count: count ?? 0,
+  });
   const { dwmp_sync_results } = await chrome.storage.local.get("dwmp_sync_results");
   const results = dwmp_sync_results || {};
   results[accountId] = {
@@ -906,12 +979,15 @@ function sleep(ms) {
 // ── Update check ───────────────────────────────────────────────────
 
 async function runUpdateCheck() {
+  log.debug("update", "Checking for extension update");
   const update = await checkForUpdate();
   if (update) {
+    log.info("update", "Update available", { version: update.version });
     await chrome.storage.local.set({ dwmp_update: update });
     chrome.action.setBadgeText({ text: "!" });
     chrome.action.setBadgeBackgroundColor({ color: "#00b894" });
   } else {
+    log.debug("update", "Extension is up to date");
     await chrome.storage.local.remove("dwmp_update");
     chrome.action.setBadgeText({ text: "" });
   }
@@ -920,6 +996,8 @@ async function runUpdateCheck() {
 // ── Message handler (popup ↔ service worker) ───────────────────────
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  log.debug("message", `Received: ${msg.type}`);
+
   if (msg.type === "sync-current-tab") {
     handleSyncCurrentTab().then(sendResponse);
     return true; // keep channel open for async
@@ -931,11 +1009,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === "update-auto-sync") {
+    log.info("message", "update-auto-sync", { accountId: msg.accountId, enabled: msg.enabled });
     handleUpdateAutoSync(msg.accountId, msg.enabled).then(sendResponse);
     return true;
   }
 
   if (msg.type === "update-sync-interval") {
+    log.info("message", "update-sync-interval", { interval: msg.interval });
     chrome.alarms.create("dwmp-auto-sync", { periodInMinutes: msg.interval });
     chrome.storage.local.set({ dwmp_sync_interval: msg.interval });
     sendResponse({ ok: true });
@@ -946,14 +1026,27 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     runUpdateCheck().then(() => sendResponse({ ok: true }));
     return true;
   }
+
+  if (msg.type === "get-log-buffer") {
+    sendResponse(log.getBuffer());
+    return false;
+  }
 });
 
 async function handleSyncCurrentTab() {
+  log.info("sync", "Sync current tab requested");
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id || !tab.url) return { ok: false, error: "No active tab" };
+  if (!tab?.id || !tab.url) {
+    log.warn("sync", "Sync current tab: no active tab");
+    return { ok: false, error: "No active tab" };
+  }
 
   const carrier = detectCarrier(tab.url);
-  if (!carrier) return { ok: false, error: "Not on a carrier site" };
+  if (!carrier) {
+    log.warn("sync", "Sync current tab: not on a carrier site", { url: tab.url });
+    return { ok: false, error: "Not on a carrier site" };
+  }
+  log.info("sync", `Sync current tab: detected carrier ${carrier}`, { tabId: tab.id, url: tab.url });
 
   const accounts = await listAccounts();
   if (!accounts.ok) return accounts;
@@ -973,7 +1066,11 @@ async function handleSyncCurrentTab() {
 }
 
 async function handleTriggerSync(accountId) {
-  if (syncInProgress) return { ok: false, error: "Sync already in progress" };
+  log.info("sync", `Trigger sync requested for account ${accountId}`);
+  if (syncInProgress) {
+    log.warn("sync", "Trigger sync skipped: already in progress");
+    return { ok: false, error: "Sync already in progress" };
+  }
 
   const result = await listAccounts();
   if (!result.ok) return result;

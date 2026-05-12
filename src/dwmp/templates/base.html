@@ -571,6 +571,7 @@
       <nav>
         <a href="{{ base_path }}/" class="{% if active_nav == 'packages' %}active{% endif %}">Packages</a>
         <a href="{{ base_path }}/accounts" class="{% if active_nav == 'accounts' %}active{% endif %}">Accounts</a>
+        <a href="{{ base_path }}/logs" class="{% if active_nav == 'logs' %}active{% endif %}">Logs</a>
         <a href="#" class="nav-bell" onclick="event.preventDefault();document.getElementById('notif-drawer-overlay').style.display='block';document.getElementById('notif-drawer').style.display='flex';htmx.ajax('GET','{{ base_path }}/notifications/drawer','#notif-drawer-body');">
           <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C10.9 2 10 2.9 10 4C10 4.1 10 4.19 10.02 4.28C7.58 5.07 6 7.36 6 10V16L4 18V19H20V18L18 16V10C18 7.36 16.42 5.07 13.98 4.28C14 4.19 14 4.1 14 4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z"/></svg>
           <span id="notif-badge" hx-get="{{ base_path }}/notifications/badge" hx-trigger="load, every 30s" hx-swap="innerHTML"></span>

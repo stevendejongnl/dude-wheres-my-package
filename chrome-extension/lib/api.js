@@ -1,4 +1,5 @@
 import { isNewerVersion } from "./carriers.js";
+import { log } from "./logger.js";
 
 const GITHUB_REPO = "stevendejongnl/dude-wheres-my-package";
 
@@ -38,7 +39,10 @@ export async function isConfigured() {
 
 async function apiCall(method, path, body) {
   const { url, token } = await getConfig();
-  if (!url || !token) return { ok: false, error: "Not configured", status: 0 };
+  if (!url || !token) {
+    log.warn("api", `${method} ${path} skipped: not configured`);
+    return { ok: false, error: "Not configured", status: 0 };
+  }
 
   const opts = {
     method,
@@ -49,20 +53,29 @@ async function apiCall(method, path, body) {
   };
   if (body !== undefined) opts.body = JSON.stringify(body);
 
+  const t0 = Date.now();
+  log.debug("api", `${method} ${path}`, { bodySize: body !== undefined ? JSON.stringify(body).length : 0 });
+
   try {
     const res = await fetch(`${url}${path}`, opts);
-    if (res.status === 204) return { ok: true, data: null, status: 204 };
+    const durationMs = Date.now() - t0;
+
+    if (res.status === 204) {
+      log.info("api", `${method} ${path} → 204`, { durationMs });
+      return { ok: true, data: null, status: 204 };
+    }
 
     const data = await res.json().catch(() => null);
     if (!res.ok) {
-      return {
-        ok: false,
-        error: data?.detail || res.statusText || `Server error (${res.status})`,
-        status: res.status,
-      };
+      const error = data?.detail || res.statusText || `Server error (${res.status})`;
+      log.error("api", `${method} ${path} → ${res.status}`, { durationMs, error });
+      return { ok: false, error, status: res.status };
     }
+
+    log.info("api", `${method} ${path} → ${res.status}`, { durationMs });
     return { ok: true, data, status: res.status };
   } catch (err) {
+    log.error("api", `${method} ${path} → network error`, { durationMs: Date.now() - t0, error: err.message });
     return { ok: false, error: err.message, status: 0 };
   }
 }
@@ -71,6 +84,7 @@ async function apiCall(method, path, body) {
 
 export async function authenticate(url, password) {
   const base = url.replace(/\/+$/, "");
+  log.info("api", "Authenticating", { url: base });
   const res = await fetch(`${base}/api/v1/auth/token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -78,10 +92,13 @@ export async function authenticate(url, password) {
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);
-    throw new Error(data?.detail || "Authentication failed");
+    const err = new Error(data?.detail || "Authentication failed");
+    log.error("api", "Authentication failed", { status: res.status, error: err.message });
+    throw err;
   }
   const { token } = await res.json();
   await saveConfig(base, token);
+  log.info("api", "Authentication succeeded");
   return token;
 }
 

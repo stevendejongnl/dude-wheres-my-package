@@ -7,10 +7,11 @@ from fastapi.responses import Response as RawResponse
 from pydantic import BaseModel
 
 from dwmp.api.auth import create_token, verify_password
-from dwmp.api.dependencies import get_tracking_service, get_web_push_notifier
+from dwmp.api.dependencies import get_repository, get_tracking_service, get_web_push_notifier
 from dwmp.carriers.base import CarrierAuthError, CarrierSyncError
 from dwmp.services.tracking import TrackingService
 from dwmp.services.web_push_notifier import WebPushNotifier
+from dwmp.storage.repository import PackageRepository
 
 router = APIRouter(prefix="/api/v1")
 
@@ -498,3 +499,36 @@ async def push_unsubscribe(
     notifier: WebPushNotifier = Depends(get_web_push_notifier),
 ) -> None:
     await notifier.remove_subscription(body.endpoint)
+
+
+# --- Extension log endpoints ---
+
+
+class ExtensionLogsRequest(BaseModel):
+    entries: list[dict]
+
+
+@router.post("/logs", status_code=204)
+async def ingest_extension_logs(
+    body: ExtensionLogsRequest,
+    repo: PackageRepository = Depends(get_repository),
+) -> None:
+    if body.entries:
+        await repo.add_extension_log_entries(body.entries)
+
+
+@router.get("/logs")
+async def get_extension_logs(
+    limit: int = 500,
+    level: str | None = None,
+    context: str | None = None,
+    repo: PackageRepository = Depends(get_repository),
+) -> list[dict]:
+    return await repo.list_extension_logs(limit=limit, level=level, context=context)
+
+
+@router.delete("/logs", status_code=204)
+async def clear_extension_logs(
+    repo: PackageRepository = Depends(get_repository),
+) -> None:
+    await repo.clear_extension_logs()

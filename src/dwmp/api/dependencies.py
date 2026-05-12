@@ -16,6 +16,7 @@ def get_repository() -> PackageRepository:
     return PackageRepository()
 
 
+
 @lru_cache
 def get_web_push_notifier() -> WebPushNotifier:
     return WebPushNotifier(repository=get_repository())
