@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.52.2 (2026-05-12)
+
+### Bug Fixes
+
+- **login**: Fix PostNL triggerlogin detection and DHL credential retrieval
+  ([`d435003`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/d435003c6cd7bd999b14611b2232765a64ac327c))
+
+
 ## v1.52.1 (2026-05-12)
 
 ### Bug Fixes
