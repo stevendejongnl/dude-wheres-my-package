@@ -549,12 +549,50 @@ function isCarrierLoginPage(carrier, url) {
   return patterns.some((p) => lower.includes(p));
 }
 
+/**
+ * Poll until the PostNL CDC login form has rendered in the tab.
+ * Returns "email" when the email field is present, "password-only" when only
+ * the password field is visible (remembered-email flow), or null on timeout.
+ */
+async function waitForPostNLLoginForm(tabId, maxMs = 10_000) {
+  const deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
+    try {
+      const result = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          if (
+            document.querySelector("#capture_signIn_signInEmailAddress") ||
+            document.querySelector("[data-capturefield='signInEmailAddress']") ||
+            document.querySelector("input[type='text'], input[type='email'], input:not([type])")
+          ) return "email";
+          const passEl = document.querySelector("input[type='password']");
+          if (passEl && passEl.offsetParent !== null) return "password-only";
+          return null;
+        },
+      });
+      const layout = result?.[0]?.result;
+      if (layout) return layout;
+    } catch {
+      // scripting not yet available (page still loading)
+    }
+    await sleep(250);
+  }
+  return null;
+}
+
 async function handlePostNLLogin(tabId, username, password) {
   // PostNL uses a two-step OIDC form: email on step 1, password on step 2.
   // When the remembered-email localStorage entry is present, the page skips
   // straight to the password step. We handle both layouts: fill whatever
   // fields are visible on the current step, submit, then check whether a
   // second step (password-only) appeared and fill that too.
+
+  // The SAP CDC screenset renders asynchronously after URL stabilisation —
+  // wait for the form to actually appear before attempting to fill it.
+  const formLayout = await waitForPostNLLoginForm(tabId);
+  if (!formLayout) return false;
+
   const fillStep = (email, pass) => {
     const passEl = document.querySelector("input[type='password']");
     const emailEl =
@@ -588,8 +626,8 @@ async function handlePostNLLogin(tabId, username, password) {
   });
 
   if (!hadPasswordField) {
-    // Step 1 only had the email field — wait for the password step to load.
-    await sleep(3000);
+    // Step 1 only had the email field — wait for the password step to render.
+    await waitForPostNLLoginForm(tabId);
     const mid = await chrome.tabs.get(tabId);
     if (isCarrierLoginPage("postnl", mid.url)) {
       await chrome.scripting.executeScript({
