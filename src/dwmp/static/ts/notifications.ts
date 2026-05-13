@@ -182,11 +182,17 @@ export function initNotifications(): () => void {
     const payload = buildPayload(count, lastCount, badgeEl);
 
     if (payload && Notification.permission === "granted") {
-      new Notification(payload.title, {
-        body: payload.body,
-        icon: payload.icon,
-        tag: payload.tag,
-      });
+      // Route through the service worker so notifications work on iOS PWA,
+      // where new Notification() from the main thread is silently ignored.
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.ready.then((reg) =>
+          reg.showNotification(payload.title, {
+            body: payload.body,
+            icon: payload.icon,
+            tag: payload.tag,
+          })
+        );
+      }
     }
 
     lastCount = count;

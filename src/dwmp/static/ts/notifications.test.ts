@@ -170,6 +170,7 @@ describe("requestPermission", () => {
 
 describe("initNotifications", () => {
   let notifSpy: ReturnType<typeof vi.fn>;
+  let showNotificationSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -179,6 +180,14 @@ describe("initNotifications", () => {
       permission: "granted",
       requestPermission: vi.fn(),
     }));
+    showNotificationSpy = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      serviceWorker: {
+        ready: Promise.resolve({ showNotification: showNotificationSpy }),
+        register: vi.fn(),
+      },
+    });
   });
 
   afterEach(() => {
@@ -201,13 +210,14 @@ describe("initNotifications", () => {
     document.dispatchEvent(evt);
   }
 
-  it("fires a notification when unread count increases", () => {
+  it("fires a notification when unread count increases", async () => {
     const cleanup = initNotifications();
 
     fireSwap("notif-badge", "3");
+    await Promise.resolve();
 
-    expect(notifSpy).toHaveBeenCalledOnce();
-    expect(notifSpy).toHaveBeenCalledWith(
+    expect(showNotificationSpy).toHaveBeenCalledOnce();
+    expect(showNotificationSpy).toHaveBeenCalledWith(
       "Dude, Where's My Package?",
       expect.objectContaining({ body: "3 package updates" }),
     );
@@ -215,70 +225,79 @@ describe("initNotifications", () => {
     cleanup();
   });
 
-  it("does not fire when count stays the same", () => {
+  it("does not fire when count stays the same", async () => {
     const cleanup = initNotifications();
 
     fireSwap("notif-badge", "2");
-    notifSpy.mockClear();
+    await Promise.resolve();
+    showNotificationSpy.mockClear();
 
     fireSwap("notif-badge", "2");
-    expect(notifSpy).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(showNotificationSpy).not.toHaveBeenCalled();
 
     cleanup();
   });
 
-  it("does not fire when count decreases", () => {
+  it("does not fire when count decreases", async () => {
     const cleanup = initNotifications();
 
     fireSwap("notif-badge", "5");
-    notifSpy.mockClear();
+    await Promise.resolve();
+    showNotificationSpy.mockClear();
 
     fireSwap("notif-badge", "3");
-    expect(notifSpy).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(showNotificationSpy).not.toHaveBeenCalled();
 
     cleanup();
   });
 
-  it("ignores htmx swaps on other targets", () => {
+  it("ignores htmx swaps on other targets", async () => {
     const cleanup = initNotifications();
 
     fireSwap("some-other-element", "10");
-    expect(notifSpy).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(showNotificationSpy).not.toHaveBeenCalled();
 
     cleanup();
   });
 
-  it("cleanup removes the listener", () => {
+  it("cleanup removes the listener", async () => {
     const cleanup = initNotifications();
     cleanup();
 
     fireSwap("notif-badge", "5");
-    expect(notifSpy).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(showNotificationSpy).not.toHaveBeenCalled();
   });
 
-  it("does not re-fire on PWA reopen when count unchanged", () => {
+  it("does not re-fire on PWA reopen when count unchanged", async () => {
     // Simulate first session: count goes to 2, saves to localStorage
     const cleanup1 = initNotifications();
     fireSwap("notif-badge", "2");
-    expect(notifSpy).toHaveBeenCalledOnce();
+    await Promise.resolve();
+    expect(showNotificationSpy).toHaveBeenCalledOnce();
     cleanup1();
 
     // Simulate reopen: new initNotifications() reads stored count=2
-    notifSpy.mockClear();
+    showNotificationSpy.mockClear();
     const cleanup2 = initNotifications();
     fireSwap("notif-badge", "2");
-    expect(notifSpy).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(showNotificationSpy).not.toHaveBeenCalled();
     cleanup2();
   });
 
-  it("fires notification for count going from 0 to 1", () => {
+  it("fires notification for count going from 0 to 1", async () => {
     const cleanup = initNotifications();
 
     fireSwap("notif-badge", "1");
+    await Promise.resolve();
 
-    expect(notifSpy).toHaveBeenCalledOnce();
+    expect(showNotificationSpy).toHaveBeenCalledOnce();
     // Without data-carrier on the badge, falls back to generic message
-    expect(notifSpy).toHaveBeenCalledWith(
+    expect(showNotificationSpy).toHaveBeenCalledWith(
       "Dude, Where's My Package?",
       expect.objectContaining({ body: "A package status has changed" }),
     );

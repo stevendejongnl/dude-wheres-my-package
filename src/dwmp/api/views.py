@@ -6,7 +6,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from dwmp.api.auth import login_response, logout_response, verify_password
@@ -174,6 +174,28 @@ def _enrich_package(pkg: dict) -> dict:
         pkg.get("postal_code"),
     )
     return pkg
+
+
+_STATIC_DIR = Path(__file__).parent.parent / "static"
+
+
+@router.get("/sw.js")
+async def service_worker(request: Request):
+    """Serve the service worker from the app root so its scope covers all pages.
+
+    A SW at /static/sw.js would have scope /static/ and never control the main
+    app pages, making navigator.serviceWorker.ready hang and preventing push
+    subscriptions from being registered. Serving from the root fixes this.
+    The Service-Worker-Allowed header explicitly grants scope "/" (or the ingress
+    prefix) so the registration can use that broader scope.
+    """
+    base = _base_path(request)
+    scope = f"{base}/" if base else "/"
+    return FileResponse(
+        str(_STATIC_DIR / "sw.js"),
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": scope},
+    )
 
 
 @router.get("/login", response_class=HTMLResponse)

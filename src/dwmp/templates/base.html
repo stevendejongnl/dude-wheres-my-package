@@ -613,7 +613,8 @@
   {% endif %}
   <script>
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/static/sw.js");
+      const base = document.querySelector('meta[name="dwmp-base"]')?.getAttribute("content")?.trim() ?? "";
+      navigator.serviceWorker.register(base + "/sw.js", { scope: base + "/" });
     }
   </script>
 </body>
