@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.56.1 (2026-05-13)
+
+### Bug Fixes
+
+- **push**: Fix SW scope so background push subscriptions actually register
+  ([`2190270`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/2190270ac5f30effd99a9fcf17bacbd28d6fd0b3))
+
+
 ## v1.56.0 (2026-05-12)
 
 ### Features
