@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -8,6 +8,21 @@ from dwmp.carriers.amazon import (
     _parse_status,
 )
 from dwmp.carriers.base import AuthTokens, AuthType, CarrierAuthError, TrackingStatus
+
+_NL_MONTHS = [
+    "", "januari", "februari", "maart", "april", "mei", "juni",
+    "juli", "augustus", "september", "oktober", "november", "december",
+]
+
+
+def _nl_date(delta_days: int = 0) -> datetime:
+    return datetime.now(UTC) + timedelta(days=delta_days)
+
+
+def _nl_date_str(delta_days: int = 0, year: bool = True) -> str:
+    d = _nl_date(delta_days)
+    suffix = f" {d.year}" if year else ""
+    return f"{d.day} {_NL_MONTHS[d.month]}{suffix}"
 
 
 def test_amazon_is_browser_push():
@@ -172,13 +187,16 @@ def test_parse_orders_page_delivered_via_delivery_box_text():
 
 def test_parse_orders_page_in_transit():
     carrier = Amazon()
-    html = """
+    order_date = _nl_date_str(-5)          # 5 days ago — within lookback window
+    delivery_date = _nl_date_str(3, year=False)  # 3 days from now — expected delivery
+    expected_day = _nl_date(3).day
+    html = f"""
     <html><body>
     <div class="order-card">
-        <span class="a-color-secondary">Besteld op 12 mei 2026</span>
+        <span class="a-color-secondary">Besteld op {order_date}</span>
         <span class="value">305-9876543-2109876</span>
         <div class="delivery-box">
-            <span class="delivery-box__primary-text">Verwacht op 18 mei</span>
+            <span class="delivery-box__primary-text">Verwacht op {delivery_date}</span>
         </div>
     </div>
     </body></html>
@@ -187,7 +205,7 @@ def test_parse_orders_page_in_transit():
     assert len(results) == 1
     assert results[0].status == TrackingStatus.IN_TRANSIT
     assert results[0].estimated_delivery is not None
-    assert results[0].estimated_delivery.day == 18
+    assert results[0].estimated_delivery.day == expected_day
 
 
 def test_parse_orders_page_empty():
