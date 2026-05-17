@@ -67,10 +67,15 @@ describe("CARRIER_LOGIN_PATTERNS (amazon)", () => {
   });
 });
 
+// Carriers that intentionally have no CARRIER_AUTH_CLEAR entry.
+// postnl: clearing site data destroys the CDC session; we rely on silent SSO
+// via triggerlogin instead, so the session must be preserved across cycles.
+const AUTH_CLEAR_EXEMPT = new Set(["postnl"]);
+
 describe("CARRIER_AUTH_CLEAR", () => {
-  it("has an entry for every carrier with an auto-login URL", () => {
+  it("has an entry for every carrier with an auto-login URL (except exempt carriers)", () => {
     const autoLoginCarriers = Object.entries(CARRIER_SYNC_URLS)
-      .filter(([, urls]) => urls.login)
+      .filter(([carrier, urls]) => urls.login && !AUTH_CLEAR_EXEMPT.has(carrier))
       .map(([carrier]) => carrier);
 
     for (const carrier of autoLoginCarriers) {
