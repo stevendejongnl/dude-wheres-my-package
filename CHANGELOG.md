@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.56.9 (2026-05-17)
+
+### Bug Fixes
+
+- **sync**: Manual trigger bypasses dedup guard
+  ([`622775a`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/622775adc7ecdac59151444e5d100d85e5ec0772))
+
+
 ## v1.56.8 (2026-05-17)
 
 ### Bug Fixes

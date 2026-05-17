@@ -398,7 +398,7 @@ wheels = [
 
 [[package]]
 name = "dude-wheres-my-package"
-version = "1.56.8"
+version = "1.56.9"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
