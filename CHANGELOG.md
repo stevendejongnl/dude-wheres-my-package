@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.56.2 (2026-05-17)
+
+### Bug Fixes
+
+- **postnl**: Fix silent sync failures and Akamai cookie wipe
+  ([`ea8e44e`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/ea8e44e63d0028f90d2dbe88ab5c52c9752a26bb))
+
+### Testing
+
+- **amazon**: Update stale fixture dates in test_parse_orders_page_in_transit
+  ([`53c5487`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/53c548733db7c896609f95fd79348511da568a7e))
+
+
 ## v1.56.1 (2026-05-13)
 
 ### Bug Fixes
