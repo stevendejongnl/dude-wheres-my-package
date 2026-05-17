@@ -252,9 +252,22 @@ async function syncCarrierViaTab(account, opts = {}) {
       let loginHandled = onLogin;
       let accessToken = null;
       let storageDiagLogged = false;
+      let triggerloginFallbackAt = Date.now() + 12_000; // navigate away if stuck on triggerlogin
       const deadline = Date.now() + 60_000;
       while (Date.now() < deadline) {
         const tabUrl = (await chrome.tabs.get(tabId)).url || "";
+
+        // Kasm and some environments block the triggerlogin → login.postnl.nl redirect.
+        // If we're still on triggerlogin after 12s with empty sessionStorage, navigate
+        // directly to login.postnl.nl which will render the CDC form without relying
+        // on the server-side redirect mechanism.
+        if (tabUrl.includes("triggerlogin") && Date.now() > triggerloginFallbackAt) {
+          log.info("postnl", "triggerlogin redirect stalled — navigating directly to login page");
+          await chrome.tabs.update(tabId, { url: "https://login.postnl.nl/" });
+          triggerloginFallbackAt = Infinity; // only do this once
+          await waitForUrlStable(tabId);
+          continue;
+        }
 
         if ((isCarrierLoginPage("postnl", tabUrl) || (await hasLoginForm(tabId))) && !loginHandled) {
           loginHandled = true;
