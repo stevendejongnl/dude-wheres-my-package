@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.56.3 (2026-05-17)
+
+### Bug Fixes
+
+- **postnl**: Skip sync if another instance synced recently
+  ([`1ca9a89`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/1ca9a8998b3283f11a6753359117d3c1bb5651a6))
+
+### Testing
+
+- **amazon**: Use relative dates in order-page fixture to prevent staleness
+  ([`155979d`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/155979da092057630be2a86f289923a92ce94acd))
+
+
 ## v1.56.2 (2026-05-17)
 
 ### Bug Fixes
