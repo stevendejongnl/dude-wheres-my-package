@@ -1217,10 +1217,18 @@ async function handleTriggerSync(accountId) {
   if (!account) return { ok: false, error: "Account not found" };
 
   syncInProgress = true;
+  const syncStartMs = Date.now();
   try {
     await syncCarrierViaTab(account);
     const { dwmp_sync_results } = await chrome.storage.local.get("dwmp_sync_results");
-    return dwmp_sync_results?.[accountId] || { ok: true };
+    const stored = dwmp_sync_results?.[accountId];
+    // Only return the stored result if it was written during this sync call.
+    // If the sync was skipped (dedup guard), no new result is stored and the
+    // stale result from a previous failed sync would otherwise be returned.
+    if (stored && new Date(stored.timestamp).getTime() >= syncStartMs) {
+      return stored;
+    }
+    return { ok: true };
   } finally {
     syncInProgress = false;
   }
