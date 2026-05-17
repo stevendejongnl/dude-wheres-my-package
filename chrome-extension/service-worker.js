@@ -245,11 +245,11 @@ async function syncCarrierViaTab(account, opts = {}) {
     // after the token is secured — navigating away first loses the token.
     if (account.carrier === "postnl") {
       log.info("postnl", "stage", { stage: "token-loop-start" });
-      // We navigate directly to login.postnl.nl (bypassing jouw.postnl.nl/account
-      // and its Akamai bot-challenge). The outer isCarrierLoginPage check above
-      // handles the initial login. This loop catches any unexpected re-auth
-      // redirects and waits for poa.auth.access_token to appear in sessionStorage
-      // after the OAuth callback completes on jouw.postnl.nl/account/login.
+      // We navigate to triggerlogin which server-side redirects to
+      // jouw.postnl.nl/account/login?code=... when the CDC session is valid,
+      // setting poa.auth.access_token in sessionStorage after the OAuth callback.
+      // If the CDC session has expired, the redirect goes to login.postnl.nl
+      // instead — isCarrierLoginPage catches that and runs handleCarrierLogin.
       let loginHandled = onLogin;
       let accessToken = null;
       let storageDiagLogged = false;

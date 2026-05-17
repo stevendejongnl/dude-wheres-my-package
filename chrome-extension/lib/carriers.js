@@ -41,20 +41,13 @@ export const CARRIER_SYNC_URLS = {
     parcels: "https://www.dpdgroup.com/nl/mydpd/my-parcels/incoming",
   },
   postnl: {
-    // Navigate directly to the CDC auth-ui on login.postnl.nl, bypassing
-    // jouw.postnl.nl/account/nl-NL/triggerlogin which routes through Akamai
-    // bot-detection. Akamai's rAF-based fingerprint collector never completes
-    // in inactive extension tabs, permanently blocking the triggerlogin →
-    // login.postnl.nl redirect. login.postnl.nl has no Akamai protection and
-    // shows the CDC sign-in form directly.
-    login:
-      "https://login.postnl.nl/101112a0-4a0f-4bbb-8176-2f1b2d370d7c/auth-ui/v2/login" +
-      "?audience=poa-profiles-api" +
-      "&client_id=1e450c3d-5bbb-4f34-9264-dd51fa9fd066" +
-      "&redirect_uri=https%3A%2F%2Fjouw.postnl.nl%2Faccount%2Flogin" +
-      "&response_type=code" +
-      "&scope=openid+poa-profiles-api" +
-      "&ui_locales=nl-NL",
+    // Use triggerlogin so an existing CDC session auto-redirects server-side
+    // to jouw.postnl.nl/account/login?code=... without any JavaScript or
+    // Akamai challenge. The CDC form only needs to render when the session
+    // has truly expired — we do NOT pre-clear the session so that most cycles
+    // succeed silently via SSO. See CARRIER_AUTH_CLEAR: postnl is omitted
+    // intentionally.
+    login: "https://jouw.postnl.nl/account/nl-NL/triggerlogin",
     parcels: "https://jouw.postnl.nl/",
   },
 };
@@ -74,21 +67,9 @@ export const CARRIER_AUTH_CLEAR = {
     cookieDomain: "dpdgroup.com",
     storageOrigins: ["https://www.dpdgroup.com", "https://login.dpdgroup.com"],
   },
-  postnl: {
-    cookieDomain: "postnl.nl",
-    // Preserve Akamai bot-fingerprint cookies across syncs. Clearing them
-    // forces a full RAF-based challenge on every cycle, which fails in
-    // background tabs. These cookies are scoped to .postnl.nl and cover both
-    // jouw.postnl.nl and login.postnl.nl.
-    preserveCookies: ["_abck", "bm_sz", "bm_sv", "ak_bmsc"],
-    // Clear both jouw.postnl.nl and login.postnl.nl to prevent stale CDC
-    // session state from either domain causing silent auth failures.
-    storageOrigins: [
-      "https://jouw.postnl.nl",
-      "https://login.postnl.nl",
-      "https://www.postnl.nl",
-    ],
-  },
+  // postnl intentionally omitted: we rely on the existing CDC session for
+  // silent SSO via triggerlogin. Clearing cookies would invalidate the
+  // session and force a CDC form render that Akamai blocks in automated tabs.
 };
 
 // URL patterns that indicate a carrier login page (not yet authenticated).
