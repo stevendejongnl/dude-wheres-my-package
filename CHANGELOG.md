@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.56.5 (2026-05-17)
+
+### Bug Fixes
+
+- **postnl**: Use unfocused popup window to allow Akamai RAF fingerprinting
+  ([`24f4905`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/24f4905a5ef5ca0351d097da1d9df6479a589d85))
+
+
 ## v1.56.4 (2026-05-17)
 
 ### Bug Fixes
