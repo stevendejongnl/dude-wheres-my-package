@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 /**
- * Local Playwright test for the PostNL sync flow.
+ * Local test for the PostNL sync flow using Playwright Chromium.
  *
- * Loads the Chrome extension into a real Chrome window, configures it to talk
- * to your DWMP server, triggers a PostNL sync, and streams the extension logs
- * live so you can see exactly where it succeeds or fails.
+ * Loads the Chrome extension into a Playwright Chromium window, configures it
+ * to talk to your DWMP server, triggers a PostNL sync, and streams server logs.
+ *
+ * Note: Akamai bot detection blocks the PostNL CDC login form in automated
+ * Chromium — so this test validates the sync flow up to the login page.
+ * The popup window the extension creates (chrome.windows.create popup) is the
+ * mechanism that passes Akamai in production (real Chrome, active rendering).
  *
  * Usage:
  *   DWMP_URL=https://your-server DWMP_TOKEN=your-token node scripts/test-postnl-sync.mjs
@@ -34,10 +38,9 @@ if (!DWMP_URL || !DWMP_TOKEN) {
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-async function fetchLogs(since, context) {
+async function fetchLogs(since) {
   const url = new URL(`${DWMP_URL}/api/v1/logs`);
   url.searchParams.set("since", since);
-  url.searchParams.set("context", context);
   url.searchParams.set("limit", "200");
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${DWMP_TOKEN}` },
@@ -61,13 +64,15 @@ async function main() {
   console.log(`  Account: ${ACCOUNT_ID}`);
   console.log(`  Extension: ${extensionPath}\n`);
 
-  // Use a fresh temp profile each run so storage/cookies don't carry over
   const userDataDir = `/tmp/dwmp-playwright-${Date.now()}`;
 
+  // Bundled Playwright Chromium properly surfaces extension service workers
+  // (channel:'chrome' does not). The extension's chrome.* APIs are accessible
+  // via page.evaluate() on extension pages navigated via page.goto().
   const context = await chromium.launchPersistentContext(userDataDir, {
-    channel: "chrome",   // use system Chrome — required for extension support
     headless: false,
     args: [
+      "--no-sandbox",
       `--disable-extensions-except=${extensionPath}`,
       `--load-extension=${extensionPath}`,
     ],
@@ -75,15 +80,25 @@ async function main() {
 
   try {
     // ── Wait for extension service worker ──────────────────────────
-    let sw = context.serviceWorkers()[0];
+    let sw = context.serviceWorkers().find(
+      (s) => s.url().startsWith("chrome-extension://"),
+    );
     if (!sw) {
-      console.log("Waiting for extension service worker...");
-      sw = await context.waitForEvent("serviceworker", { timeout: 15_000 });
+      sw = await Promise.race([
+        new Promise((resolve) => {
+          context.on("serviceworker", (worker) => {
+            if (worker.url().startsWith("chrome-extension://")) resolve(worker);
+          });
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("SW timeout after 20s")), 20_000),
+        ),
+      ]);
     }
     const extensionId = new URL(sw.url()).hostname;
     console.log(`Extension loaded  id=${extensionId}\n`);
 
-    // ── Open popup page (extension context for chrome.* API access) ─
+    // ── Open popup page ────────────────────────────────────────────
     const popupPage = await context.newPage();
     await popupPage.goto(`chrome-extension://${extensionId}/popup/popup.html`, {
       waitUntil: "domcontentloaded",
@@ -108,7 +123,6 @@ async function main() {
     const syncResult = await popupPage.evaluate(
       (accountId) =>
         new Promise((resolve) => {
-          // 90 s timeout — popup won't receive the response until SW finishes
           const timer = setTimeout(() => resolve({ ok: false, error: "timeout" }), 90_000);
           chrome.runtime.sendMessage({ type: "trigger-sync", accountId }, (result) => {
             clearTimeout(timer);
@@ -123,7 +137,7 @@ async function main() {
     // ── Fetch and display logs from server ──────────────────────────
     const since = new Date(syncStarted - 5_000).toISOString();
     try {
-      const logs = await fetchLogs(since, "");
+      const logs = await fetchLogs(since);
       if (logs.length) {
         console.log(`\n── Extension logs (${logs.length} entries) ──────────────────`);
         for (const l of logs) console.log(formatLog(l));
@@ -144,7 +158,7 @@ async function main() {
 
     if (KEEP_OPEN) {
       console.log("\nKEEP_OPEN=1 — browser left open. Close it manually.\n");
-      await new Promise(() => {}); // hang forever
+      await new Promise(() => {});
     }
   } finally {
     if (!KEEP_OPEN) await context.close();

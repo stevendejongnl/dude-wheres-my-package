@@ -76,6 +76,11 @@ export const CARRIER_AUTH_CLEAR = {
   },
   postnl: {
     cookieDomain: "postnl.nl",
+    // Preserve Akamai bot-fingerprint cookies across syncs. Clearing them
+    // forces a full RAF-based challenge on every cycle, which fails in
+    // background tabs. These cookies are scoped to .postnl.nl and cover both
+    // jouw.postnl.nl and login.postnl.nl.
+    preserveCookies: ["_abck", "bm_sz", "bm_sv", "ak_bmsc"],
     // Clear both jouw.postnl.nl and login.postnl.nl to prevent stale CDC
     // session state from either domain causing silent auth failures.
     storageOrigins: [

@@ -692,26 +692,57 @@ function isCarrierLoginPage(carrier, url) {
  * Returns "email" when the email field is present, "password-only" when only
  * the password field is visible (remembered-email flow), or null on timeout.
  */
-async function waitForPostNLLoginForm(tabId, maxMs = 10_000) {
+async function waitForPostNLLoginForm(tabId, maxMs = 15_000) {
+  // Wait for the SAP CDC (Gigya) screenset to render the login form.
+  // The page always has hidden 2FA inputs (type=text) — only match the
+  // CDC-specific selectors to avoid false positives.
+  // Returns "both" when single-step (email + password visible simultaneously),
+  // "email" when only email visible (two-step flow), "password-only", or null.
   log.debug("login", "Waiting for PostNL login form", { tabId });
   const deadline = Date.now() + maxMs;
+  let emailFoundAt = null;
+  let domDumped = false;
   while (Date.now() < deadline) {
     try {
       const result = await chrome.scripting.executeScript({
         target: { tabId },
         func: () => {
-          if (
+          const emailEl =
             document.querySelector("#capture_signIn_signInEmailAddress") ||
-            document.querySelector("[data-capturefield='signInEmailAddress']") ||
-            document.querySelector("input[type='text'], input[type='email'], input:not([type])")
-          ) return "email";
-          const passEl = document.querySelector("input[type='password']");
+            document.querySelector("[data-capturefield='signInEmailAddress']");
+          const passEl =
+            document.querySelector("#capture_signIn_currentPassword") ||
+            document.querySelector("input[type='password']");
+          if (emailEl && passEl) return "both";
+          if (emailEl) return "email";
           if (passEl && passEl.offsetParent !== null) return "password-only";
           return null;
         },
       });
       const layout = result?.[0]?.result;
-      if (layout) return layout;
+      if (layout === "both" || layout === "password-only") return layout;
+      if (layout === "email") {
+        if (!emailFoundAt) emailFoundAt = Date.now();
+        // Give the password field 3 s to appear alongside the email field
+        // before concluding it's a genuine two-step flow.
+        if (Date.now() - emailFoundAt > 3_000) return "email";
+      }
+      // After 5s with no match, dump DOM inputs to aid debugging
+      if (!domDumped && Date.now() > deadline - maxMs + 5_000) {
+        domDumped = true;
+        chrome.scripting.executeScript({
+          target: { tabId },
+          func: () => ({
+            inputs: Array.from(document.querySelectorAll("input")).map((el) => ({
+              id: el.id, type: el.type, dataCap: el.getAttribute("data-capturefield"), visible: el.offsetParent !== null,
+            })),
+            url: location.href,
+            bodySnippet: document.body?.innerText?.substring(0, 200),
+          }),
+        }).then(([{ result: dump }]) => {
+          if (dump) log.info("login", "PostNL: DOM dump (no form found yet)", dump);
+        }).catch(() => {});
+      }
     } catch {
       // scripting not yet available (page still loading)
     }
@@ -734,8 +765,7 @@ async function handlePostNLLogin(tabId, username, password) {
   const fillAndSubmit = (email, pass) => {
     const emailEl =
       document.querySelector("#capture_signIn_signInEmailAddress") ||
-      document.querySelector("[data-capturefield='signInEmailAddress']") ||
-      document.querySelector("input[type='text'], input[type='email'], input:not([type])");
+      document.querySelector("[data-capturefield='signInEmailAddress']");
     const passEl =
       document.querySelector("#capture_signIn_currentPassword") ||
       document.querySelector("input[type='password']");
@@ -754,7 +784,10 @@ async function handlePostNLLogin(tabId, username, password) {
       document.querySelector("button[type='submit']") ||
       document.querySelector("input[type='submit']");
     if (btn) btn.click();
-    return { hasEmail: !!emailEl, hasPassword: !!passEl };
+    const allInputs = Array.from(document.querySelectorAll("input")).map(
+      (el) => ({ id: el.id, type: el.type, dataCap: el.getAttribute("data-capturefield"), visible: el.offsetParent !== null })
+    );
+    return { hasEmail: !!emailEl, hasPassword: !!passEl, allInputs };
   };
 
   const [{ result: fields }] = await chrome.scripting.executeScript({
@@ -762,8 +795,9 @@ async function handlePostNLLogin(tabId, username, password) {
     func: fillAndSubmit,
     args: [username, password],
   });
+  log.info("login", "PostNL: fillAndSubmit result", { hasEmail: fields?.hasEmail, hasPassword: fields?.hasPassword, inputs: fields?.allInputs });
 
-  if (!fields?.hasPassword) {
+  if (!fields?.hasPassword && formLayout !== "both") {
     // Email-only step — wait for the password field to appear and submit again.
     log.info("login", "PostNL: email-only step, waiting for password field", { tabId });
     await waitForPostNLLoginForm(tabId);
@@ -1120,6 +1154,20 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "get-log-buffer") {
     sendResponse(log.getBuffer());
     return false;
+  }
+
+  // Test-only: configure extension storage from an automated test harness.
+  // Callers cannot use chrome.storage directly (CDP evaluation context lacks it)
+  // but CAN reach this handler via chrome.runtime.sendMessage from the SW target.
+  if (msg.type === "test-set-config") {
+    chrome.storage.local.set({
+      dwmp_url: msg.url,
+      dwmp_token: msg.token,
+      ...(msg.accountId !== undefined
+        ? { dwmp_auto_sync: { [String(msg.accountId)]: true } }
+        : {}),
+    }).then(() => sendResponse({ ok: true }));
+    return true;
   }
 });
 
