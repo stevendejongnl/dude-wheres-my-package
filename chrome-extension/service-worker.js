@@ -225,34 +225,22 @@ async function syncCarrierViaTab(account, opts = {}) {
       await waitForUrlStable(tabId);
     }
 
-    // PostNL: read the access token from sessionStorage BEFORE navigating to
-    // the parcels page. The OIDC callback sets poa.auth.access_token while
-    // still on the jouw.postnl.nl callback URL — navigating away first would
-    // interrupt that callback and lose the token.
+    // PostNL: read the access token from sessionStorage after the OIDC callback
+    // sets it on jouw.postnl.nl/account/login. Navigate to the parcels page only
+    // after the token is secured — navigating away first loses the token.
     if (account.carrier === "postnl") {
       log.info("postnl", "stage", { stage: "token-loop-start" });
-      // After clearing site data, jouw.postnl.nl/account redirects to the
-      // triggerlogin path. From there PostNL's JS fires a bot-challenge (Akamai)
-      // and then redirects to login.postnl.nl — but this can take 3-10 s.
-      // Previous logic fell through to sessionStorage reads while still on
-      // triggerlogin, found nothing, and silently timed out after 30 s.
-      //
-      // Fix: (1) treat triggerlogin as an explicit wait state; (2) extend the
-      // deadline to 60 s; (3) log.error on every failure exit.
+      // We navigate directly to login.postnl.nl (bypassing jouw.postnl.nl/account
+      // and its Akamai bot-challenge). The outer isCarrierLoginPage check above
+      // handles the initial login. This loop catches any unexpected re-auth
+      // redirects and waits for poa.auth.access_token to appear in sessionStorage
+      // after the OAuth callback completes on jouw.postnl.nl/account/login.
       let loginHandled = onLogin;
       let accessToken = null;
       let storageDiagLogged = false;
       const deadline = Date.now() + 60_000;
       while (Date.now() < deadline) {
         const tabUrl = (await chrome.tabs.get(tabId)).url || "";
-
-        // triggerlogin is a transient redirect hop — Akamai validates the bot
-        // cookie and then fires the JS redirect to login.postnl.nl. Keep
-        // waiting; don't attempt sessionStorage reads yet.
-        if (tabUrl.includes("/triggerlogin")) {
-          await sleep(500);
-          continue;
-        }
 
         if ((isCarrierLoginPage("postnl", tabUrl) || (await hasLoginForm(tabId))) && !loginHandled) {
           loginHandled = true;
