@@ -194,6 +194,21 @@ async function syncCarrierViaTab(account, opts = {}) {
         tabId = existing[0].id;
         shouldCloseTab = false;
         await chrome.tabs.update(tabId, { url: startUrl });
+      } else if (urls.login) {
+        // Carriers with a login flow use an unfocused popup window rather than
+        // an inactive background tab. Background tabs suppress requestAnimationFrame,
+        // which prevents Akamai's bot-detection script from completing its
+        // fingerprinting pass — blocking all subsequent API requests. A popup
+        // window (even unfocused) has an active rendering pipeline, so RAF fires
+        // and Akamai accepts the session. The window is closed after the sync.
+        const win = await chrome.windows.create({
+          url: startUrl,
+          type: "popup",
+          focused: false,
+          width: 480,
+          height: 640,
+        });
+        tabId = win.tabs[0].id;
       } else {
         const tab = await chrome.tabs.create({ url: startUrl, active: false });
         tabId = tab.id;
@@ -425,7 +440,21 @@ async function syncCarrierViaTab(account, opts = {}) {
     await storeSyncResult(account.id, false, err.message);
   } finally {
     if (shouldCloseTab && tabId !== null) {
-      chrome.tabs.remove(tabId).catch(() => {});
+      // If we opened a popup window for this sync, close the whole window.
+      // Otherwise just remove the tab (background-tab path or caller-reuse path).
+      chrome.tabs.get(tabId).then((tab) => {
+        if (tab.windowId) {
+          chrome.windows.get(tab.windowId).then((win) => {
+            if (win.type === "popup") {
+              chrome.windows.remove(win.id).catch(() => {});
+            } else {
+              chrome.tabs.remove(tabId).catch(() => {});
+            }
+          }).catch(() => chrome.tabs.remove(tabId).catch(() => {}));
+        } else {
+          chrome.tabs.remove(tabId).catch(() => {});
+        }
+      }).catch(() => {});
     }
   }
 }
