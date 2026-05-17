@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.56.10 (2026-05-17)
+
+### Bug Fixes
+
+- **postnl**: Fallback to direct login.postnl.nl if triggerlogin redirect stalls
+  ([`bc19136`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/bc19136787d41d2aba09bc8e7f266228aff8fa20))
+
+
 ## v1.56.9 (2026-05-17)
 
 ### Bug Fixes
