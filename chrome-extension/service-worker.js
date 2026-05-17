@@ -134,6 +134,21 @@ async function syncCarrierViaTab(account, opts = {}) {
     return;
   }
 
+  // Guard against two browser instances (e.g. desktop + laptop) triggering
+  // a login-based sync concurrently. If the server already recorded a sync
+  // within the last half-interval, the other instance beat us to it — skip.
+  // This avoids both instances clearing site data and fighting over the same
+  // Akamai bot-challenge on the same PostNL session.
+  if (urls.login && account.last_synced && !opts.tabId) {
+    const { dwmp_sync_interval } = await chrome.storage.local.get("dwmp_sync_interval");
+    const intervalMs = (dwmp_sync_interval || DEFAULT_SYNC_INTERVAL_MIN) * 60_000;
+    const ageMs = Date.now() - new Date(account.last_synced).getTime();
+    if (ageMs < intervalMs / 2) {
+      log.info("sync", `${account.carrier}: skipping — synced ${Math.round(ageMs / 1000)}s ago by another instance`);
+      return;
+    }
+  }
+
   // Carriers with a login URL require stored credentials so the extension
   // can fill in the login form automatically.
   if (urls.login && !account.has_credentials) {
