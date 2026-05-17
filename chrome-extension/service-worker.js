@@ -135,11 +135,10 @@ async function syncCarrierViaTab(account, opts = {}) {
   }
 
   // Guard against two browser instances (e.g. desktop + laptop) triggering
-  // a login-based sync concurrently. If the server already recorded a sync
-  // within the last half-interval, the other instance beat us to it — skip.
-  // This avoids both instances clearing site data and fighting over the same
-  // Akamai bot-challenge on the same PostNL session.
-  if (urls.login && account.last_synced && !opts.tabId) {
+  // a login-based sync concurrently on the auto-sync schedule. If the server
+  // already recorded a sync within the last half-interval, the other instance
+  // beat us to it — skip. Manual syncs (opts.manual) always run through.
+  if (urls.login && account.last_synced && !opts.tabId && !opts.manual) {
     const { dwmp_sync_interval } = await chrome.storage.local.get("dwmp_sync_interval");
     const intervalMs = (dwmp_sync_interval || DEFAULT_SYNC_INTERVAL_MIN) * 60_000;
     const ageMs = Date.now() - new Date(account.last_synced).getTime();
@@ -1219,7 +1218,7 @@ async function handleTriggerSync(accountId) {
   syncInProgress = true;
   const syncStartMs = Date.now();
   try {
-    await syncCarrierViaTab(account);
+    await syncCarrierViaTab(account, { manual: true });
     const { dwmp_sync_results } = await chrome.storage.local.get("dwmp_sync_results");
     const stored = dwmp_sync_results?.[accountId];
     // Only return the stored result if it was written during this sync call.
