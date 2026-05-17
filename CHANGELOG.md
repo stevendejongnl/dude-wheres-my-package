@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.56.8 (2026-05-17)
+
+### Bug Fixes
+
+- **sync**: Return ok when dedup guard skips instead of stale failure result
+  ([`64410d9`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/64410d9d8db4f4e4cdcf16c44f657fb5dcf7dede))
+
+
 ## v1.56.7 (2026-05-17)
 
 ### Bug Fixes
