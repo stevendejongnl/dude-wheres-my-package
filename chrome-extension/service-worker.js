@@ -215,23 +215,41 @@ async function syncCarrierViaTab(account, opts = {}) {
     // still on the jouw.postnl.nl callback URL — navigating away first would
     // interrupt that callback and lose the token.
     if (account.carrier === "postnl") {
-      // After clearing localStorage, PostNL's JS-driven redirect to
-      // login.postnl.nl can arrive after waitForUrlStable already resolved
-      // on jouw.postnl.nl/account, causing the login block above to be
-      // skipped. Detect that here and handle it in the token loop instead.
+      log.info("postnl", "stage", { stage: "token-loop-start" });
+      // After clearing site data, jouw.postnl.nl/account redirects to the
+      // triggerlogin path. From there PostNL's JS fires a bot-challenge (Akamai)
+      // and then redirects to login.postnl.nl — but this can take 3-10 s.
+      // Previous logic fell through to sessionStorage reads while still on
+      // triggerlogin, found nothing, and silently timed out after 30 s.
+      //
+      // Fix: (1) treat triggerlogin as an explicit wait state; (2) extend the
+      // deadline to 60 s; (3) log.error on every failure exit.
       let loginHandled = onLogin;
       let accessToken = null;
       let storageDiagLogged = false;
-      const deadline = Date.now() + 30_000;
+      const deadline = Date.now() + 60_000;
       while (Date.now() < deadline) {
         const tabUrl = (await chrome.tabs.get(tabId)).url || "";
+
+        // triggerlogin is a transient redirect hop — Akamai validates the bot
+        // cookie and then fires the JS redirect to login.postnl.nl. Keep
+        // waiting; don't attempt sessionStorage reads yet.
+        if (tabUrl.includes("/triggerlogin")) {
+          await sleep(500);
+          continue;
+        }
+
         if ((isCarrierLoginPage("postnl", tabUrl) || (await hasLoginForm(tabId))) && !loginHandled) {
           loginHandled = true;
+          log.info("postnl", "stage", { stage: "login-start", url: tabUrl });
           const loggedIn = await handleCarrierLogin(tabId, account);
           if (!loggedIn) {
+            const finalUrl = (await chrome.tabs.get(tabId)).url || "";
+            log.error("postnl", "Login failed in token loop", { url: finalUrl });
             await storeSyncResult(account.id, false, "Login failed -- check credentials");
             return;
           }
+          log.info("postnl", "stage", { stage: "login-done" });
           await waitForUrlStable(tabId);
           continue;
         }
@@ -265,9 +283,23 @@ async function syncCarrierViaTab(account, opts = {}) {
         await sleep(500);
       }
       if (!accessToken) {
+        const finalUrl = (await chrome.tabs.get(tabId)).url || "";
+        const diagResult = await chrome.scripting.executeScript({
+          target: { tabId },
+          func: () => ({
+            sessionKeys: Object.keys(sessionStorage),
+            localAuthKeys: Object.keys(localStorage).filter(k => k.includes("token") || k.includes("auth") || k.includes("poa")),
+          }),
+        }).catch(() => null);
+        log.error("postnl", "Token extraction timed out", {
+          finalUrl,
+          loginHandled,
+          ...(diagResult?.[0]?.result ?? {}),
+        });
         await storeSyncResult(account.id, false, "Could not extract PostNL token from session");
         return;
       }
+      log.info("postnl", "stage", { stage: "token-captured" });
 
       // Token secured — now navigate to the parcels page for the payload fetch.
       const postnlUrl = (await chrome.tabs.get(tabId)).url || "";
@@ -584,13 +616,17 @@ async function clearCarrierSiteData(carrier) {
 
   // Cookies: enumerate by eTLD+1 — covers all subdomains via cookie-spec
   // domain matching (e.g. Keycloak SSO cookies on .dpdgroup.com).
+  // Skip cookies that must be preserved across syncs (e.g. Akamai bot tokens).
+  const preserved = new Set(config.preserveCookies || []);
   const cookies = await chrome.cookies.getAll({ domain: config.cookieDomain });
   await Promise.all(
-    cookies.map((c) => {
-      const host = c.domain.replace(/^\./, "");
-      const url = `${c.secure ? "https" : "http"}://${host}${c.path}`;
-      return chrome.cookies.remove({ url, name: c.name, storeId: c.storeId });
-    }),
+    cookies
+      .filter((c) => !preserved.has(c.name))
+      .map((c) => {
+        const host = c.domain.replace(/^\./, "");
+        const url = `${c.secure ? "https" : "http"}://${host}${c.path}`;
+        return chrome.cookies.remove({ url, name: c.name, storeId: c.storeId });
+      }),
   );
 
   // Storage / cache: browsingData has no domain-suffix filter, so use the
@@ -653,26 +689,24 @@ async function waitForPostNLLoginForm(tabId, maxMs = 10_000) {
 }
 
 async function handlePostNLLogin(tabId, username, password) {
-  // PostNL uses a two-step OIDC form: email on step 1, password on step 2.
-  // When the remembered-email localStorage entry is present, the page skips
-  // straight to the password step. We handle both layouts: fill whatever
-  // fields are visible on the current step, submit, then check whether a
-  // second step (password-only) appeared and fill that too.
-
-  // The SAP CDC screenset renders asynchronously after URL stabilisation —
-  // wait for the form to actually appear before attempting to fill it.
+  // PostNL uses SAP CDC (Capture/Gigya) screensets. The live form shows both
+  // the email field (#capture_signIn_signInEmailAddress) and the password
+  // field (#capture_signIn_currentPassword) simultaneously — single-step.
+  //
+  // The screenset renders asynchronously after URL stabilisation — wait for
+  // either field to appear before attempting to fill.
   const formLayout = await waitForPostNLLoginForm(tabId);
   log.info("login", `PostNL login form layout: ${formLayout ?? "not found"}`, { tabId });
   if (!formLayout) return false;
 
-  const fillStep = (email, pass) => {
-    const passEl = document.querySelector("input[type='password']");
+  const fillAndSubmit = (email, pass) => {
     const emailEl =
       document.querySelector("#capture_signIn_signInEmailAddress") ||
       document.querySelector("[data-capturefield='signInEmailAddress']") ||
-      document.querySelector(
-        "input[type='text'], input[type='email'], input:not([type])"
-      );
+      document.querySelector("input[type='text'], input[type='email'], input:not([type])");
+    const passEl =
+      document.querySelector("#capture_signIn_currentPassword") ||
+      document.querySelector("input[type='password']");
     if (emailEl) {
       emailEl.value = email;
       emailEl.dispatchEvent(new Event("input", { bubbles: true }));
@@ -688,24 +722,27 @@ async function handlePostNLLogin(tabId, username, password) {
       document.querySelector("button[type='submit']") ||
       document.querySelector("input[type='submit']");
     if (btn) btn.click();
-    return !!passEl;
+    return { hasEmail: !!emailEl, hasPassword: !!passEl };
   };
 
-  const [{ result: hadPasswordField }] = await chrome.scripting.executeScript({
+  const [{ result: fields }] = await chrome.scripting.executeScript({
     target: { tabId },
-    func: fillStep,
+    func: fillAndSubmit,
     args: [username, password],
   });
 
-  if (!hadPasswordField) {
-    // Step 1 only had the email field — wait for the password step to render.
+  if (!fields?.hasPassword) {
+    // Email-only step — wait for the password field to appear and submit again.
+    log.info("login", "PostNL: email-only step, waiting for password field", { tabId });
     await waitForPostNLLoginForm(tabId);
     const mid = await chrome.tabs.get(tabId);
     if (isCarrierLoginPage("postnl", mid.url)) {
       await chrome.scripting.executeScript({
         target: { tabId },
         func: (pass) => {
-          const passEl = document.querySelector("input[type='password']");
+          const passEl =
+            document.querySelector("#capture_signIn_currentPassword") ||
+            document.querySelector("input[type='password']");
           if (passEl) {
             passEl.value = pass;
             passEl.dispatchEvent(new Event("input", { bubbles: true }));

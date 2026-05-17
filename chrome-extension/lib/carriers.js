@@ -69,6 +69,11 @@ export const CARRIER_AUTH_CLEAR = {
     // login script can't handle. Cookies for login.postnl.nl are still wiped
     // by the eTLD+1 cookie sweep above (cookieDomain: "postnl.nl").
     storageOrigins: ["https://jouw.postnl.nl", "https://www.postnl.nl"],
+    // Akamai bot-detection cookies. Clearing these every cycle forces a fresh
+    // challenge on triggerlogin, which can prevent the JS-driven redirect to
+    // login.postnl.nl from ever firing. Preserve them across syncs so the
+    // challenge only needs to pass once.
+    preserveCookies: ["_abck", "bm_sz", "bm_sv", "ak_bmsc"],
   },
 };
 

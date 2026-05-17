@@ -263,3 +263,53 @@ def test_parse_browser_payload_prefers_detail_payload_for_active_shipments():
     assert active.status == TrackingStatus.OUT_FOR_DELIVERY
     assert len(active.events) == 2
     assert delivered.status == TrackingStatus.DELIVERED
+
+
+def test_parse_browser_payload_missing_details_falls_back_to_graphql():
+    """When details list is shorter than shipments, the unmatched shipments use
+    the GraphQL-parsed result rather than crashing or silently dropping them."""
+    carrier = PostNL()
+    results = carrier._parse_browser_payload(
+        {
+            "shipments": [
+                {
+                    "barcode": "3STEST000007",
+                    "title": "Pakket A",
+                    "delivered": False,
+                    "deliveryWindowFrom": "2026-04-21T13:45:00+02:00",
+                    "creationDateTime": "2026-04-20T17:47:57+02:00",
+                },
+                {
+                    "barcode": "3STEST000008",
+                    "title": "Pakket B",
+                    "delivered": False,
+                    "deliveryWindowFrom": "2026-04-22T09:00:00+02:00",
+                    "creationDateTime": "2026-04-21T10:00:00+02:00",
+                },
+            ],
+            "details": [
+                {
+                    "tracking_number": "3STEST000007",
+                    "data": {
+                        "colli": {
+                            "3STEST000007": {
+                                "identification": "3STEST000007-NL-1234AB",
+                                "statusPhase": {"message": "Bezorger is onderweg"},
+                                "lastObservation": "2026-04-21T09:58:33+02:00",
+                                "deliveryAddress": {"address": {"postalCode": "1234AB"}},
+                                "observations": [],
+                            }
+                        }
+                    },
+                }
+                # 3STEST000008 has no details entry — simulates extension failure
+            ],
+        }
+    )
+
+    assert len(results) == 2
+    r7 = next(r for r in results if r.tracking_number == "3STEST000007")
+    r8 = next(r for r in results if r.tracking_number == "3STEST000008")
+    assert r7.status == TrackingStatus.OUT_FOR_DELIVERY
+    # 3STEST000008 falls back to GraphQL parse — status IN_TRANSIT from delivery window
+    assert r8.status == TrackingStatus.IN_TRANSIT
