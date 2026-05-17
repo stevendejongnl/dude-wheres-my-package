@@ -175,10 +175,10 @@ def test_parse_orders_page_in_transit():
     html = """
     <html><body>
     <div class="order-card">
-        <span class="a-color-secondary">Besteld op 10 april 2026</span>
+        <span class="a-color-secondary">Besteld op 12 mei 2026</span>
         <span class="value">305-9876543-2109876</span>
         <div class="delivery-box">
-            <span class="delivery-box__primary-text">Verwacht op 16 april</span>
+            <span class="delivery-box__primary-text">Verwacht op 18 mei</span>
         </div>
     </div>
     </body></html>
@@ -187,7 +187,7 @@ def test_parse_orders_page_in_transit():
     assert len(results) == 1
     assert results[0].status == TrackingStatus.IN_TRANSIT
     assert results[0].estimated_delivery is not None
-    assert results[0].estimated_delivery.day == 16
+    assert results[0].estimated_delivery.day == 18
 
 
 def test_parse_orders_page_empty():
