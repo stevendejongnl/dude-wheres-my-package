@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.56.7 (2026-05-17)
+
+### Bug Fixes
+
+- **postnl**: Preserve CDC session to enable silent SSO via triggerlogin
+  ([`913232e`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/913232ec1d179ff1a14b8eaf31e6142be08f6a98))
+
+### Testing
+
+- **carriers**: Exempt postnl from CARRIER_AUTH_CLEAR coverage check
+  ([`4875436`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/4875436daca416dc5edd3adf9c9256fbb0130894))
+
+
 ## v1.56.6 (2026-05-17)
 
 ### Bug Fixes
