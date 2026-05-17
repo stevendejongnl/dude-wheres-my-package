@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.56.4 (2026-05-17)
+
+### Bug Fixes
+
+- **postnl**: Bypass Akamai by navigating directly to login.postnl.nl
+  ([`ec6c4f8`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/ec6c4f840ae2cc6563e761183d96f57fd5747917))
+
+
 ## v1.56.3 (2026-05-17)
 
 ### Bug Fixes
