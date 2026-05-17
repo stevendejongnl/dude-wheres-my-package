@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v1.56.6 (2026-05-17)
+
+### Bug Fixes
+
+- **postnl**: Improve login detection and preserve Akamai cookies
+  ([`7281312`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/728131243610cc438041993bc17c07d359848abe))
+
+### Chores
+
+- Regenerate package-lock.json with Node 22 / npm 10
+  ([`6c0a4c2`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/6c0a4c258babc7e4c10f45f5e0ae903d6d36dd8b))
+
+- Remove ws devDependency (unused after test script rewrite)
+  ([`b06cf45`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/b06cf45a05bb920a538f7504d774b85b7e6703cd))
+
+- **dev**: Add Playwright PostNL sync test script
+  ([`46df754`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/46df754eed75f6c6fc453bc761c258ee408d23e1))
+
+
 ## v1.56.5 (2026-05-17)
 
 ### Bug Fixes
