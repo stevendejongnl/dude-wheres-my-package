@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.56.11 (2026-05-27)
+
+### Bug Fixes
+
+- **sync**: Open popup window focused so RAF fires in KasmVNC
+  ([`d5e4ec2`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/d5e4ec29ef54c2708e544d243b8af0ee71c375a8))
+
+### Testing
+
+- **postnl**: Update stale dates past 30-day lookback cutoff
+  ([`0cac40f`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/0cac40f6c35ffb3a1fa2632847b6820b48f7f763))
+
+
 ## v1.56.10 (2026-05-17)
 
 ### Bug Fixes
