@@ -203,7 +203,7 @@ async function syncCarrierViaTab(account, opts = {}) {
         const win = await chrome.windows.create({
           url: startUrl,
           type: "popup",
-          focused: false,
+          focused: true,
           width: 480,
           height: 640,
         });
