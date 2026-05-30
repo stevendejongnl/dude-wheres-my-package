@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.56.12 (2026-05-30)
+
+### Bug Fixes
+
+- **dhl**: Use correct consumer track-trace URL path
+  ([`a2212d6`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/a2212d6b6080ccda6a0923fb03dd18c5bb9de691))
+
+
 ## v1.56.11 (2026-05-27)
 
 ### Bug Fixes
