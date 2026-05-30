@@ -3,7 +3,7 @@ _TEMPLATES: dict[str, str] = {
     "gls": "https://gls-group.com/app/service/open/rstt/NL/nl/{tn}",
 }
 
-_DHL_DEEP = "https://my.dhlecommerce.nl/receiver/track-and-trace/{tn}/{postal_code}"
+_DHL_DEEP = "https://my.dhlecommerce.nl/home/tracktrace/{tn}/{postal_code}"
 _DHL_ROOT = "https://my.dhlecommerce.nl/"
 
 _TRUNKRS_DEEP = "https://parcel.trunkrs.nl/{tn}/{postal_code}"
@@ -22,7 +22,8 @@ def public_tracking_url(
     """
     if carrier == "dhl":
         if postal_code:
-            return _DHL_DEEP.format(tn=tracking_number, postal_code=postal_code)
+            pc = postal_code.replace(" ", "").upper()
+            return _DHL_DEEP.format(tn=tracking_number, postal_code=pc)
         return _DHL_ROOT
 
     if carrier == "trunkrs":

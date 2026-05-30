@@ -8,7 +8,12 @@ def test_dpd_returns_tracking_url():
 
 def test_dhl_with_postal_code():
     url = public_tracking_url("dhl", "JD000123456", "1234AB")
-    assert url == "https://my.dhlecommerce.nl/receiver/track-and-trace/JD000123456/1234AB"
+    assert url == "https://my.dhlecommerce.nl/home/tracktrace/JD000123456/1234AB"
+
+
+def test_dhl_postal_code_normalised():
+    url = public_tracking_url("dhl", "JD000123456", "1234 ab")
+    assert url == "https://my.dhlecommerce.nl/home/tracktrace/JD000123456/1234AB"
 
 
 def test_dhl_without_postal_code_returns_root():

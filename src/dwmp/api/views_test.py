@@ -503,5 +503,5 @@ def test_enrich_package_dhl_uses_postal_code():
     }
     _enrich_package(pkg)
     assert pkg["effective_tracking_url"] == (
-        "https://my.dhlecommerce.nl/receiver/track-and-trace/JD000123456/1234AB"
+        "https://my.dhlecommerce.nl/home/tracktrace/JD000123456/1234AB"
     )
