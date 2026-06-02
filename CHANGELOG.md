@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.57.0 (2026-06-02)
+
+### Bug Fixes
+
+- **ts**: Remove notifications import from index.ts, delete notifications test
+  ([`1c532ec`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/1c532ec4a0d5ebc13af7ea6cea779e2e763961b8))
+
+### Features
+
+- **dhl**: Parse IntervalIndication timeframe as delivery window
+  ([`a24b956`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/a24b95667fd8b96e58b9bb95caf55ba30251a8ee))
+
+
 ## v1.56.13 (2026-06-02)
 
 ### Bug Fixes
