@@ -440,6 +440,43 @@ class RecoveringCarrier(CarrierBase):
         return AuthTokens(access_token=f"{username}:{password}")
 
 
+async def test_sync_preserves_status_when_carrier_returns_unknown(repo):
+    """Sync should not overwrite a valid status with UNKNOWN (DHL unmapped status bug)."""
+    class UnknownSyncCarrier(CarrierBase):
+        name = "unknown-sync"
+        auth_type = AuthType.CREDENTIALS
+
+        async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+            return TrackingResult(tracking_number=tracking_number, carrier=self.name, status=TrackingStatus.UNKNOWN)
+
+        async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
+            return [TrackingResult(tracking_number="PKG-1", carrier=self.name, status=TrackingStatus.UNKNOWN)]
+
+        async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+            return AuthTokens(access_token="tok")
+
+    carrier = UnknownSyncCarrier()
+    service = TrackingService(repository=repo, carriers={"unknown-sync": carrier})
+
+    account_id = await repo.add_account(
+        carrier="unknown-sync", auth_type="credentials",
+        tokens={"access_token": "tok"}, username="u@test.com",
+    )
+
+    # First sync: package created, status written as unknown (no prior status)
+    await service.sync_account(account_id)
+    pkg = (await service.list_packages())[0]
+    assert pkg["current_status"] == "unknown"
+
+    # Manually set to in_transit (simulating a successful refresh via unified API)
+    await repo.update_status(pkg["id"], "in_transit")
+
+    # Second sync: carrier returns UNKNOWN again — must NOT overwrite in_transit
+    await service.sync_account(account_id)
+    pkg = await service.get_package(pkg["id"])
+    assert pkg["current_status"] == "in_transit"
+
+
 async def test_validate_account_credentials_by_id_recovers_auth_failed(repo):
     """A stuck auth_failed account transitions back to connected when login succeeds."""
     carrier = RecoveringCarrier()

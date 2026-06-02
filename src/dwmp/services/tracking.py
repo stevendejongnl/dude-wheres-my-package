@@ -438,13 +438,26 @@ class TrackingService:
             latest_desc = result.events[-1].description if result.events else None
             est = result.estimated_delivery.isoformat() if result.estimated_delivery else None
             win_end = result.delivery_window_end.isoformat() if result.delivery_window_end else None
-            await self._update_package_status(
-                pkg_id, result.status.value, result.tracking_number,
-                result.carrier, existing.get("label") if existing else None,
-                description=latest_desc,
-                estimated_delivery=est,
-                delivery_window_end=win_end,
+            stored_status = existing.get("current_status") if existing else None
+            is_downgrade = (
+                result.status == TrackingStatus.UNKNOWN
+                and stored_status
+                and stored_status != TrackingStatus.UNKNOWN.value
             )
+            if is_downgrade:
+                await self._repository.mark_refreshed(pkg_id)
+                logger.debug(
+                    "Preserved status for package %s (%s): sync returned UNKNOWN, stored=%s",
+                    pkg_id, result.carrier, stored_status,
+                )
+            else:
+                await self._update_package_status(
+                    pkg_id, result.status.value, result.tracking_number,
+                    result.carrier, existing.get("label") if existing else None,
+                    description=latest_desc,
+                    estimated_delivery=est,
+                    delivery_window_end=win_end,
+                )
             for event in result.events:
                 await self._repository.add_event(
                     package_id=pkg_id,
