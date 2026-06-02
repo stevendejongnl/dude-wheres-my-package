@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.56.13 (2026-06-02)
+
+### Bug Fixes
+
+- **sync**: Preserve status when carrier sync returns UNKNOWN
+  ([`72daa0b`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/72daa0bc1389333fd07b0c33a8ef616b8f9b2d70))
+
+
 ## v1.56.12 (2026-05-30)
 
 ### Bug Fixes
