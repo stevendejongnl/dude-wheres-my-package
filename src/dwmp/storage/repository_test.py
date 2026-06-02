@@ -471,29 +471,3 @@ async def test_delete_old_notifications(repo: PackageRepository):
 # --- Push subscription tests ---
 
 
-async def test_push_subscription_add_and_list(repo: PackageRepository):
-    await repo.add_push_subscription(
-        endpoint="https://push.example.com/v1/abc",
-        p256dh="dGVzdGtleQ==",
-        auth="dGVzdGF1dGg=",
-    )
-    subs = await repo.get_all_push_subscriptions()
-    assert len(subs) == 1
-    assert subs[0]["endpoint"] == "https://push.example.com/v1/abc"
-    assert subs[0]["p256dh"] == "dGVzdGtleQ=="
-    assert subs[0]["auth"] == "dGVzdGF1dGg="
-
-
-async def test_push_subscription_upsert(repo: PackageRepository):
-    await repo.add_push_subscription("https://push.example.com/v1/abc", "key1", "auth1")
-    await repo.add_push_subscription("https://push.example.com/v1/abc", "key2", "auth2")
-    subs = await repo.get_all_push_subscriptions()
-    assert len(subs) == 1
-    assert subs[0]["p256dh"] == "key2"
-
-
-async def test_push_subscription_remove(repo: PackageRepository):
-    await repo.add_push_subscription("https://push.example.com/v1/abc", "key", "auth")
-    await repo.remove_push_subscription("https://push.example.com/v1/abc")
-    subs = await repo.get_all_push_subscriptions()
-    assert subs == []

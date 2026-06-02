@@ -254,19 +254,37 @@ class DHL(CarrierBase):
             except ValueError:
                 pass
 
-        receiving = parcel.get("receivingTimeIndication", {})
-        if receiving and receiving.get("moment"):
-            try:
-                events.append(TrackingEvent(
-                    timestamp=_ensure_utc(datetime.fromisoformat(receiving["moment"])),
-                    status=TrackingStatus.DELIVERED,
-                    description="Bezorgd",
-                ))
-            except ValueError:
-                pass
+        receiving = parcel.get("receivingTimeIndication") or {}
+        indication_type = receiving.get("indicationType", "")
 
         estimated = None
-        if receiving and receiving.get("indicationType") != "MomentIndication":
+        window_end = None
+
+        if indication_type == "MomentIndication":
+            moment = receiving.get("moment")
+            if moment:
+                try:
+                    events.append(TrackingEvent(
+                        timestamp=_ensure_utc(datetime.fromisoformat(moment)),
+                        status=TrackingStatus.DELIVERED,
+                        description="Bezorgd",
+                    ))
+                except ValueError:
+                    pass
+        elif indication_type == "IntervalIndication":
+            start = receiving.get("start")
+            end = receiving.get("end")
+            if start:
+                try:
+                    estimated = _ensure_utc(datetime.fromisoformat(start))
+                except ValueError:
+                    pass
+            if end:
+                try:
+                    window_end = _ensure_utc(datetime.fromisoformat(end))
+                except ValueError:
+                    pass
+        else:
             moment = receiving.get("moment")
             if moment:
                 try:
@@ -279,6 +297,7 @@ class DHL(CarrierBase):
             carrier=self.name,
             status=status,
             estimated_delivery=estimated,
+            delivery_window_end=window_end,
             events=sorted(events, key=lambda e: e.timestamp),
         )
 

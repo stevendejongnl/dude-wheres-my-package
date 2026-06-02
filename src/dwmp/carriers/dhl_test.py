@@ -68,6 +68,32 @@ def test_parse_parcel_pre_transit():
     assert result.estimated_delivery is None
 
 
+def test_parse_parcel_interval_indication():
+    carrier = DHL()
+    parcel = {
+        "parcelId": "abc-interval",
+        "barcode": "JJD000030209146000030056778",
+        "status": "OUT_FOR_DELIVERY",
+        "category": "IN_DELIVERY",
+        "sender": {"name": "Cainiao"},
+        "createdAt": "2026-05-28T18:14:08.548372Z",
+        "receivingTimeIndication": {
+            "start": "2026-06-02T08:35:00Z",
+            "end": "2026-06-02T09:35:00Z",
+            "indicationType": "IntervalIndication",
+        },
+    }
+    result = carrier._parse_parcel(parcel)
+    assert result.tracking_number == "JJD000030209146000030056778"
+    assert result.status == TrackingStatus.OUT_FOR_DELIVERY
+    assert result.estimated_delivery is not None
+    assert result.estimated_delivery.hour == 8
+    assert result.delivery_window_end is not None
+    assert result.delivery_window_end.hour == 9
+    # No delivered event — package is not yet delivered
+    assert not any(e.status == TrackingStatus.DELIVERED for e in result.events)
+
+
 def test_parse_parcel_no_events():
     carrier = DHL()
     parcel = {

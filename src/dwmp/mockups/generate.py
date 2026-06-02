@@ -94,24 +94,13 @@ async def _seed_with_events(repo: PackageRepository) -> dict:
 
 
 def _strip_runtime_scripts(html: str) -> str:
-    """Remove scripts + triggers that would flap against a missing backend.
-
-    The static mockups don't ship a JSON API — HTMX would spin retrying the
-    badge endpoint forever, and the push-notifications glue would throw.
-    Easier to strip both than polyfill.
-    """
+    """Remove scripts + triggers that would flap against a missing backend."""
     html = re.sub(
         r'<script[^>]*src="https://unpkg\.com/htmx\.org@[^"]+"[^>]*>\s*</script>',
         "",
         html,
     )
-    html = re.sub(
-        r'<script[^>]*src="[^"]*/static/js/notifications\.js"[^>]*>\s*</script>',
-        "",
-        html,
-    )
-    # Any `hx-trigger="load,..."` on the badge or elsewhere fires on page
-    # mount — drop it so the static HTML doesn't schedule dead requests.
+    # Any `hx-trigger="load,..."` fires on page mount — drop for static HTML.
     html = re.sub(r'\shx-trigger="[^"]*load[^"]*"', "", html)
     return html
 
@@ -134,30 +123,6 @@ def _rewrite_static_assets(html: str) -> str:
         html = html.replace(live, mockup)
     return html
 
-
-def _splice_drawer_open(page_html: str, drawer_body_html: str) -> str:
-    """Pre-open the notifications drawer + overlay for the mockup.
-
-    In the live app the bell icon toggles the drawer via JS and lazy-loads
-    the body via HTMX. For a static screenshot we flip the inline
-    ``display`` styles to visible and inject the fetched body where HTMX
-    would have swapped it.
-    """
-    page_html = page_html.replace(
-        'id="notif-drawer-overlay" class="notif-drawer-overlay" style="display:none"',
-        'id="notif-drawer-overlay" class="notif-drawer-overlay" style="display:block"',
-    )
-    page_html = page_html.replace(
-        'id="notif-drawer" class="notif-drawer" style="display:none"',
-        'id="notif-drawer" class="notif-drawer" style="display:flex"',
-    )
-    page_html = re.sub(
-        r'(<div id="notif-drawer-body" class="notif-drawer-body">)\s*(</div>)',
-        lambda m: f"{m.group(1)}{drawer_body_html}{m.group(2)}",
-        page_html,
-        count=1,
-    )
-    return page_html
 
 
 def _expand_timeline_card(page_html: str) -> str:
@@ -195,17 +160,9 @@ async def build_all(output_dir: Path) -> list[Path]:
 
     Produced files:
 
-    * ``dashboard.html``     — packages page (``/``) with cards collapsed
-    * ``notifications.html`` — packages page with the drawer pre-opened and
-      populated from the canonical notification fixtures
-    * ``timeline.html``      — packages page with the first card expanded,
+    * ``dashboard.html`` — packages page with cards collapsed
+    * ``timeline.html``  — packages page with the first card expanded,
       showing metadata and a 5-step tracking timeline
-
-    ``extension.html`` is *not* generated — the Chrome-extension popup is
-    client-side rendered (``popup.js`` fetches from the API on mount), so
-    staticising it needs a DOM-driven pipeline rather than the server-side
-    template render this module performs. The existing hand-crafted mockup
-    stays in place for now.
     """
     # Auth middleware redirects to /login unless PASSWORD_HASH is unset.
     # The generator never talks to a real deployment, so clear it for the
@@ -256,18 +213,15 @@ async def build_all(output_dir: Path) -> list[Path]:
                 dashboard = _rewrite_static_assets(
                     _strip_runtime_scripts(await _render(client, "/"))
                 )
-                drawer_body = await _render(client, "/notifications/drawer")
         finally:
             app.dependency_overrides.pop(get_repository, None)
             app.dependency_overrides.pop(get_tracking_service, None)
 
-        notifications = _splice_drawer_open(dashboard, drawer_body)
         timeline = _expand_timeline_card(dashboard)
 
         written: list[Path] = []
         for name, html in (
             ("dashboard.html", dashboard),
-            ("notifications.html", notifications),
             ("timeline.html", timeline),
         ):
             path = output_dir / name
