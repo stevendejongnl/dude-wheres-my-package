@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.60.1 (2026-06-25)
+
+### Bug Fixes
+
+- **extension**: Detect new Cloudflare 'performing security verification' challenge page
+  ([`c7c7efa`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/c7c7efa84c3b4944eb6fd4ae2ae728543a41354e))
+
+
 ## v1.60.0 (2026-06-25)
 
 ### Bug Fixes
