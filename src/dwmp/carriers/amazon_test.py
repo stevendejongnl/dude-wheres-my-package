@@ -3,8 +3,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from dwmp.carriers.amazon import (
-    Amazon,
     _SHIP_TRACK_PATH,
+    Amazon,
     _parse_dutch_date,
     _parse_status,
 )
@@ -262,8 +262,8 @@ def test_parse_orders_page_multi_shipment():
         <div class="delivery-box">
             <span class="delivery-box__primary-text">Onderweg</span>
         </div>
-        <a href="/gp/your-account/ship-track?itemId=aaa&orderId=403-0968432-9677927&shipmentId=TwbgmksY4">Track package</a>
-        <a href="/gp/your-account/ship-track?itemId=bbb&orderId=403-0968432-9677927&shipmentId=T3946DsB4">Track package</a>
+        <a href="/gp/your-account/ship-track?orderId=403-0968432-9677927&shipmentId=TwbgmksY4">Track</a>
+        <a href="/gp/your-account/ship-track?orderId=403-0968432-9677927&shipmentId=T3946DsB4">Track</a>
     </div>
     </body></html>
     """
