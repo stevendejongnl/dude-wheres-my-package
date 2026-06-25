@@ -680,7 +680,9 @@ function isCloudflareChallenge(html) {
   return (
     lower.includes("<title>just a moment") ||
     lower.includes("checking your browser") ||
-    lower.includes("cf-challenge")
+    lower.includes("cf-challenge") ||
+    lower.includes("performing security verification") ||
+    lower.includes("verify you are human")
   );
 }
 
