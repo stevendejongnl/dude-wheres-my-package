@@ -2,6 +2,29 @@
 
 <!-- version list -->
 
+## v1.58.0 (2026-06-25)
+
+### Bug Fixes
+
+- **lint**: Fix ruff import order and line-length in amazon_test
+  ([`f5f66d9`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/f5f66d9ec723a3df335041c53cc2556109e15d82))
+
+### Continuous Integration
+
+- Add k8s self-hosted deploy job
+  ([`479a1a3`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/479a1a353ea178e8218a34c60226be6f61d08f39))
+
+### Features
+
+- **amazon**: Support multi-shipment orders + Dragonfly carrier tracking
+  ([`0cbcb2f`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/0cbcb2fc97684dd9c0495bac89759277b6ff0bd9))
+
+### Testing
+
+- **postnl**: Inject clock into PostNL so lookback cutoff is time-stable
+  ([`72b73b0`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/72b73b096b92b13fe3923fb10afe99289f7d1bf4))
+
+
 ## v1.57.0 (2026-06-02)
 
 ### Bug Fixes
