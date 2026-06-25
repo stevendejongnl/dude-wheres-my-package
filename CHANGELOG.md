@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.59.0 (2026-06-25)
+
+### Features
+
+- **extension**: Handle Cloudflare challenge automatically
+  ([`97cfa19`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/97cfa19b9db58ed7a7b4942f04ef04627eca0732))
+
+
 ## v1.58.0 (2026-06-25)
 
 ### Bug Fixes
