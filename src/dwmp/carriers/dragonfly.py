@@ -25,8 +25,8 @@ STATUS_MAP: dict[int, TrackingStatus] = {
     110: TrackingStatus.IN_TRANSIT,   # In transit between hubs
     200: TrackingStatus.OUT_FOR_DELIVERY,  # Out for delivery
     210: TrackingStatus.OUT_FOR_DELIVERY,  # Driver assigned
-    300: TrackingStatus.DELIVERED,    # Delivered
-    301: TrackingStatus.DELIVERED,    # Delivered to neighbour
+    300: TrackingStatus.OUT_FOR_DELIVERY,  # Loaded on truck / en route — delivered only when isDelivered=true
+    301: TrackingStatus.OUT_FOR_DELIVERY,  # Loaded on truck (neighbour variant) — same
     400: TrackingStatus.FAILED_ATTEMPT,
     401: TrackingStatus.FAILED_ATTEMPT,
     500: TrackingStatus.RETURNED,
