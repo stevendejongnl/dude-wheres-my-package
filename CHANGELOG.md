@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.60.0 (2026-06-25)
+
+### Bug Fixes
+
+- **dragonfly**: Remap status 300/301 to OUT_FOR_DELIVERY
+  ([`28504f2`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/28504f217fdcdca97096cef6dc9c39a00260b193))
+
+- **lint**: Remove unused pytest import and sort imports in dragonfly_test
+  ([`11009c0`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/11009c08bb5c2654464aec2f66a6f529be72c6c3))
+
+### Features
+
+- **amazon**: Populate label from product title + dedup superseded order-id packages
+  ([`c625282`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/c625282cd837d98ec56fc4dd78038c514179ded9))
+
+
 ## v1.59.0 (2026-06-25)
 
 ### Features
