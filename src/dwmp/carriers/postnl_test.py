@@ -1,8 +1,18 @@
+from datetime import UTC, datetime
+
 import httpx
 import pytest
 
 from dwmp.carriers.base import AuthTokens, AuthType, TrackingStatus
 from dwmp.carriers.postnl import PostNL, _parse_status
+
+# Frozen clock: all test fixtures use 2026-06-20/21 dates, which are well within
+# the 30-day lookback window relative to this anchor.
+_FROZEN_NOW = datetime(2026, 6, 22, 12, 0, 0, tzinfo=UTC)
+
+
+def _frozen_clock(tz=None):
+    return _FROZEN_NOW if tz is None else _FROZEN_NOW.astimezone(tz)
 
 
 def test_parse_status_delivered():
@@ -32,16 +42,16 @@ async def test_parse_json_response():
             "TEST123": {
                 "identification": "TEST123-NL-1234AB",
                 "statusPhase": {"message": "Bezorgd"},
-                "lastObservation": "2026-05-11T14:00:00+02:00",
-                "expectedDeliveryDate": "2026-05-12T00:00:00",
+                "lastObservation": "2026-06-11T14:00:00+02:00",
+                "expectedDeliveryDate": "2026-06-12T00:00:00",
                 "deliveryAddress": {"address": {"postalCode": "1234AB"}},
                 "observations": [
                     {
-                        "observationDate": "2026-05-11T10:00:00",
+                        "observationDate": "2026-06-11T10:00:00",
                         "description": "In ontvangst genomen",
                     },
                     {
-                        "observationDate": "2026-05-11T14:00:00",
+                        "observationDate": "2026-06-11T14:00:00",
                         "description": "Bezorgd",
                     },
                 ],
@@ -76,10 +86,10 @@ def test_parse_graphql_shipment_delivered():
         "barcode": "3STEST000001",
         "title": "Pakket van bol",
         "delivered": True,
-        "deliveredTimeStamp": "2026-05-10T14:30:00+02:00",
-        "deliveryWindowFrom": "2026-05-10T12:00:00+02:00",
-        "deliveryWindowTo": "2026-05-10T16:00:00+02:00",
-        "creationDateTime": "2026-05-09T08:00:00+02:00",
+        "deliveredTimeStamp": "2026-06-10T14:30:00+02:00",
+        "deliveryWindowFrom": "2026-06-10T12:00:00+02:00",
+        "deliveryWindowTo": "2026-06-10T16:00:00+02:00",
+        "creationDateTime": "2026-06-09T08:00:00+02:00",
         "shipmentType": "PARCEL",
     }
     result = carrier._parse_graphql_shipment(shipment)
@@ -97,8 +107,8 @@ def test_parse_graphql_shipment_in_transit():
         "barcode": "3STEST000002",
         "title": "Pakket van Amazon",
         "delivered": False,
-        "deliveryWindowFrom": "2026-05-12T09:00:00+02:00",
-        "creationDateTime": "2026-05-11T10:00:00+02:00",
+        "deliveryWindowFrom": "2026-06-12T09:00:00+02:00",
+        "creationDateTime": "2026-06-11T10:00:00+02:00",
         "detailsUrl": "https://jouw.postnl.nl/track-and-trace/3STEST000002-NL-1234AB",
     }
     result = carrier._parse_graphql_shipment(shipment)
@@ -120,12 +130,12 @@ async def test_track_uses_public_api_with_tracking_url():
                     "3STEST000003": {
                         "identification": "3STEST000003-NL-1234AB",
                         "statusPhase": {"message": "Bezorger is onderweg"},
-                        "lastObservation": "2026-05-21T09:58:33+02:00",
+                        "lastObservation": "2026-06-21T09:58:33+02:00",
                         "deliveryAddress": {"address": {"postalCode": "1234AB"}},
-                        "eta": {"start": "2026-05-21T13:45:00+02:00"},
+                        "eta": {"start": "2026-06-21T13:45:00+02:00"},
                         "observations": [
                             {
-                                "observationDate": "2026-05-21T09:11:07+02:00",
+                                "observationDate": "2026-06-21T09:11:07+02:00",
                                 "description": "Zending is gesorteerd",
                             }
                         ],
@@ -159,8 +169,8 @@ async def test_sync_packages_enriches_active_shipments_with_public_timeline():
                                     "barcode": "3STEST000004",
                                     "title": "Pakket van bol",
                                     "delivered": False,
-                                    "deliveryWindowFrom": "2026-05-21T13:45:00+02:00",
-                                    "creationDateTime": "2026-05-20T17:47:57+02:00",
+                                    "deliveryWindowFrom": "2026-06-21T13:45:00+02:00",
+                                    "creationDateTime": "2026-06-20T17:47:57+02:00",
                                     "detailsUrl": (
                                         "https://jouw.postnl.nl/track-and-trace/"
                                         "3STEST000004-NL-1234AB"
@@ -181,16 +191,16 @@ async def test_sync_packages_enriches_active_shipments_with_public_timeline():
                     "3STEST000004": {
                         "identification": "3STEST000004-NL-1234AB",
                         "statusPhase": {"message": "Bezorger is onderweg"},
-                        "lastObservation": "2026-05-21T09:58:33+02:00",
+                        "lastObservation": "2026-06-21T09:58:33+02:00",
                         "deliveryAddress": {"address": {"postalCode": "1234AB"}},
-                        "eta": {"start": "2026-05-21T13:45:00+02:00"},
+                        "eta": {"start": "2026-06-21T13:45:00+02:00"},
                         "observations": [
                             {
-                                "observationDate": "2026-05-21T09:11:07+02:00",
+                                "observationDate": "2026-06-21T09:11:07+02:00",
                                 "description": "Zending is gesorteerd",
                             },
                             {
-                                "observationDate": "2026-05-20T17:47:57+02:00",
+                                "observationDate": "2026-06-20T17:47:57+02:00",
                                 "description": "Pakket is ontvangen door PostNL",
                             },
                         ],
@@ -200,7 +210,7 @@ async def test_sync_packages_enriches_active_shipments_with_public_timeline():
         )
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        results = await PostNL(http_client=client).sync_packages(
+        results = await PostNL(http_client=client, now=_frozen_clock).sync_packages(
             AuthTokens(access_token="token"),
         )
 
@@ -211,7 +221,7 @@ async def test_sync_packages_enriches_active_shipments_with_public_timeline():
 
 
 def test_parse_browser_payload_prefers_detail_payload_for_active_shipments():
-    carrier = PostNL()
+    carrier = PostNL(now=_frozen_clock)
     results = carrier._parse_browser_payload(
         {
             "shipments": [
@@ -219,16 +229,16 @@ def test_parse_browser_payload_prefers_detail_payload_for_active_shipments():
                     "barcode": "3STEST000005",
                     "title": "Pakket van bol",
                     "delivered": False,
-                    "deliveryWindowFrom": "2026-05-21T13:45:00+02:00",
-                    "creationDateTime": "2026-05-20T17:47:57+02:00",
+                    "deliveryWindowFrom": "2026-06-21T13:45:00+02:00",
+                    "creationDateTime": "2026-06-20T17:47:57+02:00",
                     "detailsUrl": "https://jouw.postnl.nl/track-and-trace/3STEST000005-NL-1234AB",
                 },
                 {
                     "barcode": "3STEST000006",
                     "title": "Pakket van bol",
                     "delivered": True,
-                    "deliveredTimeStamp": "2026-05-21T14:30:00+02:00",
-                    "creationDateTime": "2026-05-20T17:47:57+02:00",
+                    "deliveredTimeStamp": "2026-06-21T14:30:00+02:00",
+                    "creationDateTime": "2026-06-20T17:47:57+02:00",
                     "detailsUrl": "https://jouw.postnl.nl/track-and-trace/3STEST000006-NL-1234AB",
                 },
             ],
@@ -240,12 +250,12 @@ def test_parse_browser_payload_prefers_detail_payload_for_active_shipments():
                             "3STEST000005": {
                                 "identification": "3STEST000005-NL-1234AB",
                                 "statusPhase": {"message": "Bezorger is onderweg"},
-                                "lastObservation": "2026-05-21T09:58:33+02:00",
+                                "lastObservation": "2026-06-21T09:58:33+02:00",
                                 "deliveryAddress": {"address": {"postalCode": "1234AB"}},
-                                "eta": {"start": "2026-05-21T13:45:00+02:00"},
+                                "eta": {"start": "2026-06-21T13:45:00+02:00"},
                                 "observations": [
                                     {
-                                        "observationDate": "2026-05-21T09:11:07+02:00",
+                                        "observationDate": "2026-06-21T09:11:07+02:00",
                                         "description": "Zending is gesorteerd",
                                     }
                                 ],
@@ -268,7 +278,7 @@ def test_parse_browser_payload_prefers_detail_payload_for_active_shipments():
 def test_parse_browser_payload_missing_details_falls_back_to_graphql():
     """When details list is shorter than shipments, the unmatched shipments use
     the GraphQL-parsed result rather than crashing or silently dropping them."""
-    carrier = PostNL()
+    carrier = PostNL(now=_frozen_clock)
     results = carrier._parse_browser_payload(
         {
             "shipments": [
@@ -276,15 +286,15 @@ def test_parse_browser_payload_missing_details_falls_back_to_graphql():
                     "barcode": "3STEST000007",
                     "title": "Pakket A",
                     "delivered": False,
-                    "deliveryWindowFrom": "2026-05-21T13:45:00+02:00",
-                    "creationDateTime": "2026-05-20T17:47:57+02:00",
+                    "deliveryWindowFrom": "2026-06-21T13:45:00+02:00",
+                    "creationDateTime": "2026-06-20T17:47:57+02:00",
                 },
                 {
                     "barcode": "3STEST000008",
                     "title": "Pakket B",
                     "delivered": False,
-                    "deliveryWindowFrom": "2026-05-22T09:00:00+02:00",
-                    "creationDateTime": "2026-05-21T10:00:00+02:00",
+                    "deliveryWindowFrom": "2026-06-22T09:00:00+02:00",
+                    "creationDateTime": "2026-06-21T10:00:00+02:00",
                 },
             ],
             "details": [
@@ -295,7 +305,7 @@ def test_parse_browser_payload_missing_details_falls_back_to_graphql():
                             "3STEST000007": {
                                 "identification": "3STEST000007-NL-1234AB",
                                 "statusPhase": {"message": "Bezorger is onderweg"},
-                                "lastObservation": "2026-05-21T09:58:33+02:00",
+                                "lastObservation": "2026-06-21T09:58:33+02:00",
                                 "deliveryAddress": {"address": {"postalCode": "1234AB"}},
                                 "observations": [],
                             }

@@ -1,4 +1,5 @@
 import re
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
 
@@ -114,8 +115,13 @@ class PostNL(CarrierBase):
     name = "postnl"
     auth_type = AuthType.BROWSER_PAYLOAD
 
-    def __init__(self, http_client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self,
+        http_client: httpx.AsyncClient | None = None,
+        now: Callable[..., datetime] | None = None,
+    ) -> None:
         self._client = http_client
+        self._now = now or datetime.now
 
     async def sync_packages(
         self, tokens: AuthTokens, lookback_days: int = 30
@@ -138,7 +144,7 @@ class PostNL(CarrierBase):
         data = await with_retries(_do_request, carrier=self.name)
 
         results: list[TrackingResult] = []
-        cutoff = datetime.now(UTC) - timedelta(days=lookback_days)
+        cutoff = self._now(UTC) - timedelta(days=lookback_days)
 
         tracked = data.get("data", {}).get("trackedShipments", {})
         all_shipments = tracked.get("receiverShipments", []) + tracked.get("senderShipments", [])
@@ -374,7 +380,7 @@ class PostNL(CarrierBase):
                 tracking_number, data
             )
 
-        cutoff = datetime.now(UTC) - timedelta(days=lookback_days)
+        cutoff = self._now(UTC) - timedelta(days=lookback_days)
         filtered: list[TrackingResult] = []
         for result in results_by_tracking.values():
             if result.events:
