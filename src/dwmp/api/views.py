@@ -80,14 +80,19 @@ def _format_time(ts_str: str) -> str:
         now = datetime.now(_DISPLAY_TZ)
         diff = now - dt
 
+        # no_date_fallback() produces midnight UTC — hide the time for these
+        # date-only events so they don't show a misleading "02:00" in CEST.
+        dt_utc = dt.astimezone(UTC)
+        date_only = dt_utc.hour == 0 and dt_utc.minute == 0 and dt_utc.second == 0
+
         if diff.days == 0:
-            return f"Today {dt.strftime('%H:%M')}"
+            return "Today" if date_only else f"Today {dt.strftime('%H:%M')}"
         elif diff.days == 1:
-            return f"Yesterday {dt.strftime('%H:%M')}"
+            return "Yesterday" if date_only else f"Yesterday {dt.strftime('%H:%M')}"
         elif diff.days < 7:
-            return dt.strftime("%A %H:%M")
+            return dt.strftime("%A") if date_only else dt.strftime("%A %H:%M")
         else:
-            return dt.strftime("%d %b %Y, %H:%M")
+            return dt.strftime("%d %b %Y") if date_only else dt.strftime("%d %b %Y, %H:%M")
     except (ValueError, TypeError):
         return ts_str[:16].replace("T", " ") if ts_str else ""
 

@@ -118,6 +118,10 @@ export function listPackages() {
   return apiCall("GET", "/api/v1/packages");
 }
 
+export function addPackage(trackingNumber, carrier) {
+  return apiCall("POST", "/api/v1/packages", { tracking_number: trackingNumber, carrier });
+}
+
 export function browserPush(html, url) {
   return apiCall("POST", "/api/v1/browser-push", { html, url });
 }

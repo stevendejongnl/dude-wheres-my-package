@@ -44,6 +44,13 @@ _SHARE_LINK_PATTERNS = (
     "amzn.eu/d/",
 )
 
+# Authenticated per-shipment tracker URL pattern on the orders page.
+# Each shipment in an order gets its own ship-track link with a unique shipmentId.
+_SHIP_TRACK_PATH = "/gp/your-account/ship-track"
+
+_SHIP_TRACK_ORDER_RE = re.compile(r"[?&]orderId=(\d{3}-\d{7}-\d{7})")
+_SHIP_TRACK_SHIPMENT_RE = re.compile(r"[?&]shipmentId=([A-Za-z0-9]+)")
+
 # Dutch and English status texts from Amazon order pages.
 # Ordered most-specific first to avoid partial matches
 # (e.g. "wordt vandaag bezorgd" before "bezorgd").
@@ -169,18 +176,25 @@ class Amazon(CarrierBase):
         )
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
-        """Public tracking via the ``share`` endpoint.
+        """Tracking via the share endpoint or ship-track page.
 
-        Amazon has no public (tracking_number → status) lookup — the order ID
-        alone isn't a carrier-portal tracking number. But the orders page
-        exposes a per-parcel shareable URL that renders without login. Sync
-        captures that URL as ``tracking_url``; this method fetches it.
+        Amazon has no public (tracking_number → status) lookup. Two paths:
+        - share URL (``progress-tracker/package/share``): public, no login needed.
+        - ship-track URL: authenticated; unauthenticated fetch redirects to login
+          and returns UNKNOWN — the downgrade safeguard preserves any prior status.
 
-        If no ``tracking_url`` is available we return UNKNOWN with no events —
-        the TrackingService downgrade safeguard preserves any prior status.
+        If no ``tracking_url`` is available we return UNKNOWN with no events.
         """
         tracking_url = kwargs.get("tracking_url") or ""
         if not tracking_url:
+            return TrackingResult(
+                tracking_number=tracking_number,
+                carrier=self.name,
+                status=TrackingStatus.UNKNOWN,
+            )
+
+        # ship-track URLs require authentication — the server can't fetch them.
+        if _SHIP_TRACK_PATH in tracking_url:
             return TrackingResult(
                 tracking_number=tracking_number,
                 carrier=self.name,
@@ -313,14 +327,13 @@ class Amazon(CarrierBase):
             order_cards = self._find_order_sections(soup)
 
         for card in order_cards:
-            result = self._parse_order_card(card)
-            if not result:
-                continue
-            if result.events:
-                latest = max(e.timestamp for e in result.events)
-                if latest < cutoff:
-                    continue
-            results.append(result)
+            card_results = self._parse_order_card_multi(card)
+            for result in card_results:
+                if result.events:
+                    latest = max(e.timestamp for e in result.events)
+                    if latest < cutoff:
+                        continue
+                results.append(result)
 
         return results
 
@@ -334,26 +347,87 @@ class Amazon(CarrierBase):
         return sections
 
     def _parse_order_card(self, card: object) -> TrackingResult | None:
-        """Parse a single order card from Amazon's order history HTML."""
+        """Parse a single order card, returning only the first shipment.
+
+        Kept for backward-compatibility with tests. New code uses
+        ``_parse_order_card_multi`` which returns one result per shipment.
+        """
+        results = self._parse_order_card_multi(card)
+        return results[0] if results else None
+
+    def _parse_order_card_multi(self, card: object) -> list[TrackingResult]:
+        """Parse an order card, yielding one TrackingResult per shipment.
+
+        Amazon renders multi-product orders with one ship-track link per
+        shipment. We use ``orderId#shipmentId`` as the tracking number so each
+        shipment gets its own package row even when they share an order ID.
+        For orders without ship-track links (old/digital/not-yet-shipped) we
+        fall back to the order ID alone and return a single result.
+        """
         card_text = card.get_text(separator=" ", strip=True)  # type: ignore[union-attr]
 
         order_match = ORDER_ID_PATTERN.search(card_text)
         if not order_match:
-            return None
+            return []
         order_id = order_match.group()
 
-        # Harvest the public "Track package" share URL if Amazon exposes one
-        # on this card. Present only for shipped/in-flight orders, missing for
-        # digital / not-yet-shipped / delivered-long-ago orders — in those
-        # cases we still persist the package with just the order ID and fall
-        # back to sync-only status updates.
-        tracking_url = _extract_share_url(card)
+        # --- order date (shared across all shipments in the card) ---
+        order_date_el = card.select_one(  # type: ignore[union-attr]
+            ".a-color-secondary.value, .order-date-text"
+        )
+        if not order_date_el:
+            for el in card.select(".a-color-secondary"):  # type: ignore[union-attr]
+                text = el.get_text(strip=True)
+                if _parse_dutch_date(text):
+                    order_date_el = el
+                    break
 
+        order_date_event: TrackingEvent | None = None
+        if order_date_el:
+            order_date_text = order_date_el.get_text(strip=True)
+            order_date = _parse_dutch_date(order_date_text)
+            if order_date:
+                order_date_event = TrackingEvent(
+                    timestamp=order_date,
+                    status=TrackingStatus.PRE_TRANSIT,
+                    description=order_date_text,
+                )
+
+        # --- per-shipment ship-track links ---
+        shipments = _extract_ship_track_urls(card, order_id)
+
+        if not shipments:
+            # No ship-track links: single result keyed by order ID only.
+            # Try share URL first (older Amazon page variants), then no URL.
+            tracking_url = _extract_share_url(card)
+            result = self._build_shipment_result(
+                card, card_text, order_id, order_id, tracking_url, order_date_event
+            )
+            return [result] if result else []
+
+        results = []
+        for tracking_number, ship_track_url in shipments:
+            result = self._build_shipment_result(
+                card, card_text, order_id, tracking_number, ship_track_url, order_date_event
+            )
+            if result:
+                results.append(result)
+        return results
+
+    def _build_shipment_result(
+        self,
+        card: object,
+        card_text: str,
+        order_id: str,
+        tracking_number: str,
+        tracking_url: str | None,
+        order_date_event: TrackingEvent | None,
+    ) -> TrackingResult | None:
+        """Build a TrackingResult for one shipment from an order card."""
         # --- delivery status ---
         status = TrackingStatus.UNKNOWN
         status_text = ""
 
-        # Amazon uses .delivery-box with nested text; also try specific elements
         delivery_el = card.select_one(  # type: ignore[union-attr]
             ".delivery-box__primary-text, "
             ".shipment-is-delivered, "
@@ -361,15 +435,12 @@ class Amazon(CarrierBase):
             ".a-color-success"
         )
         if not delivery_el:
-            # Fallback: .delivery-box first child text
             delivery_box = card.select_one(".delivery-box")  # type: ignore[union-attr]
             if delivery_box:
-                # Get first meaningful text from the delivery box
                 for child in delivery_box.descendants:
                     if isinstance(child, str):
                         text = child.strip()
                         if text and _parse_status(text) != TrackingStatus.UNKNOWN:
-                            delivery_el = None
                             status_text = text
                             status = _parse_status(text)
                             break
@@ -382,34 +453,9 @@ class Amazon(CarrierBase):
 
         # --- events ---
         events: list[TrackingEvent] = []
+        if order_date_event:
+            events.append(order_date_event)
 
-        # Order date — look for the value next to "Bestelling geplaatst"
-        order_date_el = card.select_one(  # type: ignore[union-attr]
-            ".a-color-secondary.value, .order-date-text"
-        )
-        if not order_date_el:
-            # Fallback: find date near "Bestelling geplaatst" label
-            for el in card.select(".a-color-secondary"):  # type: ignore[union-attr]
-                text = el.get_text(strip=True)
-                if _parse_dutch_date(text):
-                    order_date_el = el
-                    break
-
-        if order_date_el:
-            order_date_text = order_date_el.get_text(strip=True)
-            order_date = _parse_dutch_date(order_date_text)
-            if order_date:
-                events.append(TrackingEvent(
-                    timestamp=order_date,
-                    status=TrackingStatus.PRE_TRANSIT,
-                    description=order_date_text,
-                ))
-
-        # Delivery/expected date from status text.
-        # Always add a status event when we have a known status — even without
-        # a parseable date. Amazon often shows "Onderweg" or "Verwacht donderdag"
-        # with no machine-readable date; without a fallback timestamp the
-        # timeline would only contain the order date.
         if status_text and status != TrackingStatus.UNKNOWN:
             event_date = _parse_dutch_date(status_text)
             events.append(TrackingEvent(
@@ -430,13 +476,39 @@ class Amazon(CarrierBase):
             ))
 
         return TrackingResult(
-            tracking_number=order_id,
+            tracking_number=tracking_number,
             carrier=self.name,
             status=status,
             estimated_delivery=estimated,
             events=sorted(events, key=lambda e: e.timestamp),
             tracking_url=tracking_url,
         )
+
+
+def _extract_ship_track_urls(card: object, order_id: str) -> list[tuple[str, str]]:
+    """Extract per-shipment (tracking_number, ship_track_url) pairs from an order card.
+
+    Returns one tuple per ship-track link found. tracking_number is
+    ``orderId#shipmentId`` to disambiguate shipments within the same order.
+    Returns empty list if no ship-track links are present.
+    """
+    results = []
+    seen: set[str] = set()
+    for link in card.select("a[href]"):  # type: ignore[union-attr]
+        href = link.get("href") or ""
+        if _SHIP_TRACK_PATH not in href:
+            continue
+        shipment_match = _SHIP_TRACK_SHIPMENT_RE.search(href)
+        if not shipment_match:
+            continue
+        shipment_id = shipment_match.group(1)
+        if shipment_id in seen:
+            continue
+        seen.add(shipment_id)
+        tracking_number = f"{order_id}#{shipment_id}"
+        full_url = href if href.startswith("http") else f"{AMAZON_BASE}{href}"
+        results.append((tracking_number, full_url))
+    return results
 
 
 def _extract_share_url(card: object) -> str | None:

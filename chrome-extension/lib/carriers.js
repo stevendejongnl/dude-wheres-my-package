@@ -95,6 +95,7 @@ export const CARRIER_LABELS = {
   dpd: "DPD",
   gls: "GLS",
   trunkrs: "Trunkrs",
+  dragonfly: "Dragonfly",
 };
 
 /**

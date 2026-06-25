@@ -4,6 +4,7 @@ import pytest
 
 from dwmp.carriers.amazon import (
     Amazon,
+    _SHIP_TRACK_PATH,
     _parse_dutch_date,
     _parse_status,
 )
@@ -245,6 +246,64 @@ def test_parse_parcels_page_aliases_parse_orders_page():
     results = carrier._parse_parcels_page(html)
     assert len(results) == 1
     assert results[0].tracking_number == "305-7777777-7777777"
+
+
+# --- multi-shipment order parsing ---
+
+
+def test_parse_orders_page_multi_shipment():
+    """One order with two ship-track links → two separate TrackingResults."""
+    carrier = Amazon()
+    html = """
+    <html><body>
+    <div class="order-card">
+        <span class="a-color-secondary">Besteld op 5 april 2026</span>
+        <span>403-0968432-9677927</span>
+        <div class="delivery-box">
+            <span class="delivery-box__primary-text">Onderweg</span>
+        </div>
+        <a href="/gp/your-account/ship-track?itemId=aaa&orderId=403-0968432-9677927&shipmentId=TwbgmksY4">Track package</a>
+        <a href="/gp/your-account/ship-track?itemId=bbb&orderId=403-0968432-9677927&shipmentId=T3946DsB4">Track package</a>
+    </div>
+    </body></html>
+    """
+    results = carrier._parse_orders_page(html, lookback_days=365)
+    assert len(results) == 2
+    tns = {r.tracking_number for r in results}
+    assert tns == {"403-0968432-9677927#TwbgmksY4", "403-0968432-9677927#T3946DsB4"}
+    for r in results:
+        assert r.carrier == "amazon"
+        assert r.status == TrackingStatus.IN_TRANSIT
+        assert _SHIP_TRACK_PATH in (r.tracking_url or "")
+
+
+def test_parse_orders_page_single_shipment_no_ship_track():
+    """Order with no ship-track links falls back to order ID as tracking number."""
+    carrier = Amazon()
+    html = """
+    <html><body>
+    <div class="order-card">
+        <span class="a-color-secondary">Besteld op 5 april 2026</span>
+        <span>305-1234567-8901234</span>
+        <div class="delivery-box">
+            <span class="delivery-box__primary-text">Bezorgd op 8 apr.</span>
+        </div>
+    </div>
+    </body></html>
+    """
+    results = carrier._parse_orders_page(html, lookback_days=365)
+    assert len(results) == 1
+    assert results[0].tracking_number == "305-1234567-8901234"
+
+
+async def test_track_ship_track_url_returns_unknown():
+    """ship-track URLs require auth — track() returns UNKNOWN without fetching."""
+    carrier = Amazon()
+    result = await carrier.track(
+        "403-0968432-9677927#TwbgmksY4",
+        tracking_url="https://www.amazon.nl/gp/your-account/ship-track?shipmentId=TwbgmksY4",
+    )
+    assert result.status == TrackingStatus.UNKNOWN
 
 
 # --- sync / auth contracts ---

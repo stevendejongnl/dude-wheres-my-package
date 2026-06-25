@@ -1,4 +1,5 @@
 import {
+  addPackage,
   browserPush,
   browserPayload,
   checkForUpdate,
@@ -443,6 +444,13 @@ async function syncCarrierViaTab(account, opts = {}) {
       const count = pushResult.data?.length || 0;
       log.info("sync", `${account.carrier}: browser-push succeeded`, { packages: count, durationMs: Date.now() - _syncStart });
       await storeSyncResult(account.id, true, null, count);
+
+      // For Amazon: scrape ship-track pages to discover third-party carrier
+      // tracking numbers (e.g. Dragonfly). The orders page only has ship-track
+      // links — the actual carrier tracking ID lives one page deeper.
+      if (account.carrier === "amazon") {
+        await scrapeAmazonShipTrackCarriers(tabId, html);
+      }
     } else {
       log.error("sync", `${account.carrier}: browser-push failed`, { error: pushResult.error });
       await storeSyncResult(account.id, false, pushResult.error);
@@ -841,6 +849,81 @@ async function handlePostNLLogin(tabId, username, password) {
   const success = !isCarrierLoginPage("postnl", info.url);
   log.info("login", `PostNL login ${success ? "succeeded" : "failed"}`, { finalUrl: info.url });
   return success;
+}
+
+// Carrier name as shown on Amazon's ship-track page → DWMP carrier name.
+// Amazon's own logistics shows "AMAZON" or "Delivery By Amazon".
+const SHIP_TRACK_CARRIER_MAP = {
+  dragonfly: "dragonfly",
+};
+
+/**
+ * After an Amazon orders-page sync, visit each ship-track URL found in the
+ * HTML and extract the third-party carrier + tracking ID from the page.
+ * Registers them as standalone packages via POST /api/v1/packages so they
+ * can be tracked independently (e.g. Dragonfly via its own API).
+ */
+async function scrapeAmazonShipTrackCarriers(tabId, ordersHtml) {
+  // Extract ship-track hrefs from the orders page HTML (DOM-free, regex).
+  const shipTrackRe = /href="([^"]*\/gp\/your-account\/ship-track[^"]*)"/g;
+  const urls = [];
+  let m;
+  while ((m = shipTrackRe.exec(ordersHtml)) !== null) {
+    const href = m[1].replace(/&amp;/g, "&");
+    const url = href.startsWith("http") ? href : `https://www.amazon.nl${href}`;
+    urls.push(url);
+  }
+
+  if (urls.length === 0) return;
+  log.info("amazon", `Scraping ${urls.length} ship-track page(s) for carrier tracking IDs`);
+
+  for (const url of urls) {
+    try {
+      await chrome.tabs.update(tabId, { url });
+      await waitForTabNavigation(tabId, 10000);
+
+      const result = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          const carrierEl = document.querySelector(".tracking-event-carrier-header, .pt-delivery-card-wrapper");
+          const idEl = document.querySelector(".pt-delivery-card-trackingId");
+          const carrierText = carrierEl?.innerText?.trim() || "";
+          const trackingId = idEl?.innerText?.replace(/Tracking ID:/i, "").trim() || "";
+          return { carrierText, trackingId };
+        },
+      });
+
+      const { carrierText, trackingId } = result?.[0]?.result || {};
+      if (!trackingId) continue;
+
+      // Map carrier name to DWMP carrier key
+      const carrierLower = carrierText.toLowerCase();
+      let dwmpCarrier = null;
+      for (const [key, name] of Object.entries(SHIP_TRACK_CARRIER_MAP)) {
+        if (carrierLower.includes(key)) {
+          dwmpCarrier = name;
+          break;
+        }
+      }
+
+      if (!dwmpCarrier) {
+        log.info("amazon", `ship-track: unrecognised carrier "${carrierText}" for ${trackingId} — skipping`);
+        continue;
+      }
+
+      log.info("amazon", `Registering ${dwmpCarrier} package: ${trackingId}`);
+      const addResult = await addPackage(trackingId, dwmpCarrier);
+      if (addResult.ok) {
+        log.info("amazon", `Registered ${dwmpCarrier}:${trackingId}`);
+      } else if (addResult.status === 409) {
+        log.info("amazon", `${dwmpCarrier}:${trackingId} already tracked`);
+      } else {
+        log.warn("amazon", `Failed to register ${dwmpCarrier}:${trackingId}`, { error: addResult.error });
+      }
+    } catch (err) {
+      log.warn("amazon", `ship-track scrape failed for ${url}`, { error: err.message });
+    }
+  }
 }
 
 async function handleCarrierLogin(tabId, account) {
