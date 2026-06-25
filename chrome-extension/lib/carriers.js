@@ -37,6 +37,9 @@ export const CARRIER_SYNC_URLS = {
   dpd: {
     // /nl/mydpd/login always redirects through Keycloak with an explicit
     // login prompt (no prompt=none silent SSO).
+    // prewarm: brief visit to homepage before login so Cloudflare sees a
+    // normal browsing entry point and is less likely to challenge.
+    prewarm: "https://www.dpdgroup.com/nl",
     login: "https://www.dpdgroup.com/nl/mydpd/login",
     parcels: "https://www.dpdgroup.com/nl/mydpd/my-parcels/incoming",
   },

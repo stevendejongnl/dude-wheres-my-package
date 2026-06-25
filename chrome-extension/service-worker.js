@@ -202,13 +202,21 @@ async function syncCarrierViaTab(account, opts = {}) {
         // window (even unfocused) has an active rendering pipeline, so RAF fires
         // and Akamai accepts the session. The window is closed after the sync.
         const win = await chrome.windows.create({
-          url: startUrl,
+          url: urls.prewarm || startUrl,
           type: "popup",
           focused: true,
           width: 480,
           height: 640,
         });
         tabId = win.tabs[0].id;
+        // Pre-warm: if a separate prewarm URL was configured, let it settle
+        // briefly so Cloudflare sees a normal entry point, then navigate to
+        // the actual login URL.
+        if (urls.prewarm) {
+          await waitForTabLoad(tabId);
+          await sleep(2000);
+          await chrome.tabs.update(tabId, { url: startUrl });
+        }
       } else {
         const tab = await chrome.tabs.create({ url: startUrl, active: false });
         tabId = tab.id;
@@ -378,14 +386,29 @@ async function syncCarrierViaTab(account, opts = {}) {
     }
     log.debug("sync", `${account.carrier}: captured HTML`, { htmlBytes: html.length });
 
-    // Detect Cloudflare challenge page
+    // Detect Cloudflare challenge page — surface the tab, notify the user,
+    // then wait up to 3 minutes for them to solve it before resuming.
     if (isCloudflareChallenge(html)) {
       log.warn("sync", `${account.carrier}: Cloudflare challenge detected`);
-      // Make the tab visible so the user can solve the captcha
       await chrome.tabs.update(tabId, { active: true });
       shouldCloseTab = false;
-      await storeSyncResult(account.id, false, "Cloudflare challenge -- please solve manually");
-      return;
+      notifyCloudflareChallenge(account.carrier);
+      await storeSyncResult(account.id, false, "Cloudflare challenge — solve in the tab to continue");
+
+      const solved = await waitForCloudflareSolve(tabId, 3 * 60 * 1000);
+      if (!solved) {
+        log.warn("sync", `${account.carrier}: Cloudflare challenge not solved within timeout`);
+        await storeSyncResult(account.id, false, "Cloudflare challenge timed out — sync skipped");
+        return;
+      }
+
+      log.info("sync", `${account.carrier}: Cloudflare challenge solved, resuming sync`);
+      await waitForUrlStable(tabId);
+      html = await captureTabHtml(tabId);
+      if (!html) {
+        await storeSyncResult(account.id, false, "Could not capture page after Cloudflare solve");
+        return;
+      }
     }
 
     // Detect carrier error/outage page (e.g. DPD "Technical issue occurred").
@@ -659,6 +682,34 @@ function isCloudflareChallenge(html) {
     lower.includes("checking your browser") ||
     lower.includes("cf-challenge")
   );
+}
+
+function notifyCloudflareChallenge(carrier) {
+  chrome.notifications.create(`cf-challenge-${carrier}`, {
+    type: "basic",
+    iconUrl: "icons/icon-48.png",
+    title: "Action required — DWMP",
+    message: `${carrier.toUpperCase()} needs a Cloudflare check. Click the tab and solve it to continue syncing.`,
+    priority: 2,
+  });
+}
+
+/**
+ * Poll the tab every 3s until the Cloudflare challenge page is gone.
+ * Returns true if solved within timeoutMs, false if it timed out.
+ */
+async function waitForCloudflareSolve(tabId, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await sleep(3000);
+    try {
+      const html = await captureTabHtml(tabId);
+      if (html && !isCloudflareChallenge(html)) return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 async function clearCarrierSiteData(carrier) {
