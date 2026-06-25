@@ -409,11 +409,24 @@ class TrackingService:
                 pkg_id = await self._repository.add_package(
                     tracking_number=result.tracking_number,
                     carrier=result.carrier,
+                    label=result.label,
                     postal_code=pkg_postal,
                     account_id=account_id,
                     source="account",
                     tracking_url=result.tracking_url,
                 )
+                # When we create an orderId#shipmentId package, delete the old
+                # plain orderId entry (from a prior sync before multi-shipment
+                # parsing was introduced) to avoid duplicate rows.
+                if "#" in result.tracking_number:
+                    order_id = result.tracking_number.split("#", 1)[0]
+                    old = await self._repository.find_package(order_id, result.carrier)
+                    if old:
+                        await self._repository.delete_package(old["id"])
+                        logger.debug(
+                            "Deleted superseded package %s in favour of %s",
+                            order_id, result.tracking_number,
+                        )
 
             backfill_postal = (
                 pkg_postal if pkg_postal and existing and not existing.get("postal_code") else None

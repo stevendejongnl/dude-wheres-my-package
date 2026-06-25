@@ -277,6 +277,45 @@ def test_parse_orders_page_multi_shipment():
         assert _SHIP_TRACK_PATH in (r.tracking_url or "")
 
 
+def test_parse_orders_page_product_title_as_label():
+    """Product title from .yohtmlc-product-title is used as label on the result."""
+    carrier = Amazon()
+    html = """
+    <html><body>
+    <div class="order-card">
+        <span>305-1234567-8901234</span>
+        <div class="delivery-box">
+            <span class="delivery-box__primary-text">Bezorgd op 8 apr.</span>
+        </div>
+        <a class="yohtmlc-product-title" href="/dp/B0TEST">USB-C Cable</a>
+    </div>
+    </body></html>
+    """
+    results = carrier._parse_orders_page(html, lookback_days=365)
+    assert len(results) == 1
+    assert results[0].label == "USB-C Cable"
+
+
+def test_parse_orders_page_multi_product_label():
+    """Multiple product titles are joined with ', ' as the label."""
+    carrier = Amazon()
+    html = """
+    <html><body>
+    <div class="order-card">
+        <span>305-1234567-8901234</span>
+        <div class="delivery-box">
+            <span class="delivery-box__primary-text">Bezorgd op 8 apr.</span>
+        </div>
+        <a class="yohtmlc-product-title" href="/dp/B001">Widget A</a>
+        <a class="yohtmlc-product-title" href="/dp/B002">Widget B</a>
+    </div>
+    </body></html>
+    """
+    results = carrier._parse_orders_page(html, lookback_days=365)
+    assert len(results) == 1
+    assert results[0].label == "Widget A, Widget B"
+
+
 def test_parse_orders_page_single_shipment_no_ship_track():
     """Order with no ship-track links falls back to order ID as tracking number."""
     carrier = Amazon()

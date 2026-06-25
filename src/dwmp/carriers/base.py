@@ -118,6 +118,7 @@ class TrackingResult:
     # on the authenticated orders page and must be captured at discovery time
     # for unauthenticated refreshes to work afterwards.
     tracking_url: str | None = None
+    label: str | None = None
 
 
 @dataclass(frozen=True)

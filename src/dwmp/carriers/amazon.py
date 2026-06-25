@@ -366,6 +366,14 @@ class Amazon(CarrierBase):
         """
         card_text = card.get_text(separator=" ", strip=True)  # type: ignore[union-attr]
 
+        # Collect product titles from the card for use as labels.
+        product_titles = [
+            el.get_text(strip=True)
+            for el in card.select(".yohtmlc-product-title")  # type: ignore[union-attr]
+            if el.get_text(strip=True)
+        ]
+        label = ", ".join(product_titles) or None
+
         order_match = ORDER_ID_PATTERN.search(card_text)
         if not order_match:
             return []
@@ -401,14 +409,14 @@ class Amazon(CarrierBase):
             # Try share URL first (older Amazon page variants), then no URL.
             tracking_url = _extract_share_url(card)
             result = self._build_shipment_result(
-                card, card_text, order_id, order_id, tracking_url, order_date_event
+                card, card_text, order_id, order_id, tracking_url, order_date_event, label
             )
             return [result] if result else []
 
         results = []
         for tracking_number, ship_track_url in shipments:
             result = self._build_shipment_result(
-                card, card_text, order_id, tracking_number, ship_track_url, order_date_event
+                card, card_text, order_id, tracking_number, ship_track_url, order_date_event, label
             )
             if result:
                 results.append(result)
@@ -422,6 +430,7 @@ class Amazon(CarrierBase):
         tracking_number: str,
         tracking_url: str | None,
         order_date_event: TrackingEvent | None,
+        label: str | None = None,
     ) -> TrackingResult | None:
         """Build a TrackingResult for one shipment from an order card."""
         # --- delivery status ---
@@ -482,6 +491,7 @@ class Amazon(CarrierBase):
             estimated_delivery=estimated,
             events=sorted(events, key=lambda e: e.timestamp),
             tracking_url=tracking_url,
+            label=label,
         )
 
 
