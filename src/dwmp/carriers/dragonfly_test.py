@@ -1,6 +1,5 @@
-import pytest
-from dwmp.carriers.dragonfly import Dragonfly
 from dwmp.carriers.base import TrackingStatus
+from dwmp.carriers.dragonfly import Dragonfly
 
 dragonfly = Dragonfly()
 
