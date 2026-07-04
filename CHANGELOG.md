@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.61.0 (2026-07-04)
+
+### Features
+
+- **alerts**: Surface Cloudflare challenge via DWMP notification + Telegram
+  ([`645e56e`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/645e56ed4ce7496d262c853f6924806f0c841ecc))
+
+
 ## v1.60.1 (2026-06-25)
 
 ### Bug Fixes
