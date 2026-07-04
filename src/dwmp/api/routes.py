@@ -13,6 +13,7 @@ from dwmp.api import _log_stream
 from dwmp.api.auth import create_token, verify_password
 from dwmp.api.dependencies import get_repository, get_tracking_service
 from dwmp.carriers.base import CarrierAuthError, CarrierSyncError
+from dwmp.services.telegram_notifier import TelegramNotifier
 from dwmp.services.tracking import TrackingService
 from dwmp.storage.repository import PackageRepository
 
@@ -48,6 +49,10 @@ class ManualTokenRequest(BaseModel):
 
 class AuthTokenRequest(BaseModel):
     password: str
+
+
+class CloudflareAlertRequest(BaseModel):
+    carrier: str
 
 
 
@@ -237,6 +242,25 @@ class UniversalBrowserPushRequest(BaseModel):
 
 class BrowserPayloadRequest(BaseModel):
     payload: dict
+
+
+@router.post("/alerts/cloudflare", status_code=204)
+async def alert_cloudflare(
+    body: CloudflareAlertRequest,
+    service: TrackingService = Depends(get_tracking_service),
+) -> Response:
+    """Forward a Cloudflare-challenge alert from the extension.
+
+    The extension's own chrome.notifications popup only shows inside the
+    headless Kasm session where nobody is looking. Creating a DWMP
+    notification lets the HA integration fire an event for automations;
+    Telegram is sent directly, gated on the same dedup so repeated sync
+    attempts don't spam.
+    """
+    created = await service.notify_cloudflare_challenge(body.carrier)
+    if created:
+        await TelegramNotifier().send_cloudflare_challenge(body.carrier)
+    return Response(status_code=204)
 
 
 # URL hostname → carrier name mapping for universal browser-push.

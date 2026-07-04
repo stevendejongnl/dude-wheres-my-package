@@ -157,3 +157,33 @@ async def test_explicit_empty_string_still_disables(monkeypatch):
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "")
     notifier = TelegramNotifier()
     assert notifier.enabled is False
+
+
+async def test_send_cloudflare_challenge_posts_carrier(monkeypatch):
+    captured: dict = {}
+
+    class FakeResponse:
+        status_code = 200
+        text = "ok"
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, url, json):
+            captured["json"] = json
+            return FakeResponse()
+
+    monkeypatch.setattr("dwmp.services.telegram_notifier.httpx.AsyncClient", FakeClient)
+
+    notifier = TelegramNotifier(bot_token="t", chat_id="c", pod_name=None)
+    await notifier.send_cloudflare_challenge("dpd")
+
+    assert "Cloudflare challenge" in captured["json"]["text"]
+    assert "DPD" in captured["json"]["text"]

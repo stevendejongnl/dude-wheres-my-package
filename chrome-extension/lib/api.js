@@ -134,6 +134,10 @@ export function getAccountCredentials(accountId) {
   return apiCall("GET", `/api/v1/accounts/${accountId}/credentials`);
 }
 
+export function alertCloudflare(carrier) {
+  return apiCall("POST", "/api/v1/alerts/cloudflare", { carrier });
+}
+
 // ── Self-update check ──────────────────────────────────────────────
 
 export async function checkForUpdate() {

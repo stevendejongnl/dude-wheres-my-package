@@ -91,6 +91,18 @@ class TelegramNotifier:
             message += f"\n<b>Pod:</b> <code>{_escape_html(self._pod_name)}</code>"
         await self._send(message)
 
+    async def send_cloudflare_challenge(self, carrier: str) -> None:
+        """Extension hit a Cloudflare challenge; it runs headless in Kasm so
+        the in-browser popup is never seen — Telegram is the visible channel."""
+        timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+        message = (
+            "<b>🤖 Cloudflare challenge</b>\n\n"
+            f"<b>Carrier:</b> {_escape_html(carrier.upper())}\n"
+            f"<b>Timestamp:</b> {timestamp}\n\n"
+            "Open the Kasm browser and solve the check to resume syncing."
+        )
+        await self._send(message)
+
     async def _send(self, message: str, *, disable_notification: bool = False) -> None:
         if not self.enabled:
             logger.info("Telegram credentials not configured — skipping notification")

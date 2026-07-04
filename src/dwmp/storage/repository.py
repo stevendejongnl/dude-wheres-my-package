@@ -543,10 +543,10 @@ class PackageRepository:
 
     # --- Notification methods ---
 
-    async def has_recent_auth_failure(self, carrier: str) -> bool:
+    async def has_recent_auth_failure(self, carrier: str, status: str = "auth_failed") -> bool:
         """Check if the most recent notification for *carrier* is already
-        an ``auth_failed`` transition.  Returns ``True`` when a duplicate
-        auth-failure notification should be suppressed."""
+        a *status* transition.  Returns ``True`` when a duplicate
+        notification should be suppressed."""
         cursor = await self.db.execute(
             """SELECT new_status FROM notifications
                WHERE carrier = ?
@@ -554,7 +554,7 @@ class PackageRepository:
             (carrier,),
         )
         row = await cursor.fetchone()
-        return row is not None and row[0] == "auth_failed"
+        return row is not None and row[0] == status
 
     async def add_notification(
         self,

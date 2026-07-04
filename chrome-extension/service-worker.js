@@ -1,5 +1,6 @@
 import {
   addPackage,
+  alertCloudflare,
   browserPush,
   browserPayload,
   checkForUpdate,
@@ -694,6 +695,10 @@ function notifyCloudflareChallenge(carrier) {
     message: `${carrier.toUpperCase()} needs a Cloudflare check. Click the tab and solve it to continue syncing.`,
     priority: 2,
   });
+  // The extension runs headless in Kasm — nobody sees the popup above.
+  // Forward to the backend, which relays to Telegram.
+  // ponytail: fires once per sync attempt (max 1/interval per carrier); dedup server-side if it spams.
+  alertCloudflare(carrier).catch(() => {});
 }
 
 /**

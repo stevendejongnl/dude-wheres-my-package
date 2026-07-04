@@ -84,6 +84,27 @@ class TrackingService:
             description=message,
         )
 
+    async def notify_cloudflare_challenge(self, carrier: str) -> bool:
+        """Create a notification when a sync is blocked by a Cloudflare challenge.
+
+        Same dedup as :meth:`notify_auth_failure` — suppressed while the most
+        recent notification for this carrier is already a cloudflare_challenge.
+        The HA integration turns the notification into a
+        ``dwmp_package_status_changed`` event for automations.
+        Returns ``True`` when a notification was actually created.
+        """
+        if await self._repository.has_recent_auth_failure(carrier, status="cloudflare_challenge"):
+            return False
+        await self._repository.add_notification(
+            package_id=None,
+            old_status="syncing",
+            new_status="cloudflare_challenge",
+            tracking_number="Account",
+            carrier=carrier,
+            description="Sync blocked by a Cloudflare check — open the Kasm browser and solve it.",
+        )
+        return True
+
     # --- Account management ---
 
     async def validate_account_credentials(

@@ -257,6 +257,25 @@ async def test_poll_does_not_duplicate_auth_failure_notification(repo):
     assert notifications[0]["new_status"] == "auth_failed"
 
 
+async def test_cloudflare_challenge_notification_deduped(repo):
+    """Repeated Cloudflare challenges create only one notification until cleared."""
+    service = TrackingService(repository=repo, carriers={})
+
+    assert await service.notify_cloudflare_challenge("dpd") is True
+    assert await service.notify_cloudflare_challenge("dpd") is False
+    notifications = await repo.list_notifications()
+    assert len(notifications) == 1
+    assert notifications[0]["new_status"] == "cloudflare_challenge"
+
+    # A successful sync (status-change notification) clears the streak
+    pkg_id = await repo.add_package(tracking_number="PKG1", carrier="dpd")
+    await repo.add_notification(
+        package_id=pkg_id, old_status="unknown", new_status="in_transit",
+        tracking_number="PKG1", carrier="dpd",
+    )
+    assert await service.notify_cloudflare_challenge("dpd") is True
+
+
 async def test_poll_handles_empty(repo):
     service = TrackingService(repository=repo, carriers={})
     scheduler = PackageScheduler(tracking_service=service)
