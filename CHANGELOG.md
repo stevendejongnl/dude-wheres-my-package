@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v1.62.0 (2026-07-11)
+
+### Bug Fixes
+
+- **carriers**: Correct stuck/incorrect active tracking statuses
+  ([`6020221`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/6020221ad1b622b7dd2cc8df4c1db5e827217d39))
+
+### Chores
+
+- Update scheduled tasks lock
+  ([`62fb008`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/62fb00842ea3a40db439bc21978edefa2182f5fb))
+
+### Features
+
+- **carriers**: Add UPS via official Track API
+  ([`af6adab`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/af6adab81ce9dff2d71160ae545141476d3811d7))
+
+
 ## v1.61.0 (2026-07-04)
 
 ### Features
