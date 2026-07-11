@@ -21,9 +21,70 @@ def test_map_status_falls_back_to_description():
     assert _map_status("", "Something else") == TrackingStatus.UNKNOWN
 
 
-async def test_track_without_credentials_returns_unknown():
+async def test_track_without_credentials_uses_browser(monkeypatch):
+    """No API creds (UPS API requires a paying account) → Playwright scrape."""
     carrier = UPS(client_id="", client_secret="")
+    called = {}
+
+    async def fake_browser_track(tracking_number):
+        called["tn"] = tracking_number
+        return "browser-result"
+
+    monkeypatch.setattr(carrier, "_track_via_browser", fake_browser_track)
     result = await carrier.track("1Z979Y556807514675")
+    assert result == "browser-result"
+    assert called["tn"] == "1Z979Y556807514675"
+
+
+def test_parse_web_json_delivered():
+    """The JSON the ups.com track page's own GetStatus XHR returns."""
+    carrier = UPS()
+    data = {
+        "statusCode": "200",
+        "trackDetails": [
+            {
+                "trackingNumber": "1Z979Y556807514675",
+                "packageStatus": "Delivered",
+                "packageStatusType": "D",
+                "scheduledDeliveryDate": "",
+                "shipmentProgressActivities": [
+                    {
+                        # date/time are locale-formatted (DD/MM, 24h for en_NL)
+                        # — gmtDate/gmtTime are the reliable fields.
+                        "date": "11/07/2026",
+                        "time": "12:30",
+                        "gmtDate": "20260711",
+                        "gmtTime": "10:30:45",
+                        "location": "Amstelveen, NL",
+                        "activityScan": "Delivered",
+                        "trackingStatusType": "D",
+                    },
+                    {
+                        "date": "11/07/2026",
+                        "time": "0:15",
+                        "gmtDate": "20260710",
+                        "gmtTime": "22:15:00",
+                        "location": "Eindhoven, NL",
+                        "activityScan": "Departed from Facility",
+                        "trackingStatusType": None,
+                    },
+                ],
+            }
+        ],
+    }
+    result = carrier._parse_web_json("1Z979Y556807514675", data)
+    assert result.status == TrackingStatus.DELIVERED
+    assert len(result.events) == 2
+    assert result.events[0].status == TrackingStatus.IN_TRANSIT
+    assert result.events[0].timestamp.isoformat() == "2026-07-10T22:15:00+00:00"
+    assert result.events[1].timestamp.isoformat() == "2026-07-11T10:30:45+00:00"
+    assert result.events[1].description == "Delivered"
+    assert result.events[1].location == "Amstelveen, NL"
+
+
+def test_parse_web_json_no_details():
+    carrier = UPS()
+    result = carrier._parse_web_json("1Z000", {"statusCode": "200", "trackDetails": []})
     assert result.status == TrackingStatus.UNKNOWN
     assert result.events == []
 

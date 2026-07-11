@@ -913,6 +913,7 @@ async function handlePostNLLogin(tabId, username, password) {
 // Amazon's own logistics shows "AMAZON" or "Delivery By Amazon".
 const SHIP_TRACK_CARRIER_MAP = {
   dragonfly: "dragonfly",
+  ups: "ups",
 };
 
 /**

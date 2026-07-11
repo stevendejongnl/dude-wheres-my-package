@@ -58,8 +58,8 @@ STATUS_MAP: list[tuple[str, TrackingStatus]] = [
 ]
 
 
-def _map_status(type_code: str, description: str) -> TrackingStatus:
-    status = _STATUS_TYPE_MAP.get(type_code.upper())
+def _map_status(type_code: str | None, description: str) -> TrackingStatus:
+    status = _STATUS_TYPE_MAP.get((type_code or "").upper())
     if status:
         return status
     lower = description.lower()
@@ -74,6 +74,20 @@ def _parse_activity_ts(date_str: str, time_str: str) -> datetime:
     try:
         return datetime.strptime(
             f"{date_str}{(time_str or '000000'):0>6}", "%Y%m%d%H%M%S"
+        ).replace(tzinfo=UTC)
+    except ValueError:
+        return no_date_fallback()
+
+
+def _parse_web_ts(gmt_date: str, gmt_time: str) -> datetime:
+    """Web GetStatus gmtDate/gmtTime: YYYYMMDD + HH:MM:SS in GMT.
+
+    The `date`/`time` fields are locale-formatted (DD/MM vs MM/DD, 12/24h
+    depending on loc=) — never parse those.
+    """
+    try:
+        return datetime.strptime(
+            f"{gmt_date} {gmt_time or '00:00:00'}", "%Y%m%d %H:%M:%S"
         ).replace(tzinfo=UTC)
     except ValueError:
         return no_date_fallback()
@@ -101,16 +115,10 @@ class UPS(CarrierBase):
         self._token_deadline = 0.0
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        # The official API needs a paying UPS account; without creds fall back
+        # to scraping the public track page (same approach as DHL's fallback).
         if not (self._client_id and self._client_secret):
-            logger.warning(
-                "UPS_CLIENT_ID / UPS_CLIENT_SECRET not configured — "
-                "cannot track %s", tracking_number,
-            )
-            return TrackingResult(
-                tracking_number=tracking_number,
-                carrier=self.name,
-                status=TrackingStatus.UNKNOWN,
-            )
+            return await self._track_via_browser(tracking_number)
 
         token = await self._get_token()
 
@@ -140,6 +148,107 @@ class UPS(CarrierBase):
                 status=TrackingStatus.UNKNOWN,
             )
         return self._parse_track_response(tracking_number, response.json())
+
+    async def _track_via_browser(self, tracking_number: str) -> TrackingResult:
+        """Scrape ups.com/track with Playwright and intercept the page's own
+        GetStatus XHR — plain httpx is blocked by UPS's TLS fingerprinting."""
+        from playwright.async_api import async_playwright
+
+        from dwmp.carriers.browser import (
+            _USER_AGENT,
+            _browser_lock,
+            _launch_browser,
+            _stealth,
+        )
+
+        url = f"https://www.ups.com/track?loc=en_NL&tracknum={tracking_number}"
+
+        async with _browser_lock:
+            async with _stealth(_USER_AGENT).use_async(async_playwright()) as pw:
+                browser = await _launch_browser(pw)
+                try:
+                    context = await browser.new_context(
+                        user_agent=_USER_AGENT,
+                        viewport={"width": 1280, "height": 800},
+                        locale="en-GB",
+                        timezone_id="Europe/Amsterdam",
+                    )
+                    page = await context.new_page()
+                    async with page.expect_response(
+                        lambda r: "track/api/Track/GetStatus" in r.url,
+                        timeout=30_000,
+                    ) as response_info:
+                        await page.goto(
+                            url, wait_until="domcontentloaded", timeout=30_000
+                        )
+                    response = await response_info.value
+                    data = await response.json()
+                except Exception:
+                    logger.warning(
+                        "UPS track page scrape failed for %s", tracking_number,
+                        exc_info=True,
+                    )
+                    return TrackingResult(
+                        tracking_number=tracking_number,
+                        carrier=self.name,
+                        status=TrackingStatus.UNKNOWN,
+                    )
+                finally:
+                    await browser.close()
+
+        return self._parse_web_json(tracking_number, data)
+
+    def _parse_web_json(self, tracking_number: str, data: dict) -> TrackingResult:
+        """Parse the ups.com web GetStatus JSON (unofficial, page-internal)."""
+        details = (data.get("trackDetails") or [None])[0] or {}
+        if not details:
+            return TrackingResult(
+                tracking_number=tracking_number,
+                carrier=self.name,
+                status=TrackingStatus.UNKNOWN,
+            )
+
+        events: list[TrackingEvent] = []
+        for activity in details.get("shipmentProgressActivities") or []:
+            description = (activity.get("activityScan") or "").strip()
+            if not description:
+                continue
+            events.append(TrackingEvent(
+                timestamp=_parse_web_ts(
+                    activity.get("gmtDate", ""), activity.get("gmtTime", "")
+                ),
+                status=_map_status(
+                    activity.get("trackingStatusType"), description
+                ),
+                description=description,
+                location=(activity.get("location") or "").strip() or None,
+            ))
+        events.sort(key=lambda e: e.timestamp)
+
+        status = _map_status(
+            details.get("packageStatusType", ""),
+            details.get("packageStatus", ""),
+        )
+        if status == TrackingStatus.UNKNOWN and events:
+            status = events[-1].status
+
+        # scheduledDeliveryDate is locale-formatted; we always request
+        # loc=en_NL so it's DD/MM/YYYY.
+        estimated = None
+        sched = details.get("scheduledDeliveryDate", "")
+        if sched:
+            try:
+                estimated = datetime.strptime(sched, "%d/%m/%Y").replace(tzinfo=UTC)
+            except ValueError:
+                pass
+
+        return TrackingResult(
+            tracking_number=tracking_number,
+            carrier=self.name,
+            status=status,
+            estimated_delivery=estimated,
+            events=events,
+        )
 
     async def sync_packages(
         self, tokens: AuthTokens, lookback_days: int = 30
