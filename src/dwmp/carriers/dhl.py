@@ -44,7 +44,15 @@ STATUS_MAP: list[tuple[str, TrackingStatus]] = [
     ("failed delivery", TrackingStatus.FAILED_ATTEMPT),
     ("returned", TrackingStatus.RETURNED),
     ("returned_to_shipper", TrackingStatus.RETURNED),
+    ("return_hub", TrackingStatus.RETURNED),
 ]
+
+# Latest-event descriptions that mean the parcel went back to the sender.
+# DHL keeps statusCode=transit for the entire return trip, so the
+# description is the only signal. Only applied to the newest event —
+# a mid-timeline "returned from the route of the courier" just means an
+# undelivered parcel is back at the depot.
+_RETURN_PHRASES = ("returned to sender", "retour naar afzender")
 
 # Fallback for parcel-list statuses STATUS_MAP doesn't know (e.g.
 # PARCEL_SCANNED_AT_RETURN_HUB) — the category field is coarse but reliable.
@@ -371,11 +379,17 @@ class DHL(CarrierBase):
                 location=location,
             ))
 
+        events.sort(key=lambda e: e.timestamp)
+        if events and any(
+            phrase in events[-1].description.lower() for phrase in _RETURN_PHRASES
+        ):
+            status = TrackingStatus.RETURNED
+
         return TrackingResult(
             tracking_number=tracking_number,
             carrier=self.name,
             status=status,
-            events=sorted(events, key=lambda e: e.timestamp),
+            events=events,
         )
 
     def _parse_tracking_html(self, tracking_number: str, html: str) -> TrackingResult:

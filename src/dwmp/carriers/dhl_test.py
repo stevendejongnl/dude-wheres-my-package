@@ -50,10 +50,9 @@ def test_parse_parcel_delivered():
     assert result.events[1].status == TrackingStatus.DELIVERED
 
 
-def test_parse_parcel_underway_moment_is_estimate_not_delivery():
-    """An undelivered parcel's MomentIndication is the *expected* delivery
-    moment — it must not fabricate a Bezorgd/DELIVERED event. Unmapped
-    status codes fall back to the category field (UNDERWAY → in_transit)."""
+def test_parse_parcel_return_hub_is_returned():
+    """A return-shipment scan maps to RETURNED, and its MomentIndication is
+    the *expected* moment — it must not fabricate a Bezorgd/DELIVERED event."""
     carrier = DHL()
     parcel = {
         "parcelId": "ret-1",
@@ -68,10 +67,50 @@ def test_parse_parcel_underway_moment_is_estimate_not_delivery():
         },
     }
     result = carrier._parse_parcel(parcel)
-    assert result.status == TrackingStatus.IN_TRANSIT
+    assert result.status == TrackingStatus.RETURNED
     assert all(e.status != TrackingStatus.DELIVERED for e in result.events)
     assert result.estimated_delivery is not None
     assert result.estimated_delivery.isoformat() == "2026-07-14T09:21:34+00:00"
+
+
+def test_parse_parcel_unmapped_status_falls_back_to_category():
+    carrier = DHL()
+    parcel = {
+        "barcode": "3SXYZ0000000001",
+        "status": "SOME_NEW_STATUS_CODE",
+        "category": "UNDERWAY",
+    }
+    assert carrier._parse_parcel(parcel).status == TrackingStatus.IN_TRANSIT
+
+
+def test_parse_unified_response_returned_to_sender():
+    """DHL keeps statusCode=transit on the whole return trip — the latest
+    event's description is the only signal the parcel went back."""
+    carrier = DHL()
+    data = {
+        "shipments": [{
+            "id": "3SAMZ9002223265",
+            "status": {"statusCode": "transit", "description": "Returned to sender"},
+            "events": [
+                {
+                    "timestamp": "2026-07-09T11:21:34",
+                    "statusCode": "transit",
+                    "description": "Returned to sender",
+                },
+                {
+                    "timestamp": "2026-07-06T17:16:21",
+                    "statusCode": "transit",
+                    "description": "Returned from the route of the courier",
+                },
+            ],
+        }],
+    }
+    result = carrier._parse_unified_response("3SAMZ9002223265", data)
+    assert result.status == TrackingStatus.RETURNED
+    # mid-timeline "returned from the route" (undelivered, back at depot)
+    # must NOT mark the parcel returned — only the latest event counts
+    events_by_ts = sorted(result.events, key=lambda e: e.timestamp)
+    assert events_by_ts[0].status == TrackingStatus.IN_TRANSIT
 
 
 def test_parse_parcel_pre_transit():

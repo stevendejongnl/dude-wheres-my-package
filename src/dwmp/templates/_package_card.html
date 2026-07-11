@@ -8,7 +8,8 @@
     expanded  — optional, if true render card-body open (used by HTMX responses)
 #}
 <div class="card" id="pkg-{{ pkg.id }}">
-  <div class="card-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+  {# Don't toggle when the click ends a text selection (copying a tracking number) #}
+  <div class="card-header" onclick="if (!getSelection().toString()) this.nextElementSibling.classList.toggle('collapsed')">
     <div class="pkg-main">
       <span class="pkg-carrier {{ pkg.carrier }}">{{ pkg.carrier }}</span>
       <div class="pkg-info">
