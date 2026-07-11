@@ -46,6 +46,13 @@ STATUS_MAP: list[tuple[str, TrackingStatus]] = [
     ("returned_to_shipper", TrackingStatus.RETURNED),
 ]
 
+# Fallback for parcel-list statuses STATUS_MAP doesn't know (e.g.
+# PARCEL_SCANNED_AT_RETURN_HUB) — the category field is coarse but reliable.
+_CATEGORY_MAP: dict[str, TrackingStatus] = {
+    "UNDERWAY": TrackingStatus.IN_TRANSIT,
+    "DELIVERED": TrackingStatus.DELIVERED,
+}
+
 
 def _ensure_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
@@ -238,6 +245,10 @@ class DHL(CarrierBase):
         barcode = parcel.get("barcode", "unknown")
         status_text = parcel.get("status", "")
         status = _parse_status(status_text)
+        if status == TrackingStatus.UNKNOWN:
+            status = _CATEGORY_MAP.get(
+                parcel.get("category", "").upper(), TrackingStatus.UNKNOWN
+            )
 
         sender_name = parcel.get("sender", {}).get("name", "")
 
@@ -261,16 +272,22 @@ class DHL(CarrierBase):
         window_end = None
 
         if indication_type == "MomentIndication":
+            # For an undelivered parcel the moment is the *expected* delivery
+            # time — only a delivered parcel gets a Bezorgd event from it.
             moment = receiving.get("moment")
             if moment:
                 try:
+                    moment_dt = _ensure_utc(datetime.fromisoformat(moment))
+                except ValueError:
+                    moment_dt = None
+                if moment_dt and status == TrackingStatus.DELIVERED:
                     events.append(TrackingEvent(
-                        timestamp=_ensure_utc(datetime.fromisoformat(moment)),
+                        timestamp=moment_dt,
                         status=TrackingStatus.DELIVERED,
                         description="Bezorgd",
                     ))
-                except ValueError:
-                    pass
+                elif moment_dt:
+                    estimated = moment_dt
         elif indication_type == "IntervalIndication":
             start = receiving.get("start")
             end = receiving.get("end")

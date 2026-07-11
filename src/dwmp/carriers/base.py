@@ -18,6 +18,8 @@ class TrackingStatus(StrEnum):
     PRE_TRANSIT = "pre_transit"
     IN_TRANSIT = "in_transit"
     OUT_FOR_DELIVERY = "out_for_delivery"
+    # At a pickup point waiting for the customer — still "active" in the UI.
+    READY_FOR_PICKUP = "ready_for_pickup"
     DELIVERED = "delivered"
     FAILED_ATTEMPT = "failed_attempt"
     RETURNED = "returned"

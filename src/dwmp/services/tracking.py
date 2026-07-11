@@ -759,34 +759,36 @@ class TrackingService:
             await self._repository.mark_refreshed(package_id, failure=True)
             return await self.get_package(package_id)
 
-        # Downgrade safeguard: a public track() that returns UNKNOWN with no
-        # events means the carrier couldn't resolve the package (missing
-        # postal_code, unimplemented endpoint, transient error). Don't let that
-        # overwrite a good status from a prior sync — just bump last_refreshed_at
-        # so the scheduler won't retry it immediately.
-        is_empty_result = (
-            result.status == TrackingStatus.UNKNOWN
-            and not result.events
-        )
+        # Downgrade safeguard: never overwrite a known status with UNKNOWN —
+        # whether the carrier couldn't resolve the package (empty result) or
+        # returned events whose phrases we don't map yet. Matches the
+        # account-sync guard in _persist_account_results. Events (if any) are
+        # still appended below; an empty UNKNOWN counts as a failure so the
+        # scheduler can eventually stop polling dead packages.
         stored_status = pkg.get("current_status", TrackingStatus.UNKNOWN.value)
-        if is_empty_result and stored_status != TrackingStatus.UNKNOWN.value:
-            await self._repository.mark_refreshed(package_id, failure=True)
-            logger.debug(
-                "Preserved status for package %s (%s): track() returned empty UNKNOWN",
-                package_id, pkg["carrier"],
-            )
-            return await self.get_package(package_id)
-
-        latest_desc = result.events[-1].description if result.events else None
-        est = result.estimated_delivery.isoformat() if result.estimated_delivery else None
-        win_end = result.delivery_window_end.isoformat() if result.delivery_window_end else None
-        await self._update_package_status(
-            package_id, result.status.value,
-            pkg["tracking_number"], pkg["carrier"], pkg.get("label"),
-            description=latest_desc,
-            estimated_delivery=est,
-            delivery_window_end=win_end,
+        preserve = (
+            result.status == TrackingStatus.UNKNOWN
+            and stored_status != TrackingStatus.UNKNOWN.value
         )
+        if preserve:
+            await self._repository.mark_refreshed(
+                package_id, failure=not result.events
+            )
+            logger.debug(
+                "Preserved status for package %s (%s): track() returned UNKNOWN, stored=%s",
+                package_id, pkg["carrier"], stored_status,
+            )
+        else:
+            latest_desc = result.events[-1].description if result.events else None
+            est = result.estimated_delivery.isoformat() if result.estimated_delivery else None
+            win_end = result.delivery_window_end.isoformat() if result.delivery_window_end else None
+            await self._update_package_status(
+                package_id, result.status.value,
+                pkg["tracking_number"], pkg["carrier"], pkg.get("label"),
+                description=latest_desc,
+                estimated_delivery=est,
+                delivery_window_end=win_end,
+            )
         for event in result.events:
             await self._repository.add_event(
                 package_id=package_id,

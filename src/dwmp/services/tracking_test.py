@@ -477,6 +477,42 @@ async def test_sync_preserves_status_when_carrier_returns_unknown(repo):
     assert pkg["current_status"] == "in_transit"
 
 
+async def test_refresh_preserves_status_when_unknown_result_has_events(repo):
+    """track() returning UNKNOWN *with* events (unmapped carrier phrase) must
+    not downgrade a delivered package back to unknown (PostNL pickup-point bug)."""
+    class UnknownWithEventsCarrier(CarrierBase):
+        name = "unk-events"
+        auth_type = AuthType.MANUAL_TOKEN
+
+        async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+            return TrackingResult(
+                tracking_number=tracking_number,
+                carrier=self.name,
+                status=TrackingStatus.UNKNOWN,
+                events=[TrackingEvent(
+                    timestamp=datetime(2026, 7, 8, 14, 41, tzinfo=UTC),
+                    status=TrackingStatus.UNKNOWN,
+                    description="Zending is afgehaald bij PostNL-punt",
+                )],
+            )
+
+        async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
+            return []
+
+        async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+            return AuthTokens(access_token="tok")
+
+    service = TrackingService(repository=repo, carriers={"unk-events": UnknownWithEventsCarrier()})
+    pkg = await service.add_package(tracking_number="PNT-1", carrier="unk-events")
+    await repo.update_status(pkg["id"], "delivered")
+
+    refreshed = await service.refresh_package(pkg["id"])
+    assert refreshed is not None
+    assert refreshed["current_status"] == "delivered"
+    # events still appended for the timeline
+    assert any("afgehaald" in e["description"] for e in refreshed["events"])
+
+
 async def test_validate_account_credentials_by_id_recovers_auth_failed(repo):
     """A stuck auth_failed account transitions back to connected when login succeeds."""
     carrier = RecoveringCarrier()

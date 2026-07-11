@@ -50,6 +50,30 @@ def test_parse_parcel_delivered():
     assert result.events[1].status == TrackingStatus.DELIVERED
 
 
+def test_parse_parcel_underway_moment_is_estimate_not_delivery():
+    """An undelivered parcel's MomentIndication is the *expected* delivery
+    moment — it must not fabricate a Bezorgd/DELIVERED event. Unmapped
+    status codes fall back to the category field (UNDERWAY → in_transit)."""
+    carrier = DHL()
+    parcel = {
+        "parcelId": "ret-1",
+        "barcode": "3SAMZ9002223265",
+        "status": "PARCEL_SCANNED_AT_RETURN_HUB",
+        "category": "UNDERWAY",
+        "sender": {"name": "Steven de Jong"},
+        "createdAt": "2026-07-05T16:28:06.671326Z",
+        "receivingTimeIndication": {
+            "moment": "2026-07-14T09:21:34Z",
+            "indicationType": "MomentIndication",
+        },
+    }
+    result = carrier._parse_parcel(parcel)
+    assert result.status == TrackingStatus.IN_TRANSIT
+    assert all(e.status != TrackingStatus.DELIVERED for e in result.events)
+    assert result.estimated_delivery is not None
+    assert result.estimated_delivery.isoformat() == "2026-07-14T09:21:34+00:00"
+
+
 def test_parse_parcel_pre_transit():
     carrier = DHL()
     parcel = {

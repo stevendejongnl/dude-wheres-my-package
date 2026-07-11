@@ -87,6 +87,10 @@ def _details_from_tracking_url(details_url: str | None) -> tuple[str | None, str
 
 # Ordered most-specific first to avoid partial matches
 STATUS_MAP: list[tuple[str, TrackingStatus]] = [
+    # Pickup-point flow: "ligt klaar" = waiting at the point, "afgehaald" =
+    # customer collected it (terminal).
+    ("afgehaald", TrackingStatus.DELIVERED),
+    ("ligt klaar", TrackingStatus.READY_FOR_PICKUP),
     ("Bezorger is onderweg", TrackingStatus.OUT_FOR_DELIVERY),
     ("Bezorgd", TrackingStatus.DELIVERED),
     ("Onderweg naar bestemming", TrackingStatus.IN_TRANSIT),

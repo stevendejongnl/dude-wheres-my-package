@@ -35,6 +35,14 @@ def test_parse_status_case_insensitive():
     assert _parse_status("bezorgd") == TrackingStatus.DELIVERED
 
 
+def test_parse_status_picked_up_at_postnl_point():
+    assert _parse_status("Zending is afgehaald bij PostNL-punt") == TrackingStatus.DELIVERED
+
+
+def test_parse_status_ready_for_pickup_at_postnl_point():
+    assert _parse_status("Pakket ligt klaar bij PostNL-punt") == TrackingStatus.READY_FOR_PICKUP
+
+
 async def test_parse_json_response():
     carrier = PostNL()
     mock_data = {
