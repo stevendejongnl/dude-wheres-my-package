@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.63.0 (2026-07-11)
+
+### Features
+
+- **ups**: Browser scrape fallback + register Amazon UPS shipments
+  ([`9910367`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/9910367cc922ddd1adb3d9f8f34d1ae72b2e1a9a))
+
+
 ## v1.62.0 (2026-07-11)
 
 ### Bug Fixes
