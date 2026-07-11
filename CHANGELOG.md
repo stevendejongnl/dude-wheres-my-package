@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.63.1 (2026-07-11)
+
+### Bug Fixes
+
+- **dhl**: Detect returned-to-sender parcels; card toggle ignores text selection
+  ([`88cda5e`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/88cda5e2ba92c9d178353752ad7525909f20ef15))
+
+
 ## v1.63.0 (2026-07-11)
 
 ### Features
