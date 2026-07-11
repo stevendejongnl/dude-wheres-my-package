@@ -25,7 +25,7 @@ async def test_list_carriers():
     assert response.status_code == 200
     carriers = response.json()
     names = {c["name"] for c in carriers}
-    assert names == {"amazon", "dhl", "dpd", "dragonfly", "gls", "postnl", "trunkrs"}
+    assert names == {"amazon", "dhl", "dpd", "dragonfly", "gls", "postnl", "trunkrs", "ups"}
     assert all("auth_type" in c for c in carriers)
 
 

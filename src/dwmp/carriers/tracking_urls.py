@@ -1,6 +1,7 @@
 _TEMPLATES: dict[str, str] = {
     "dpd": "https://www.dpd.com/nl/nl/ontvangen/track-en-trace/?shipmentNumber={tn}",
     "gls": "https://gls-group.com/app/service/open/rstt/NL/nl/{tn}",
+    "ups": "https://www.ups.com/track?loc=en_NL&tracknum={tn}",
 }
 
 _DHL_DEEP = "https://my.dhlecommerce.nl/home/tracktrace/{tn}/{postal_code}"
