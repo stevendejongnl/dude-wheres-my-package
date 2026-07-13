@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.63.2 (2026-07-13)
+
+### Bug Fixes
+
+- **ui**: Allow selecting tracking number (parent had user-select:none)
+  ([`d094637`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/d0946379873edd4a18d77b3af7fdee66a23f3563))
+
+
 ## v1.63.1 (2026-07-11)
 
 ### Bug Fixes
