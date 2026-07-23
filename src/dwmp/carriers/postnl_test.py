@@ -282,6 +282,7 @@ def test_parse_browser_payload_prefers_detail_payload_for_active_shipments():
     assert active.status == TrackingStatus.OUT_FOR_DELIVERY
     assert len(active.events) == 2
     assert delivered.status == TrackingStatus.DELIVERED
+    assert active.label == "Pakket van bol"
 
 
 def test_parse_browser_payload_missing_details_falls_back_to_graphql():

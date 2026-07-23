@@ -1,5 +1,6 @@
 import re
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
 
@@ -381,9 +382,11 @@ class PostNL(CarrierBase):
             data = detail.get("data")
             if not tracking_number or not isinstance(data, dict):
                 continue
-            results_by_tracking[tracking_number] = self._parse_json(
-                tracking_number, data
-            )
+            graphql_result = results_by_tracking.get(tracking_number)
+            detail_result = self._parse_json(tracking_number, data)
+            if graphql_result and graphql_result.label:
+                detail_result = replace(detail_result, label=graphql_result.label)
+            results_by_tracking[tracking_number] = detail_result
 
         cutoff = self._now(UTC) - timedelta(days=lookback_days)
         filtered: list[TrackingResult] = []
