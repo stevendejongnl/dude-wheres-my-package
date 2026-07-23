@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.64.1 (2026-07-23)
+
+### Bug Fixes
+
+- **postnl**: Preserve label when detail payload overwrites graphql result
+  ([`3cd25e1`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/3cd25e1ea6d33b2f0a3340ee7ca29960a52366d2))
+
+
 ## v1.64.0 (2026-07-23)
 
 ### Features
