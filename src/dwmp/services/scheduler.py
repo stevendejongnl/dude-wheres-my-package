@@ -161,6 +161,7 @@ class PackageScheduler:
 
 _DELIVERED_CUTOFF_DAYS = 14
 _MAX_CONSECUTIVE_FAILURES = 5
+_STALE_REPROBE_HOURS = 24
 
 
 def _should_skip(pkg: dict) -> bool:
@@ -170,10 +171,21 @@ def _should_skip(pkg: dict) -> bool:
     - Delivered and last updated more than 14 days ago — the carrier page is
       stale, nothing new will appear.
     - 5+ consecutive tracking failures — the carrier can no longer resolve this
-      package (too old, archived, never existed on the public API).
+      package right now. Rather than skip forever (which would freeze the
+      package even if the carrier's outage was transient), it gets re-probed
+      once every _STALE_REPROBE_HOURS — same as auth_failed accounts.
     """
     if pkg.get("consecutive_failures", 0) >= _MAX_CONSECUTIVE_FAILURES:
-        return True
+        last_refreshed_at = pkg.get("last_refreshed_at")
+        if not last_refreshed_at:
+            return False
+        try:
+            ts = datetime.fromisoformat(last_refreshed_at)
+        except ValueError:
+            return False
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=UTC)
+        return datetime.now(UTC) - ts < timedelta(hours=_STALE_REPROBE_HOURS)
 
     if pkg.get("current_status") == "delivered":
         updated = pkg.get("updated_at")

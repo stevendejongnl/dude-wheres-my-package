@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from dwmp.carriers.base import (
@@ -315,19 +317,38 @@ async def test_poll_does_not_skip_delivered_package_within_14_days(repo):
     assert carrier.track_count == 1
 
 
-async def test_poll_skips_package_with_max_consecutive_failures(repo):
+async def test_poll_skips_package_with_max_consecutive_failures_within_reprobe_window(repo):
     carrier = StubCarrier()
     service = TrackingService(repository=repo, carriers={"stub": carrier})
     scheduler = PackageScheduler(tracking_service=service)
 
     pkg_id = await repo.add_package(tracking_number="FAIL1", carrier="stub")
+    now = datetime.now(UTC).isoformat()
     await repo.db.execute(
-        "UPDATE packages SET consecutive_failures = 5 WHERE id = ?", (pkg_id,)
+        "UPDATE packages SET consecutive_failures = 5, last_refreshed_at = ? WHERE id = ?",
+        (now, pkg_id),
     )
     await repo.db.commit()
 
     await scheduler._poll_all()
     assert carrier.track_count == 0
+
+
+async def test_poll_reprobes_stale_package_after_reprobe_window(repo):
+    carrier = StubCarrier()
+    service = TrackingService(repository=repo, carriers={"stub": carrier})
+    scheduler = PackageScheduler(tracking_service=service)
+
+    pkg_id = await repo.add_package(tracking_number="FAIL1", carrier="stub")
+    stale = (datetime.now(UTC) - timedelta(hours=25)).isoformat()
+    await repo.db.execute(
+        "UPDATE packages SET consecutive_failures = 5, last_refreshed_at = ? WHERE id = ?",
+        (stale, pkg_id),
+    )
+    await repo.db.commit()
+
+    await scheduler._poll_all()
+    assert carrier.track_count == 1
 
 
 async def test_consecutive_failures_incremented_on_transient_error(repo):
