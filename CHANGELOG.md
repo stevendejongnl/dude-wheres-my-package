@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.64.0 (2026-07-23)
+
+### Features
+
+- **postnl**: Map shipment title to label, backfill on existing packages
+  ([`1a44f78`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/1a44f786a2e055c056fd97d1be6350005e73ec3e))
+
+
 ## v1.63.3 (2026-07-23)
 
 ### Bug Fixes
