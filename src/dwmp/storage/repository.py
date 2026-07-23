@@ -469,6 +469,20 @@ class PackageRepository:
         )
         await self.db.commit()
 
+    async def update_package_label(self, package_id: int, label: str) -> None:
+        """Backfill label on a package row.
+
+        Used during account sync when the carrier now surfaces a label it
+        didn't before (e.g. a PostNL parcel synced before the GraphQL `title`
+        field was mapped to label).
+        """
+        now = datetime.now(UTC).isoformat()
+        await self.db.execute(
+            "UPDATE packages SET label = ?, updated_at = ? WHERE id = ?",
+            (label, now, package_id),
+        )
+        await self.db.commit()
+
     async def update_package_postal_code(
         self, package_id: int, postal_code: str
     ) -> None:

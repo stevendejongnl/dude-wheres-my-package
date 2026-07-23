@@ -460,6 +460,8 @@ class TrackingService:
                 await self._repository.update_package_tracking_url(
                     pkg_id, result.tracking_url
                 )
+            if result.label and existing and not existing.get("label"):
+                await self._repository.update_package_label(pkg_id, result.label)
 
             latest_desc = result.events[-1].description if result.events else None
             est = result.estimated_delivery.isoformat() if result.estimated_delivery else None

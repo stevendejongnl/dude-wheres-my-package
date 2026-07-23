@@ -276,6 +276,7 @@ class PostNL(CarrierBase):
             events=sorted(events, key=lambda e: e.timestamp),
             postal_code=postal_code,
             tracking_url=tracking_url,
+            label=title or None,
         )
 
     def _parse_json(self, tracking_number: str, data: dict) -> TrackingResult:
@@ -417,6 +418,7 @@ class PostNL(CarrierBase):
             events=enriched.events or result.events,
             postal_code=result.postal_code or enriched.postal_code,
             tracking_url=result.tracking_url or enriched.tracking_url,
+            label=result.label or enriched.label,
         )
 
 

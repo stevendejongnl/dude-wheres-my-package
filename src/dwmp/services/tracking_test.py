@@ -513,6 +513,45 @@ async def test_refresh_preserves_status_when_unknown_result_has_events(repo):
     assert any("afgehaald" in e["description"] for e in refreshed["events"])
 
 
+class LabeledSyncCarrier(CarrierBase):
+    name = "labeled"
+    auth_type = AuthType.CREDENTIALS
+
+    async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        raise NotImplementedError
+
+    async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
+        return [
+            TrackingResult(
+                tracking_number="TRK-LABEL",
+                carrier="labeled",
+                status=TrackingStatus.IN_TRANSIT,
+                label="Hashop",
+            )
+        ]
+
+    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+        return AuthTokens(access_token="stub-token")
+
+
+async def test_sync_account_backfills_label_on_existing_package(repo):
+    """An existing package synced before label-mapping existed gets it backfilled."""
+    service = TrackingService(repository=repo, carriers={"labeled": LabeledSyncCarrier()})
+    account_id = await repo.add_account(
+        carrier="labeled", auth_type="credentials",
+        tokens={"access_token": "token"},
+        username="user@test.com",
+    )
+    await repo.add_package(
+        tracking_number="TRK-LABEL", carrier="labeled", account_id=account_id, source="account",
+    )
+
+    await service.sync_account(account_id)
+
+    pkg = await repo.find_package("TRK-LABEL", "labeled")
+    assert pkg["label"] == "Hashop"
+
+
 async def test_validate_account_credentials_by_id_recovers_auth_failed(repo):
     """A stuck auth_failed account transitions back to connected when login succeeds."""
     carrier = RecoveringCarrier()

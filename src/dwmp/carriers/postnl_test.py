@@ -103,6 +103,7 @@ def test_parse_graphql_shipment_delivered():
     result = carrier._parse_graphql_shipment(shipment)
     assert result.tracking_number == "3STEST000001"
     assert result.status == TrackingStatus.DELIVERED
+    assert result.label == "Pakket van bol"
     assert len(result.events) == 2
     assert result.events[0].status == TrackingStatus.PRE_TRANSIT
     assert result.events[1].status == TrackingStatus.DELIVERED
