@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.63.3 (2026-07-23)
+
+### Bug Fixes
+
+- **scheduler**: Re-probe stale packages every 24h instead of skipping forever
+  ([`a619388`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/a6193887d6276dd691191be3f1cdb39feffcc7b8))
+
+
 ## v1.63.2 (2026-07-13)
 
 ### Bug Fixes
