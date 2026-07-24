@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.64.2 (2026-07-24)
+
+### Bug Fixes
+
+- **amazon**: Correct Tracking-id label regex, normalize tracking numbers server-side
+  ([`bcf5926`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/bcf5926aea3f9a4d8c5f6cc86c3b64186249bec7))
+
+
 ## v1.64.1 (2026-07-23)
 
 ### Bug Fixes
