@@ -947,7 +947,7 @@ async function scrapeAmazonShipTrackCarriers(tabId, ordersHtml) {
           const carrierEl = document.querySelector(".tracking-event-carrier-header, .pt-delivery-card-wrapper");
           const idEl = document.querySelector(".pt-delivery-card-trackingId");
           const carrierText = carrierEl?.innerText?.trim() || "";
-          const trackingId = idEl?.innerText?.replace(/Tracking ID:/i, "").trim() || "";
+          const trackingId = idEl?.innerText?.replace(/Tracking[\s-]?id:?/i, "").trim() || "";
           return { carrierText, trackingId };
         },
       });

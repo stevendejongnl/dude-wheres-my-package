@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from dataclasses import asdict
 
 from dwmp.carriers.base import (
@@ -16,6 +17,17 @@ from dwmp.carriers.base import (
 from dwmp.storage.repository import PackageRepository
 
 logger = logging.getLogger(__name__)
+
+# Amazon's ship-track page renders tracking IDs with a leading label
+# ("Tracking ID:", "Tracking-id:") that a DOM-scrape can fail to strip if the
+# page's exact wording drifts (see the extension's service-worker.js scraper).
+# Stripping it here too means a future scrape regression degrades to a
+# correct dedup instead of a duplicate package row.
+_TRACKING_ID_LABEL_RE = re.compile(r"^\s*Tracking[\s-]?id:?\s*", re.IGNORECASE)
+
+
+def _normalize_tracking_number(tracking_number: str) -> str:
+    return _TRACKING_ID_LABEL_RE.sub("", tracking_number).strip()
 
 
 class TrackingService:
@@ -713,6 +725,7 @@ class TrackingService:
         label: str | None = None,
         postal_code: str | None = None,
     ) -> dict:
+        tracking_number = _normalize_tracking_number(tracking_number)
         pkg_id = await self._repository.add_package(
             tracking_number=tracking_number,
             carrier=carrier,

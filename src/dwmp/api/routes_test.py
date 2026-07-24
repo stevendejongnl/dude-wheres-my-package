@@ -115,6 +115,21 @@ async def test_add_package(client: AsyncClient):
     assert data["source"] == "manual"
 
 
+async def test_add_package_strips_tracking_id_label_prefix(client: AsyncClient):
+    """A scraped tracking number that still has its DOM label prefix
+
+    (e.g. Amazon's ship-track page rendering "Tracking-id: 1Z...") must be
+    normalized before storage, so it dedupes correctly against a clean
+    tracking number for the same parcel instead of creating a duplicate row.
+    """
+    response = await client.post(
+        "/api/v1/packages",
+        json={"tracking_number": "Tracking-id: 1Z979Y556807514675", "carrier": "ups"},
+    )
+    assert response.status_code == 201
+    assert response.json()["tracking_number"] == "1Z979Y556807514675"
+
+
 async def test_add_duplicate_package_returns_409(client: AsyncClient):
     payload = {"tracking_number": "DUP1", "carrier": "dpd"}
     await client.post("/api/v1/packages", json=payload)
