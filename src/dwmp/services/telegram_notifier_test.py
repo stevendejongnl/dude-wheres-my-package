@@ -10,18 +10,18 @@ def test_escape_html_handles_all_specials():
     )
 
 
-def test_disabled_without_credentials():
-    notifier = TelegramNotifier(bot_token=None, chat_id=None, pod_name=None)
+def test_disabled_without_apprise_url():
+    notifier = TelegramNotifier(apprise_url=None, pod_name=None)
     assert notifier.enabled is False
 
 
-def test_enabled_with_both_credentials():
-    notifier = TelegramNotifier(bot_token="t", chat_id="c", pod_name=None)
+def test_enabled_with_apprise_url():
+    notifier = TelegramNotifier(apprise_url="http://apprise/notify/app-reports", pod_name=None)
     assert notifier.enabled is True
 
 
-async def test_send_startup_noop_without_credentials(caplog):
-    notifier = TelegramNotifier(bot_token=None, chat_id=None, pod_name=None)
+async def test_send_startup_noop_without_apprise_url(caplog):
+    notifier = TelegramNotifier(apprise_url=None, pod_name=None)
     with caplog.at_level("INFO"):
         await notifier.send_startup("1.0.0")
     assert any("not configured" in r.message for r in caplog.records)
@@ -51,15 +51,15 @@ async def test_send_startup_posts_formatted_message(monkeypatch):
 
     monkeypatch.setattr("dwmp.services.telegram_notifier.httpx.AsyncClient", FakeClient)
 
-    notifier = TelegramNotifier(bot_token="bot-123", chat_id="chat-456", pod_name="dwmp-xyz")
+    notifier = TelegramNotifier(apprise_url="http://apprise/notify/app-reports", pod_name="dwmp-xyz")
     await notifier.send_startup("9.9.9")
 
-    assert captured["url"] == "https://api.telegram.org/botbot-123/sendMessage"
-    assert captured["json"]["chat_id"] == "chat-456"
-    assert captured["json"]["parse_mode"] == "HTML"
-    assert "DWMP started" in captured["json"]["text"]
-    assert "9.9.9" in captured["json"]["text"]
-    assert "dwmp-xyz" in captured["json"]["text"]
+    assert captured["url"] == "http://apprise/notify/app-reports"
+    assert captured["json"]["title"] == "DWMP"
+    assert captured["json"]["format"] == "html"
+    assert "DWMP started" in captured["json"]["body"]
+    assert "9.9.9" in captured["json"]["body"]
+    assert "dwmp-xyz" in captured["json"]["body"]
 
 
 async def test_send_crash_includes_error_details(monkeypatch):
@@ -85,13 +85,13 @@ async def test_send_crash_includes_error_details(monkeypatch):
 
     monkeypatch.setattr("dwmp.services.telegram_notifier.httpx.AsyncClient", FakeClient)
 
-    notifier = TelegramNotifier(bot_token="t", chat_id="c")
+    notifier = TelegramNotifier(apprise_url="http://apprise/notify/app-reports")
     await notifier.send_crash(RuntimeError("boom <bad>"), "1.0.0")
 
-    text = captured["json"]["text"]
-    assert "RuntimeError" in text
-    assert "boom &lt;bad&gt;" in text  # HTML-escaped
-    assert "crashed" in text.lower()
+    body = captured["json"]["body"]
+    assert "RuntimeError" in body
+    assert "boom &lt;bad&gt;" in body  # HTML-escaped
+    assert "crashed" in body.lower()
 
 
 async def test_send_swallows_timeout(caplog, monkeypatch):
@@ -110,7 +110,7 @@ async def test_send_swallows_timeout(caplog, monkeypatch):
 
     monkeypatch.setattr("dwmp.services.telegram_notifier.httpx.AsyncClient", TimingOutClient)
 
-    notifier = TelegramNotifier(bot_token="t", chat_id="c")
+    notifier = TelegramNotifier(apprise_url="http://apprise/notify/app-reports")
     with caplog.at_level("WARNING"):
         await notifier.send_startup("1.0.0")
 
@@ -131,12 +131,12 @@ async def test_send_swallows_non_200_response(caplog, monkeypatch):
         async def post(self, url, json):
             class R:
                 status_code = 429
-                text = '{"ok":false,"error":"rate limit"}'
+                text = '{"error":"rate limit"}'
             return R()
 
     monkeypatch.setattr("dwmp.services.telegram_notifier.httpx.AsyncClient", FailingClient)
 
-    notifier = TelegramNotifier(bot_token="t", chat_id="c")
+    notifier = TelegramNotifier(apprise_url="http://apprise/notify/app-reports")
     with caplog.at_level("WARNING"):
         await notifier.send_startup("1.0.0")
 
@@ -144,8 +144,7 @@ async def test_send_swallows_non_200_response(caplog, monkeypatch):
 
 
 async def test_env_vars_resolved_when_not_passed(monkeypatch):
-    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "from-env")
-    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat-env")
+    monkeypatch.setenv("APPRISE_URL", "http://apprise/notify/app-reports")
     monkeypatch.setenv("POD_NAME", "pod-env")
     notifier = TelegramNotifier()
     assert notifier.enabled is True
@@ -153,8 +152,7 @@ async def test_env_vars_resolved_when_not_passed(monkeypatch):
 
 
 async def test_explicit_empty_string_still_disables(monkeypatch):
-    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "")
-    monkeypatch.setenv("TELEGRAM_CHAT_ID", "")
+    monkeypatch.setenv("APPRISE_URL", "")
     notifier = TelegramNotifier()
     assert notifier.enabled is False
 
@@ -182,8 +180,8 @@ async def test_send_cloudflare_challenge_posts_carrier(monkeypatch):
 
     monkeypatch.setattr("dwmp.services.telegram_notifier.httpx.AsyncClient", FakeClient)
 
-    notifier = TelegramNotifier(bot_token="t", chat_id="c", pod_name=None)
+    notifier = TelegramNotifier(apprise_url="http://apprise/notify/app-reports", pod_name=None)
     await notifier.send_cloudflare_challenge("dpd")
 
-    assert "Cloudflare challenge" in captured["json"]["text"]
-    assert "DPD" in captured["json"]["text"]
+    assert "Cloudflare challenge" in captured["json"]["body"]
+    assert "DPD" in captured["json"]["body"]

@@ -1,14 +1,15 @@
 """Telegram notification service for deploy + pod-lifecycle events.
 
-The service is a best-effort sidecar: any error (missing creds, timeout,
+The service is a best-effort sidecar: any error (missing config, timeout,
 non-2xx response) is logged and swallowed so notification failures never
 cascade into app-startup or shutdown failures.
 
-Credentials come from env vars ``TELEGRAM_BOT_TOKEN`` and
-``TELEGRAM_CHAT_ID``; when either is missing the service silently no-ops.
-The optional ``POD_NAME`` env var (set via Downward API in k8s) is
-included in crash/shutdown messages so the user can correlate which pod
-restarted.
+Sends through Apprise (``APPRISE_URL`` env var, pointed at the cluster's
+Apprise instance) rather than calling Telegram directly — Apprise owns the
+fan-out to Telegram and to the telegram-bridge history log. When unset the
+service silently no-ops. The optional ``POD_NAME`` env var (set via
+Downward API in k8s) is included in crash/shutdown messages so the user
+can correlate which pod restarted.
 """
 
 from __future__ import annotations
@@ -21,7 +22,6 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-_TELEGRAM_API = "https://api.telegram.org/bot{token}/sendMessage"
 _HTTP_TIMEOUT = 10.0
 
 
@@ -38,17 +38,15 @@ def _escape_html(text: str) -> str:
 class TelegramNotifier:
     def __init__(
         self,
-        bot_token: str | None = None,
-        chat_id: str | None = None,
+        apprise_url: str | None = None,
         pod_name: str | None = None,
     ) -> None:
-        self._bot_token = bot_token if bot_token is not None else os.environ.get("TELEGRAM_BOT_TOKEN")
-        self._chat_id = chat_id if chat_id is not None else os.environ.get("TELEGRAM_CHAT_ID")
+        self._apprise_url = apprise_url if apprise_url is not None else os.environ.get("APPRISE_URL")
         self._pod_name = pod_name if pod_name is not None else os.environ.get("POD_NAME")
 
     @property
     def enabled(self) -> bool:
-        return bool(self._bot_token and self._chat_id)
+        return bool(self._apprise_url)
 
     async def send_startup(self, version: str) -> None:
         """Pod came online — a new deploy just rolled or a pod restarted."""
@@ -104,29 +102,26 @@ class TelegramNotifier:
         await self._send(message)
 
     async def _send(self, message: str, *, disable_notification: bool = False) -> None:
+        # disable_notification: Apprise's generic /notify API has no
+        # per-call silent-delivery flag, so this is currently a no-op —
+        # kept for call-site compatibility (send_shutdown passes it).
         if not self.enabled:
-            logger.info("Telegram credentials not configured — skipping notification")
+            logger.info("APPRISE_URL not configured — skipping notification")
             return
-        url = _TELEGRAM_API.format(token=self._bot_token)
         try:
             async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
                 response = await client.post(
-                    url,
-                    json={
-                        "chat_id": self._chat_id,
-                        "text": message,
-                        "parse_mode": "HTML",
-                        "disable_notification": disable_notification,
-                    },
+                    self._apprise_url,
+                    json={"title": "DWMP", "body": message, "format": "html"},
                 )
             if response.status_code != 200:
                 logger.warning(
-                    "Telegram notification rejected: HTTP %s body=%s",
+                    "Apprise notification rejected: HTTP %s body=%s",
                     response.status_code, response.text[:200],
                 )
         except httpx.TimeoutException:
-            logger.warning("Telegram notification timed out")
+            logger.warning("Apprise notification timed out")
         except httpx.RequestError as exc:
-            logger.warning("Telegram notification failed: %s", exc)
+            logger.warning("Apprise notification failed: %s", exc)
         except Exception as exc:
-            logger.warning("Unexpected error sending Telegram notification: %s", exc)
+            logger.warning("Unexpected error sending Apprise notification: %s", exc)
