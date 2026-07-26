@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.64.4 (2026-07-26)
+
+### Bug Fixes
+
+- **ci**: Route CI notification script through Apprise instead of direct Telegram API
+  ([`069f65d`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/069f65d8b6ccf3f4d05828ccf834a6508eaa1deb))
+
+
 ## v1.64.3 (2026-07-26)
 
 ### Bug Fixes
