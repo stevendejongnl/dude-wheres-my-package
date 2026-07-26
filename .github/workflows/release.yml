@@ -175,8 +175,7 @@ jobs:
       - name: Notify Telegram on release success
         if: steps.release.outputs.released == 'true'
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          APPRISE_URL: ${{ secrets.APPRISE_URL }}
           VERSION: ${{ steps.release.outputs.version }}
           BRANCH: ${{ github.ref_name }}
           COMMIT: ${{ github.sha }}

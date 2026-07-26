@@ -1,7 +1,7 @@
 #!/bin/bash
-# Send Telegram notification for CI events on dude-wheres-my-package.
-# Requires env vars TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID — silently
-# no-ops if either is missing so CI never fails because of this script.
+# Send Telegram notification for CI events on dude-wheres-my-package, via
+# Apprise. Requires env var APPRISE_URL — silently no-ops if missing so
+# CI never fails because of this script.
 #
 # Usage:
 #   send-telegram-notification.sh --type release_success --version 1.2.3 \
@@ -11,7 +11,6 @@
 
 set -e
 
-TELEGRAM_API="https://api.telegram.org/bot"
 REPO="stevendejongnl/dude-wheres-my-package"
 
 NOTIFICATION_TYPE=""
@@ -88,8 +87,8 @@ if [[ "$DRY_RUN" == "true" ]]; then
   exit 0
 fi
 
-if [[ -z "$TELEGRAM_BOT_TOKEN" || -z "$TELEGRAM_CHAT_ID" ]]; then
-  echo "⚠️  TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID not set — skipping notification"
+if [[ -z "$APPRISE_URL" ]]; then
+  echo "⚠️  APPRISE_URL not set — skipping notification"
   exit 0
 fi
 
@@ -98,14 +97,14 @@ if [[ ${#MESSAGE} -gt 4000 ]]; then
   MESSAGE="${MESSAGE:0:4000}..."
 fi
 
+payload=$(python3 -c 'import json,sys; print(json.dumps({"title":"dwmp","body":sys.argv[1],"format":"html"}))' "$MESSAGE" 2>/dev/null)
+if [[ -z "$payload" ]]; then
+  echo "⚠️  failed to build notification payload, skipping"
+  exit 0
+fi
+
 set +e
-response=$(curl -s -X POST \
-  "${TELEGRAM_API}${TELEGRAM_BOT_TOKEN}/sendMessage" \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
-  --data-urlencode "text=${MESSAGE}" \
-  --data-urlencode "parse_mode=HTML" \
-  --data-urlencode "disable_web_page_preview=false")
+response=$(curl -sf -X POST "$APPRISE_URL" -H 'Content-Type: application/json' -d "$payload")
 rc=$?
 set -e
 
@@ -114,9 +113,5 @@ if [[ $rc -ne 0 ]]; then
   exit 0
 fi
 
-if echo "$response" | grep -q '"ok":true'; then
-  echo "✓ Telegram notification sent"
-else
-  echo "⚠️  Telegram API error: $response"
-fi
+echo "✓ Apprise notification sent"
 exit 0
