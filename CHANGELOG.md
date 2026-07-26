@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.64.3 (2026-07-26)
+
+### Bug Fixes
+
+- **notifications**: Route Telegram alerts through Apprise instead of direct API
+  ([`6ad57aa`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/6ad57aa555f62c28dba5d5462322ab1c0a5ca5c7))
+
+
 ## v1.64.2 (2026-07-24)
 
 ### Bug Fixes
