@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.64.5 (2026-08-19)
+
+### Bug Fixes
+
+- **amazon**: Trigger release for orders-page pagination fix
+  ([`0d640ba`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/0d640baf9ca6d5cba961ab75524dc01c718507a7))
+
+
 ## v1.64.4 (2026-07-26)
 
 ### Bug Fixes
