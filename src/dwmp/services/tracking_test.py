@@ -495,6 +495,58 @@ async def test_sync_preserves_status_when_carrier_returns_unknown(repo):
     assert pkg["current_status"] == "in_transit"
 
 
+async def test_sync_does_not_overwrite_manually_resolved_package(repo):
+    """A package the user marked delivered must survive the next sync,
+    even when the carrier still reports its old (stale) status — this is
+    exactly the Amazon self-delivery bug "Mark delivered" exists to fix."""
+    class StuckCarrier(CarrierBase):
+        name = "stuck"
+        auth_type = AuthType.CREDENTIALS
+
+        async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+            return TrackingResult(tracking_number=tracking_number, carrier=self.name, status=TrackingStatus.IN_TRANSIT)
+
+        async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
+            return [
+                TrackingResult(
+                    tracking_number="PKG-STUCK",
+                    carrier=self.name,
+                    status=TrackingStatus.IN_TRANSIT,
+                    events=[
+                        TrackingEvent(
+                            timestamp=datetime(2026, 8, 5, tzinfo=UTC),
+                            status=TrackingStatus.IN_TRANSIT,
+                            description="Still delayed",
+                        ),
+                    ],
+                )
+            ]
+
+        async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+            return AuthTokens(access_token="tok")
+
+    carrier = StuckCarrier()
+    service = TrackingService(repository=repo, carriers={"stuck": carrier})
+
+    account_id = await repo.add_account(
+        carrier="stuck", auth_type="credentials",
+        tokens={"access_token": "tok"}, username="u@test.com",
+    )
+
+    await service.sync_account(account_id)
+    pkg = (await service.list_packages())[0]
+    assert pkg["current_status"] == "in_transit"
+
+    resolved = await service.mark_delivered(pkg["id"])
+    assert resolved["current_status"] == "delivered"
+
+    # Carrier still (incorrectly) reports in_transit on the next sync —
+    # the manual resolution must stick.
+    await service.sync_account(account_id)
+    pkg = await service.get_package(pkg["id"])
+    assert pkg["current_status"] == "delivered"
+
+
 async def test_refresh_preserves_status_when_unknown_result_has_events(repo):
     """track() returning UNKNOWN *with* events (unmapped carrier phrase) must
     not downgrade a delivered package back to unknown (PostNL pickup-point bug)."""

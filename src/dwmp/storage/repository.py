@@ -214,6 +214,21 @@ class PackageRepository:
         )
         await self.db.commit()
 
+        # v1.65: add packages.resolved_manually. Without this, a package the
+        # user manually marked delivered (because a carrier's own tracking
+        # is permanently stuck, e.g. Amazon self-delivery) gets silently
+        # overwritten back to the stale status on the very next sync — the
+        # account-sync and refresh_package status writers need to know to
+        # leave it alone.
+        cursor = await self.db.execute("PRAGMA table_info(packages)")
+        pkg_cols = {col["name"] for col in await cursor.fetchall()}
+        if "resolved_manually" not in pkg_cols:
+            await self.db.execute(
+                "ALTER TABLE packages ADD COLUMN resolved_manually "
+                "INTEGER NOT NULL DEFAULT 0"
+            )
+            await self.db.commit()
+
     @property
     def db(self) -> aiosqlite.Connection:
         assert self._db is not None, "Repository not initialized — call init() first"
@@ -455,6 +470,23 @@ class PackageRepository:
             " delivery_window_end = ?, updated_at = ?, last_refreshed_at = ?,"
             " consecutive_failures = 0 WHERE id = ?",
             (status, estimated_delivery, delivery_window_end, now, now, package_id),
+        )
+        await self.db.commit()
+
+    async def mark_resolved(self, package_id: int, status: str) -> None:
+        """Set status and flag the package as manually resolved.
+
+        Sets ``resolved_manually`` so account-sync and refresh_package status
+        writers skip it going forward — otherwise the very next sync just
+        overwrites this back to whatever the carrier is still (incorrectly)
+        reporting.
+        """
+        now = datetime.now(UTC).isoformat()
+        await self.db.execute(
+            "UPDATE packages SET current_status = ?, updated_at = ?,"
+            " last_refreshed_at = ?, consecutive_failures = 0,"
+            " resolved_manually = 1 WHERE id = ?",
+            (status, now, now, package_id),
         )
         await self.db.commit()
 

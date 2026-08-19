@@ -485,7 +485,13 @@ class TrackingService:
                 and stored_status
                 and stored_status != TrackingStatus.UNKNOWN.value
             )
-            if is_downgrade:
+            # A package the user manually resolved (e.g. via "Mark delivered"
+            # because the carrier's own tracking is permanently stuck) must
+            # stay resolved — otherwise the very next sync just overwrites it
+            # back to whatever stale status the carrier is still reporting.
+            if existing and existing.get("resolved_manually"):
+                await self._repository.mark_refreshed(pkg_id)
+            elif is_downgrade:
                 await self._repository.mark_refreshed(pkg_id)
                 logger.debug(
                     "Preserved status for package %s (%s): sync returned UNKNOWN, stored=%s",
@@ -499,14 +505,14 @@ class TrackingService:
                     estimated_delivery=est,
                     delivery_window_end=win_end,
                 )
-            for event in result.events:
-                await self._repository.add_event(
-                    package_id=pkg_id,
-                    timestamp=event.timestamp,
-                    status=event.status.value,
-                    description=event.description,
-                    location=event.location,
-                )
+                for event in result.events:
+                    await self._repository.add_event(
+                        package_id=pkg_id,
+                        timestamp=event.timestamp,
+                        status=event.status.value,
+                        description=event.description,
+                        location=event.location,
+                    )
 
             pkg = await self.get_package(pkg_id)
             if pkg:
@@ -764,11 +770,18 @@ class TrackingService:
         pkg = await self._repository.get_package(package_id)
         if pkg is None:
             return None
-        await self._update_package_status(
-            package_id, TrackingStatus.DELIVERED.value,
-            pkg["tracking_number"], pkg["carrier"], pkg.get("label"),
-            description="Marked as delivered manually",
-        )
+        old_status = pkg["current_status"]
+        await self._repository.mark_resolved(package_id, TrackingStatus.DELIVERED.value)
+        if old_status != TrackingStatus.DELIVERED.value:
+            await self._repository.add_notification(
+                package_id=package_id,
+                old_status=old_status,
+                new_status=TrackingStatus.DELIVERED.value,
+                tracking_number=pkg["tracking_number"],
+                carrier=pkg["carrier"],
+                label=pkg.get("label"),
+                description="Marked as delivered manually",
+            )
         await self._repository.add_event(
             package_id=package_id,
             timestamp=datetime.now(UTC),
@@ -782,6 +795,9 @@ class TrackingService:
         pkg = await self._repository.get_package(package_id)
         if pkg is None:
             return None
+        if pkg.get("resolved_manually"):
+            events = await self._repository.get_events(package_id)
+            return {**pkg, "events": events}
 
         carrier = self._carriers.get(pkg["carrier"])
         if carrier is None:
