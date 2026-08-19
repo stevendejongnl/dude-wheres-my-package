@@ -420,6 +420,18 @@ async def refresh_package(
     return pkg
 
 
+@router.post("/packages/{package_id}/resolve")
+async def resolve_package(
+    package_id: int,
+    service: TrackingService = Depends(get_tracking_service),
+) -> dict:
+    """Manually mark a package as delivered when a carrier's tracking has gone stale."""
+    pkg = await service.mark_delivered(package_id)
+    if pkg is None:
+        raise HTTPException(status_code=404, detail="Package not found")
+    return pkg
+
+
 # --- Notification endpoints ---
 
 @router.get("/notifications")

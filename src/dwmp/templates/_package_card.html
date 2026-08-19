@@ -69,6 +69,17 @@
         <span class="htmx-indicator"><span class="spinner"></span></span>
       </button>
       {% endif %}
+      {% if pkg.current_status != 'delivered' %}
+      <button class="btn btn-ghost btn-sm"
+        hx-post="{{ base_path }}/packages/{{ pkg.id }}/resolve"
+        hx-target="#pkg-{{ pkg.id }}"
+        hx-swap="outerHTML"
+        hx-confirm="Mark this package as delivered? Use this when the carrier's tracking is stuck but it actually arrived — this stops further tracking updates."
+        hx-indicator="closest .card">
+        Mark delivered
+        <span class="htmx-indicator"><span class="spinner"></span></span>
+      </button>
+      {% endif %}
       <button class="btn btn-danger btn-sm"
         hx-delete="{{ base_path }}/api/v1/packages/{{ pkg.id }}"
         hx-target="#pkg-{{ pkg.id }}"

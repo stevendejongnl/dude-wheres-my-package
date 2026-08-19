@@ -114,6 +114,24 @@ async def test_refresh_nonexistent_returns_none(service: TrackingService):
     assert result is None
 
 
+async def test_mark_delivered_sets_status_and_event(service: TrackingService):
+    pkg = await service.add_package(tracking_number="STALE1", carrier="stub")
+    assert pkg["current_status"] == "unknown"
+
+    resolved = await service.mark_delivered(pkg["id"])
+    assert resolved is not None
+    assert resolved["current_status"] == "delivered"
+    assert resolved["consecutive_failures"] == 0
+    assert any(
+        e["description"] == "Marked as delivered manually" for e in resolved["events"]
+    )
+
+
+async def test_mark_delivered_nonexistent_returns_none(service: TrackingService):
+    result = await service.mark_delivered(999)
+    assert result is None
+
+
 # --- Notification tests ---
 
 

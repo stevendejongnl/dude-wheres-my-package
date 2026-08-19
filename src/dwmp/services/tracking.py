@@ -2,6 +2,7 @@ import json
 import logging
 import re
 from dataclasses import asdict
+from datetime import UTC, datetime
 
 from dwmp.carriers.base import (
     AccountStatus,
@@ -749,6 +750,33 @@ class TrackingService:
 
     async def delete_package(self, package_id: int) -> bool:
         return await self._repository.delete_package(package_id)
+
+    async def mark_delivered(self, package_id: int) -> dict | None:
+        """Manually mark a package as delivered.
+
+        Some carriers (Amazon self-delivery in particular) can stop
+        reporting new status forever, even though the package genuinely
+        arrived. This lets the user resolve it themselves rather than wait
+        on a carrier that will never say so — same effect as a real
+        DELIVERED result, including clearing consecutive_failures so the
+        scheduler stops polling it.
+        """
+        pkg = await self._repository.get_package(package_id)
+        if pkg is None:
+            return None
+        await self._update_package_status(
+            package_id, TrackingStatus.DELIVERED.value,
+            pkg["tracking_number"], pkg["carrier"], pkg.get("label"),
+            description="Marked as delivered manually",
+        )
+        await self._repository.add_event(
+            package_id=package_id,
+            timestamp=datetime.now(UTC),
+            status=TrackingStatus.DELIVERED.value,
+            description="Marked as delivered manually",
+            location=None,
+        )
+        return await self.get_package(package_id)
 
     async def refresh_package(self, package_id: int) -> dict | None:
         pkg = await self._repository.get_package(package_id)
