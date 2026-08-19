@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.65.0 (2026-08-19)
+
+### Features
+
+- **packages**: Add manual "mark delivered" action with confirmation
+  ([`a37ab45`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/a37ab4574c89eb1da9e48dd63b239eb6ee307a00))
+
+
 ## v1.64.5 (2026-08-19)
 
 ### Bug Fixes
