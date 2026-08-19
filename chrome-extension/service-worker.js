@@ -474,6 +474,14 @@ async function syncCarrierViaTab(account, opts = {}) {
       // links — the actual carrier tracking ID lives one page deeper.
       if (account.carrier === "amazon") {
         await scrapeAmazonShipTrackCarriers(tabId, html);
+
+        // The orders page only shows its first page (~10 orders) by default.
+        // Once a still-in-transit order ages off page 1, nothing ever
+        // re-pushes its status again — the per-shipment ship-track URL is
+        // auth-walled and can't be fetched server-side, so the package
+        // freezes at its last-seen status forever. Walk a few more pages so
+        // older-but-still-active shipments keep getting fresh HTML pushed.
+        await syncAdditionalAmazonOrderPages(tabId, html, pageUrl);
       }
     } else {
       log.error("sync", `${account.carrier}: browser-push failed`, { error: pushResult.error });
@@ -982,6 +990,78 @@ async function scrapeAmazonShipTrackCarriers(tabId, ordersHtml) {
     } catch (err) {
       log.warn("amazon", `ship-track scrape failed for ${url}`, { error: err.message });
     }
+  }
+}
+
+// Cap on how many extra order-list pages we walk per sync. Each page is
+// roughly 10 orders, so 4 extra pages covers ~50 orders beyond the first —
+// generous for a typical lookback window without risking a runaway loop if
+// Amazon's pagination markup ever changes shape.
+const MAX_EXTRA_AMAZON_PAGES = 4;
+
+/**
+ * Find the "next page" link on an Amazon orders-page HTML dump.
+ *
+ * Amazon's order-history pagination has used a few different markups over
+ * the years (rel="next", an .a-last list item, a Volgende/Next label) — try
+ * each and fall back to null (caller just stops paginating) rather than
+ * guessing wrong and looping forever.
+ */
+function _extractAmazonNextPageUrl(html, currentUrl) {
+  const patterns = [
+    /<a[^>]+rel="next"[^>]+href="([^"]+)"/i,
+    /<li[^>]*\bclass="[^"]*a-last[^"]*"[^>]*>\s*<a[^>]+href="([^"]+)"/i,
+    /<a[^>]+href="([^"]*your-orders\/orders\?[^"]*startIndex=\d+[^"]*)"[^>]*>[^<]*(?:Volgende|Next)/i,
+  ];
+  for (const re of patterns) {
+    const match = html.match(re);
+    if (match) {
+      const href = match[1].replace(/&amp;/g, "&");
+      try {
+        return new URL(href, currentUrl).toString();
+      } catch {
+        continue;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Walk a few more pages of the Amazon orders list beyond the first, pushing
+ * each page's HTML so shipments that have aged off page 1 (but are still
+ * in transit) get a fresh status pushed instead of freezing forever. Best
+ * effort: any failure just stops the walk, leaving the original single-page
+ * sync behavior intact.
+ */
+async function syncAdditionalAmazonOrderPages(tabId, firstPageHtml, firstPageUrl) {
+  let html = firstPageHtml;
+  let currentUrl = firstPageUrl;
+
+  for (let page = 1; page <= MAX_EXTRA_AMAZON_PAGES; page++) {
+    const nextUrl = _extractAmazonNextPageUrl(html, currentUrl);
+    if (!nextUrl || nextUrl === currentUrl) break;
+
+    try {
+      await chrome.tabs.update(tabId, { url: nextUrl });
+      await waitForTabNavigation(tabId, 10000);
+      await waitForUrlStable(tabId);
+      html = await captureTabHtml(tabId);
+      currentUrl = (await chrome.tabs.get(tabId)).url;
+    } catch (err) {
+      log.warn("amazon", `orders pagination: navigation failed on page ${page + 1}`, { error: err.message });
+      break;
+    }
+
+    if (!html) break;
+
+    const pushResult = await browserPush(html, currentUrl);
+    if (!pushResult.ok) {
+      log.warn("amazon", `orders pagination: push failed on page ${page + 1}`, { error: pushResult.error });
+      break;
+    }
+    log.info("amazon", `orders pagination: page ${page + 1} synced`, { packages: pushResult.data?.length || 0 });
+    await scrapeAmazonShipTrackCarriers(tabId, html);
   }
 }
 
