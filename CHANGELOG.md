@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.65.1 (2026-08-19)
+
+### Bug Fixes
+
+- **packages**: Make manual "mark delivered" survive the next sync
+  ([`7388efd`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/7388efd534f3f2d356a34d5052b4efc9df4b2719))
+
+
 ## v1.65.0 (2026-08-19)
 
 ### Features
