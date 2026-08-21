@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.65.2 (2026-08-21)
+
+### Bug Fixes
+
+- **gls**: Replace retired public tracking link with current one
+  ([`b474ae3`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/b474ae3bb7766380baf6f03e9475c5d967bb9a36))
+
+
 ## v1.65.1 (2026-08-19)
 
 ### Bug Fixes
