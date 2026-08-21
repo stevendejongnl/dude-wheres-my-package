@@ -26,9 +26,17 @@ def test_dhl_without_postal_code_explicit_none():
     assert url == "https://my.dhlecommerce.nl/"
 
 
-def test_gls_returns_tracking_url():
+def test_gls_returns_tracking_url_without_postal_code():
     url = public_tracking_url("gls", "123456789")
-    assert url == "https://gls-group.com/app/service/open/rstt/NL/nl/123456789"
+    assert url == "https://gls-group.com/GROUP/en/parcel-tracking/?match=123456789"
+
+
+def test_gls_returns_tracking_url_with_postal_code():
+    url = public_tracking_url("gls", "123456789", "1234 ab")
+    assert (
+        url
+        == "https://gls-group.com/GROUP/en/parcel-tracking/?match=123456789&postalCode=1234AB"
+    )
 
 
 def test_trunkrs_with_postal_code():
