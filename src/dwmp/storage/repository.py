@@ -76,6 +76,14 @@ CREATE TABLE IF NOT EXISTS extension_logs (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_extension_logs_ts ON extension_logs (ts DESC);
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    endpoint   TEXT NOT NULL UNIQUE,
+    p256dh     TEXT NOT NULL,
+    auth       TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
@@ -719,3 +727,27 @@ class PackageRepository:
         cursor = await self.db.execute("DELETE FROM extension_logs")
         await self.db.commit()
         return cursor.rowcount
+
+    # --- Push subscription methods ---
+
+    async def add_push_subscription(self, endpoint: str, p256dh: str, auth: str) -> None:
+        await self.db.execute(
+            """INSERT INTO push_subscriptions (endpoint, p256dh, auth)
+               VALUES (?, ?, ?)
+               ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh, auth=excluded.auth""",
+            (endpoint, p256dh, auth),
+        )
+        await self.db.commit()
+
+    async def remove_push_subscription(self, endpoint: str) -> None:
+        await self.db.execute(
+            "DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,)
+        )
+        await self.db.commit()
+
+    async def get_all_push_subscriptions(self) -> list[dict]:
+        cursor = await self.db.execute(
+            "SELECT endpoint, p256dh, auth FROM push_subscriptions"
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]

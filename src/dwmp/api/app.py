@@ -8,7 +8,7 @@ from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -94,7 +94,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 OPEN_PATHS = {
     "/health", "/login", "/api/v1/auth/token", "/api/v1/extension",
-    "/static", "/docs", "/openapi.json", "/redoc",
+    "/static", "/docs", "/openapi.json", "/redoc", "/sw.js",
 }
 
 
@@ -165,6 +165,31 @@ def create_app() -> FastAPI:
         return RedirectResponse(f"{_root_path(request)}/login", status_code=303)
 
     static_dir = Path(__file__).parent.parent / "static"
+
+    @app.get("/sw.js")
+    async def service_worker() -> Response:
+        # Served from the root (not /static/sw.js) so its scope covers the
+        # whole origin - a worker registered from under /static/ can only
+        # ever control /static/ requests, never the actual app pages.
+        # Cache-Control: no-cache so the PWA update mechanism works
+        # correctly once any upstream (Cloudflare) edge cache entry
+        # expires - Cloudflare will still cache this by file-extension
+        # default regardless of this header, that's a Cloudflare-side
+        # config fix, out of scope here.
+        return Response(
+            content=(static_dir / "sw.js").read_text(),
+            media_type="text/javascript",
+            headers={"Cache-Control": "no-cache"},
+        )
+
+    @app.get("/static/manifest.json")
+    async def manifest() -> Response:
+        return Response(
+            content=(static_dir / "manifest.json").read_text(),
+            media_type="application/manifest+json",
+            headers={"Cache-Control": "no-cache"},
+        )
+
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     app.include_router(router)
