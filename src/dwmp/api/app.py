@@ -95,6 +95,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 OPEN_PATHS = {
     "/health", "/login", "/api/v1/auth/token", "/api/v1/extension",
     "/static", "/docs", "/openapi.json", "/redoc", "/sw.js",
+    "/api/v1/push/vapid-public-key",
 }
 
 
