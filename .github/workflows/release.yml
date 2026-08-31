@@ -47,7 +47,13 @@ jobs:
 
       - uses: astral-sh/setup-uv@v4
 
-      - run: pip install python-semantic-release
+      # Pinned: an unpinned install silently broke once already (GitPython's
+      # Actor.name_email_regex was removed upstream, semantic-release calls
+      # it internally) — the release step "succeeded" but cut no tag, and
+      # the version drift it caused is exactly what forced the manual
+      # pyproject.toml/deployment.yaml bumps below to stop matching git
+      # history. Bump deliberately after verifying the new pin works.
+      - run: pip install python-semantic-release==10.6.2
 
       - name: Semantic Release
         id: release
@@ -292,9 +298,19 @@ jobs:
   deploy:
     name: Deploy to k8s
     needs: release
+    if: needs.release.outputs.released == 'true'
     runs-on: [self-hosted, k8s]
     steps:
-      - name: Restart deployment
+      # Sets the image tag directly rather than relying solely on keel.sh's
+      # registry polling — keel's poller has repeatedly failed to even reach
+      # ghcr.io from this cluster (DNS/network timeouts), and semantically
+      # keel also won't apply a tag it considers a downgrade, so a version
+      # mixup upstream can leave the live pod silently stuck on stale code
+      # with no error surfaced anywhere. Setting it here makes the release
+      # step's own version the source of truth for what actually deploys.
+      - name: Set image and restart deployment
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
         run: |
           RESTART_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
@@ -304,4 +320,4 @@ jobs:
             -H "Content-Type: application/strategic-merge-patch+json" \
             --cacert "$CA" \
             "https://kubernetes.default.svc/apis/apps/v1/namespaces/package-tracking/deployments/dwmp" \
-            -d "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"$RESTART_AT\"}}}}}"
+            -d "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"$RESTART_AT\"}},\"spec\":{\"containers\":[{\"name\":\"dwmp\",\"image\":\"ghcr.io/stevendejongnl/dude-wheres-my-package:${VERSION}\"}]}}}}"
