@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v1.66.0 (2026-08-31)
+
+### Bug Fixes
+
+- Correct DPD tracking URL and require postal code for DPD parcels
+  ([`673dff3`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/673dff34ce326c77facc20784d78def4c7767ccb))
+
+- Vapid-public-key endpoint should not require auth
+  ([`b6b694c`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/b6b694cc75f2c7a15beaeb33c53f63c20c254ee6))
+
+### Features
+
+- Add in-app install button
+  ([`653b837`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/653b83718d182718cccdf898b3c61f7301a4285a))
+
+- Add web push notifications
+  ([`5860922`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/5860922fb27baf393990320917a4103231634f03))
+
+
 ## v1.65.2 (2026-08-21)
 
 ### Bug Fixes
