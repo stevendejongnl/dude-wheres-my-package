@@ -19,6 +19,8 @@ import { log } from "./lib/logger.js";
 const DEFAULT_SYNC_INTERVAL_MIN = 60;
 const RENDER_WAIT_MS = 5_000;
 const TAB_TIMEOUT_MS = 30_000;
+const TAB_REAP_INTERVAL_MIN = 5;
+const TAB_MAX_OPEN_MS = 15 * 60 * 1000;
 const POSTNL_GRAPHQL_URL = "https://jouw.postnl.nl/account/api/graphql";
 const POSTNL_TRACK_API_URL = "https://jouw.postnl.nl/track-and-trace/api/trackAndTrace";
 const POSTNL_SHIPMENTS_QUERY = `
@@ -60,6 +62,7 @@ async function setupAlarms() {
   log.info("sw", "Service worker started, registering alarms", { syncIntervalMin: interval });
   chrome.alarms.create("dwmp-auto-sync", { periodInMinutes: interval });
   chrome.alarms.create("dwmp-update-check", { periodInMinutes: 360 });
+  chrome.alarms.create("dwmp-tab-reaper", { periodInMinutes: TAB_REAP_INTERVAL_MIN });
 
   // Run an immediate update check on install
   runUpdateCheck();
@@ -69,7 +72,69 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   log.info("alarm", `Alarm fired: ${alarm.name}`);
   if (alarm.name === "dwmp-auto-sync") runAutoSync();
   if (alarm.name === "dwmp-update-check") runUpdateCheck();
+  if (alarm.name === "dwmp-tab-reaper") reapStaleTabs();
 });
+
+// ── Stale-tab reaper ───────────────────────────────────────────────
+// Tabs/windows this extension opens for a sync (not caller-supplied,
+// not a reused existing tab — see trackOpenedTab call sites) are
+// tracked here so they can be force-closed if a sync never finishes.
+// The main case: a DPD Cloudflare challenge that nobody solves within
+// the 3-minute wait leaves its popup window open with nothing left to
+// close it. Kasm runs this extension headless for days at a stretch,
+// so a handful of unreaped windows per day becomes a pile of dead
+// windows fast. chrome.storage.session survives service-worker
+// restarts (the SW is ephemeral in MV3) but clears on browser
+// restart, which is fine — stale tab IDs from a previous browser
+// session are meaningless anyway.
+async function trackOpenedTab(tabId, carrier) {
+  const { dwmp_open_tabs = {} } = await chrome.storage.session.get("dwmp_open_tabs");
+  dwmp_open_tabs[tabId] = { carrier, openedAt: Date.now() };
+  await chrome.storage.session.set({ dwmp_open_tabs });
+}
+
+async function untrackOpenedTab(tabId) {
+  const { dwmp_open_tabs = {} } = await chrome.storage.session.get("dwmp_open_tabs");
+  if (!(tabId in dwmp_open_tabs)) return;
+  delete dwmp_open_tabs[tabId];
+  await chrome.storage.session.set({ dwmp_open_tabs });
+}
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  untrackOpenedTab(tabId).catch(() => {});
+});
+
+async function closeManagedTab(tabId) {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.windowId) {
+      const win = await chrome.windows.get(tab.windowId);
+      if (win.type === "popup") {
+        await chrome.windows.remove(win.id);
+        return;
+      }
+    }
+    await chrome.tabs.remove(tabId);
+  } catch {
+    // Already closed.
+  }
+}
+
+async function reapStaleTabs() {
+  const { dwmp_open_tabs = {} } = await chrome.storage.session.get("dwmp_open_tabs");
+  const now = Date.now();
+  for (const [tabIdStr, info] of Object.entries(dwmp_open_tabs)) {
+    if (now - info.openedAt < TAB_MAX_OPEN_MS) continue;
+    const tabId = Number(tabIdStr);
+    log.warn(
+      "reaper",
+      `Closing stale ${info.carrier} tab open for ${Math.round((now - info.openedAt) / 60000)}min`,
+      { tabId },
+    );
+    await closeManagedTab(tabId);
+    await untrackOpenedTab(tabId);
+  }
+}
 
 // ── Auto-sync ──────────────────────────────────────────────────────
 
@@ -210,6 +275,7 @@ async function syncCarrierViaTab(account, opts = {}) {
           height: 640,
         });
         tabId = win.tabs[0].id;
+        await trackOpenedTab(tabId, account.carrier);
         // Pre-warm: if a separate prewarm URL was configured, let it settle
         // briefly so Cloudflare sees a normal entry point, then navigate to
         // the actual login URL.
@@ -221,6 +287,7 @@ async function syncCarrierViaTab(account, opts = {}) {
       } else {
         const tab = await chrome.tabs.create({ url: startUrl, active: false });
         tabId = tab.id;
+        await trackOpenedTab(tabId, account.carrier);
       }
     }
 
@@ -400,6 +467,11 @@ async function syncCarrierViaTab(account, opts = {}) {
       if (!solved) {
         log.warn("sync", `${account.carrier}: Cloudflare challenge not solved within timeout`);
         await storeSyncResult(account.id, false, "Cloudflare challenge timed out — sync skipped");
+        // Nobody's watching in a headless Kasm session — leaving the tab
+        // open just accumulates dead windows. The reaper would catch this
+        // eventually too, but close it now for a prompt cleanup.
+        await closeManagedTab(tabId);
+        await untrackOpenedTab(tabId);
         return;
       }
 
@@ -494,19 +566,10 @@ async function syncCarrierViaTab(account, opts = {}) {
     if (shouldCloseTab && tabId !== null) {
       // If we opened a popup window for this sync, close the whole window.
       // Otherwise just remove the tab (background-tab path or caller-reuse path).
-      chrome.tabs.get(tabId).then((tab) => {
-        if (tab.windowId) {
-          chrome.windows.get(tab.windowId).then((win) => {
-            if (win.type === "popup") {
-              chrome.windows.remove(win.id).catch(() => {});
-            } else {
-              chrome.tabs.remove(tabId).catch(() => {});
-            }
-          }).catch(() => chrome.tabs.remove(tabId).catch(() => {}));
-        } else {
-          chrome.tabs.remove(tabId).catch(() => {});
-        }
-      }).catch(() => {});
+      await closeManagedTab(tabId);
+    }
+    if (tabId !== null) {
+      await untrackOpenedTab(tabId);
     }
   }
 }
