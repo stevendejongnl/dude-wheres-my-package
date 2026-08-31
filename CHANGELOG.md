@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.66.2 (2026-08-31)
+
+### Bug Fixes
+
+- Close hanging sync tabs/windows after a timeout
+  ([`d820f52`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/d820f5202eadcf37f173b0f7c8467c0e9924e8e4))
+
+
 ## v1.66.1 (2026-08-31)
 
 ### Bug Fixes
