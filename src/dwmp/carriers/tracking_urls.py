@@ -1,5 +1,7 @@
+from dwmp.carriers.dpd import DPD_PARCELS_URL
+
 _TEMPLATES: dict[str, str] = {
-    "dpd": "https://www.dpd.com/nl/nl/ontvangen/track-en-trace/?shipmentNumber={tn}",
+    "dpd": DPD_PARCELS_URL + "?parcelNumber={tn}",
     "ups": "https://www.ups.com/track?loc=en_NL&tracknum={tn}",
 }
 

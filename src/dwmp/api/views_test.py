@@ -418,6 +418,17 @@ async def test_track_package_save_trunkrs_requires_postal_code(client: AsyncClie
     assert await repo.list_packages() == []
 
 
+async def test_track_package_save_dpd_requires_postal_code(client: AsyncClient, repo):
+    response = await client.post(
+        "/packages/add/save",
+        data={"tracking_number": "05212122470790", "carrier": "dpd", "postal_code": ""},
+    )
+    assert response.status_code == 200
+    assert "test-result error" in response.text
+    assert "postal code" in response.text.lower()
+    assert await repo.list_packages() == []
+
+
 def test_enrich_package_sets_effective_tracking_url_from_db():
     pkg = {
         "carrier": "dpd",
@@ -438,7 +449,8 @@ def test_enrich_package_falls_back_to_template_when_no_db_url():
     }
     _enrich_package(pkg)
     assert pkg["effective_tracking_url"] == (
-        "https://www.dpd.com/nl/nl/ontvangen/track-en-trace/?shipmentNumber=01234567890123456789"
+        "https://www.dpdgroup.com/nl/mydpd/my-parcels/incoming"
+        "?parcelNumber=01234567890123456789"
     )
 
 

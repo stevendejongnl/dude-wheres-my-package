@@ -3,7 +3,10 @@ from dwmp.carriers.tracking_urls import public_tracking_url
 
 def test_dpd_returns_tracking_url():
     url = public_tracking_url("dpd", "01234567890123456789")
-    assert url == "https://www.dpd.com/nl/nl/ontvangen/track-en-trace/?shipmentNumber=01234567890123456789"
+    assert url == (
+        "https://www.dpdgroup.com/nl/mydpd/my-parcels/incoming"
+        "?parcelNumber=01234567890123456789"
+    )
 
 
 def test_dhl_with_postal_code():
