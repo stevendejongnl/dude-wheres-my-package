@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.66.1 (2026-08-31)
+
+### Bug Fixes
+
+- Pin semantic-release and make release deploy set the image tag
+  ([`ce65365`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/ce6536503445939ed0482f3fa85569c1f077501a))
+
+
 ## v1.66.0 (2026-08-31)
 
 ### Bug Fixes
