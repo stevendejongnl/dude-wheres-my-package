@@ -160,7 +160,9 @@ class PackageScheduler:
 
 
 _DELIVERED_CUTOFF_DAYS = 14
-_MAX_CONSECUTIVE_FAILURES = 5
+# Public: the packages view imports this to fold chronically-unresolvable
+# parcels out of the Active list, matching the scheduler's own skip logic.
+MAX_CONSECUTIVE_FAILURES = 5
 _STALE_REPROBE_HOURS = 24
 
 
@@ -175,7 +177,7 @@ def _should_skip(pkg: dict) -> bool:
       package even if the carrier's outage was transient), it gets re-probed
       once every _STALE_REPROBE_HOURS — same as auth_failed accounts.
     """
-    if pkg.get("consecutive_failures", 0) >= _MAX_CONSECUTIVE_FAILURES:
+    if pkg.get("consecutive_failures", 0) >= MAX_CONSECUTIVE_FAILURES:
         last_refreshed_at = pkg.get("last_refreshed_at")
         if not last_refreshed_at:
             return False

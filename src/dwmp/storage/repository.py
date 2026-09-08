@@ -435,6 +435,26 @@ class PackageRepository:
         row = await cursor.fetchone()
         return dict(row) if row else None
 
+    async def find_package_by_order_prefix(
+        self, order_id: str, carrier: str
+    ) -> dict | None:
+        """Find a package keyed by ``order_id`` or ``order_id#<shipmentId>``.
+
+        Amazon drops the per-shipment ship-track link once an order is
+        delivered, so a later scrape re-keys that order by its bare order ID.
+        This lets the persist path reconcile the bare ID against the existing
+        ``orderId#shipmentId`` row instead of spawning a duplicate that can
+        never dedupe against it.
+        """
+        cursor = await self.db.execute(
+            "SELECT * FROM packages WHERE carrier = ? "
+            "AND (tracking_number = ? OR tracking_number LIKE ?) "
+            "ORDER BY id LIMIT 1",
+            (carrier, order_id, f"{order_id}#%"),
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
     async def list_packages(self) -> list[dict]:
         cursor = await self.db.execute(
             """SELECT p.*, a.last_synced AS account_last_synced

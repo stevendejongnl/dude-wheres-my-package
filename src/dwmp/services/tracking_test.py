@@ -638,3 +638,107 @@ async def test_validate_account_credentials_by_id_recovers_auth_failed(repo):
 
     account = await repo.get_account(account_id)
     assert account["status"] == "connected"
+
+
+class EmptyUnknownCarrier(CarrierBase):
+    """track() and sync both return an UNKNOWN result with no events —
+    a parcel the carrier simply can't resolve (orphaned return label,
+    retailer-side barcode)."""
+    name = "empty-unknown"
+    auth_type = AuthType.CREDENTIALS
+
+    async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+        return TrackingResult(
+            tracking_number=tracking_number, carrier=self.name,
+            status=TrackingStatus.UNKNOWN,
+        )
+
+    async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
+        return [TrackingResult(
+            tracking_number="ORPH-1", carrier=self.name,
+            status=TrackingStatus.UNKNOWN,
+        )]
+
+    async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+        return AuthTokens(access_token="tok")
+
+
+async def test_refresh_empty_unknown_increments_failures_from_unknown(repo):
+    """A package stuck at UNKNOWN whose refresh keeps returning nothing must
+    accumulate consecutive_failures — otherwise it never trips the scheduler's
+    skip threshold and lingers on the Active list forever."""
+    service = TrackingService(repository=repo, carriers={"empty-unknown": EmptyUnknownCarrier()})
+    pkg = await service.add_package(tracking_number="ORPH-1", carrier="empty-unknown")
+    assert pkg["current_status"] == "unknown"
+
+    for expected in (1, 2, 3):
+        refreshed = await service.refresh_package(pkg["id"])
+        assert refreshed["current_status"] == "unknown"
+        assert refreshed["consecutive_failures"] == expected
+
+
+async def test_sync_empty_unknown_increments_failures_on_stuck_package(repo):
+    """Same guarantee via the account-sync path."""
+    service = TrackingService(repository=repo, carriers={"empty-unknown": EmptyUnknownCarrier()})
+    account_id = await repo.add_account(
+        carrier="empty-unknown", auth_type="credentials",
+        tokens={"access_token": "tok"}, username="u@test.com",
+    )
+
+    await service.sync_account(account_id)
+    pkg = (await service.list_packages())[0]
+    assert pkg["current_status"] == "unknown"
+    assert pkg["consecutive_failures"] == 0  # freshly created
+
+    await service.sync_account(account_id)
+    await service.sync_account(account_id)
+    pkg = await service.get_package(pkg["id"])
+    assert pkg["consecutive_failures"] == 2
+
+
+async def test_sync_bare_order_id_reconciles_with_shipment_row(repo):
+    """Amazon drops the ship-track link once an order is delivered, so a later
+    scrape re-keys it by the bare order ID. That must reconcile against the
+    existing orderId#shipmentId row, not spawn a duplicate that downgrades a
+    delivered order back to in_transit."""
+    class BareOrderCarrier(CarrierBase):
+        name = "amazon"
+        auth_type = AuthType.CREDENTIALS
+
+        async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+            return TrackingResult(tracking_number=tracking_number, carrier=self.name, status=TrackingStatus.UNKNOWN)
+
+        async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30) -> list[TrackingResult]:
+            return [TrackingResult(
+                tracking_number="171-0000000-0000001",
+                carrier=self.name,
+                status=TrackingStatus.IN_TRANSIT,
+                events=[TrackingEvent(
+                    timestamp=datetime(2026, 7, 31, tzinfo=UTC),
+                    status=TrackingStatus.IN_TRANSIT,
+                    description="Onderweg, maar vertraagd",
+                )],
+            )]
+
+        async def login(self, username: str, password: str, **kwargs: str) -> AuthTokens:
+            return AuthTokens(access_token="tok")
+
+    service = TrackingService(repository=repo, carriers={"amazon": BareOrderCarrier()})
+    canonical_id = await repo.add_package(
+        tracking_number="171-0000000-0000001#DYbZV7SKJ", carrier="amazon",
+        source="account",
+    )
+    await repo.update_status(canonical_id, "delivered")
+
+    account_id = await repo.add_account(
+        carrier="amazon", auth_type="credentials",
+        tokens={"access_token": "tok"}, username="u@test.com",
+    )
+    await service.sync_account(account_id)
+
+    packages = await service.list_packages()
+    assert len(packages) == 1
+    assert packages[0]["tracking_number"] == "171-0000000-0000001#DYbZV7SKJ"
+    assert packages[0]["current_status"] == "delivered"
+    full = await service.get_package(canonical_id)
+    assert full["events"] == []

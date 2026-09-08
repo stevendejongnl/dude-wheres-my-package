@@ -46,7 +46,16 @@
 {% endfor %}
 {% endif %}
 
-{% if not active and not delivered %}
+{% if stale %}
+<details class="stale-group" style="margin-top:32px;">
+  <summary><strong>Can't track ({{ stale | length }})</strong> — no updates from the carrier</summary>
+  {% for pkg in stale %}
+  {% include "_package_card.html" %}
+  {% endfor %}
+</details>
+{% endif %}
+
+{% if not active and not delivered and not stale %}
 <div class="empty">
   <p>No packages tracked yet.</p>
   <p>Connect a carrier account, or click <strong>Track a package</strong> above to add a single tracking number.</p>

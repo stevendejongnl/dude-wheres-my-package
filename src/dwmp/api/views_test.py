@@ -517,3 +517,26 @@ def test_enrich_package_dhl_uses_postal_code():
     assert pkg["effective_tracking_url"] == (
         "https://my.dhlecommerce.nl/home/tracktrace/JD000123456/1234AB"
     )
+
+
+async def test_packages_page_folds_stale_unknown_out_of_active(client: AsyncClient, repo):
+    """A package stuck at UNKNOWN past the failure threshold moves to the
+    collapsed 'Can't track' group instead of cluttering Active."""
+    await repo.add_package(tracking_number="ACT-1", carrier="postnl", source="account")
+    stale_id = await repo.add_package(tracking_number="STALE-1", carrier="postnl", source="account")
+    for _ in range(5):
+        await repo.mark_refreshed(stale_id, failure=True)
+
+    response = await client.get("/")
+    assert response.status_code == 200
+    body = response.text
+
+    assert "Can&#39;t track (1)" in body or "Can't track (1)" in body
+    assert "ACT-1" in body
+    assert "STALE-1" in body
+
+    # STALE-1 sits after the "Can't track" marker; ACT-1 sits before it.
+    marker = body.find("Can't track (1)")
+    if marker == -1:
+        marker = body.find("Can&#39;t track (1)")
+    assert body.find("ACT-1") < marker < body.find("STALE-1")

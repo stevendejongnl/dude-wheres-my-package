@@ -14,6 +14,7 @@ from dwmp.api.dependencies import get_repository, get_tracking_service
 from dwmp.api.routes import _has_stored_credentials
 from dwmp.carriers.base import AuthType, CarrierAuthError
 from dwmp.carriers.tracking_urls import public_tracking_url
+from dwmp.services.scheduler import MAX_CONSECUTIVE_FAILURES
 from dwmp.services.tracking import TrackingService
 from dwmp.storage.repository import PackageRepository
 
@@ -251,12 +252,30 @@ async def packages_page(
             return events[-1].get("timestamp", "")
         return pkg.get("updated_at", "")
 
+    def _is_stale(p: dict) -> bool:
+        # Discovered from an account but stuck at UNKNOWN past the point the
+        # scheduler gives up re-probing it — orphaned return labels,
+        # retailer-side barcodes the recipient can't track. Keep it findable,
+        # but out of the Active list.
+        return (
+            p["current_status"] == "unknown"
+            and p.get("consecutive_failures", 0) >= MAX_CONSECUTIVE_FAILURES
+        )
+
     active = sorted(
-        [p for p in packages if p["current_status"] not in ("delivered", "returned")],
+        [
+            p for p in packages
+            if p["current_status"] not in ("delivered", "returned")
+            and not _is_stale(p)
+        ],
         key=_last_event_ts, reverse=True,
     )
     delivered = sorted(
         [p for p in packages if p["current_status"] in ("delivered", "returned")],
+        key=_last_event_ts, reverse=True,
+    )
+    stale = sorted(
+        [p for p in packages if _is_stale(p)],
         key=_last_event_ts, reverse=True,
     )
 
@@ -264,6 +283,7 @@ async def packages_page(
 
     ctx = {
         "active_nav": "packages", "active": active, "delivered": delivered,
+        "stale": stale,
         "accounts": len(accounts), "version": VERSION,
         "base_path": _base_path(request),
     }

@@ -445,6 +445,25 @@ class TrackingService:
             existing = await self._repository.find_package(
                 result.tracking_number, result.carrier
             )
+
+            if not existing and "#" not in result.tracking_number:
+                # A scrape that lost the per-shipment tracking link (Amazon
+                # drops it once an order is delivered) re-keys the order by
+                # its bare ID. Reconcile against the existing
+                # orderId#shipmentId row rather than spawning a duplicate that
+                # can never dedupe. Without the link the card's status text is
+                # unreliable, so only stamp the refresh — never overwrite
+                # status or events on the canonical row.
+                canonical = await self._repository.find_package_by_order_prefix(
+                    result.tracking_number, result.carrier
+                )
+                if canonical:
+                    await self._repository.mark_refreshed(canonical["id"])
+                    pkg = await self.get_package(canonical["id"])
+                    if pkg:
+                        synced.append(pkg)
+                    continue
+
             if existing:
                 pkg_id = existing["id"]
             else:
@@ -488,6 +507,9 @@ class TrackingService:
             est = result.estimated_delivery.isoformat() if result.estimated_delivery else None
             win_end = result.delivery_window_end.isoformat() if result.delivery_window_end else None
             stored_status = existing.get("current_status") if existing else None
+            empty_unknown = (
+                result.status == TrackingStatus.UNKNOWN and not result.events
+            )
             is_downgrade = (
                 result.status == TrackingStatus.UNKNOWN
                 and stored_status
@@ -499,8 +521,15 @@ class TrackingService:
             # back to whatever stale status the carrier is still reporting.
             if existing and existing.get("resolved_manually"):
                 await self._repository.mark_refreshed(pkg_id)
-            elif is_downgrade:
-                await self._repository.mark_refreshed(pkg_id)
+            elif is_downgrade or (empty_unknown and existing):
+                # Empty UNKNOWN result — the carrier can't resolve this parcel.
+                # Preserve whatever we have, and count an empty result as a
+                # failure so a parcel stuck at UNKNOWN (orphaned return labels,
+                # retailer-side barcodes) eventually trips the scheduler's skip
+                # threshold instead of resetting its failure counter forever.
+                await self._repository.mark_refreshed(
+                    pkg_id, failure=bool(empty_unknown)
+                )
                 logger.debug(
                     "Preserved status for package %s (%s): sync returned UNKNOWN, stored=%s",
                     pkg_id, result.carrier, stored_status,
@@ -833,9 +862,9 @@ class TrackingService:
         # still appended below; an empty UNKNOWN counts as a failure so the
         # scheduler can eventually stop polling dead packages.
         stored_status = pkg.get("current_status", TrackingStatus.UNKNOWN.value)
-        preserve = (
-            result.status == TrackingStatus.UNKNOWN
-            and stored_status != TrackingStatus.UNKNOWN.value
+        preserve = result.status == TrackingStatus.UNKNOWN and (
+            not result.events
+            or stored_status != TrackingStatus.UNKNOWN.value
         )
         if preserve:
             await self._repository.mark_refreshed(
