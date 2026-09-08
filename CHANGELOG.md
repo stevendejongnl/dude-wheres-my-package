@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.67.0 (2026-09-08)
+
+### Features
+
+- Daily garbage collector for dead and aged package rows
+  ([`fa26bd9`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/fa26bd900cb0b2ffb5ddc9b11640b6ea09d36a3e))
+
+
 ## v1.66.3 (2026-09-08)
 
 ### Bug Fixes
