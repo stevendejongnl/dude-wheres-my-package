@@ -66,6 +66,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     scheduler = PackageScheduler(
         tracking_service=get_tracking_service(),
         interval_minutes=interval,
+        gc_enabled=os.environ.get("GC_ENABLED", "true").lower()
+        not in ("false", "0", "no"),
+        gc_stale_unknown_days=int(os.environ.get("GC_STALE_UNKNOWN_DAYS", "14")),
+        gc_delivered_days=int(os.environ.get("GC_DELIVERED_DAYS", "180")),
     )
     scheduler.start()
 

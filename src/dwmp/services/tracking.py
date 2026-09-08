@@ -794,6 +794,21 @@ class TrackingService:
     async def delete_package(self, package_id: int) -> bool:
         return await self._repository.delete_package(package_id)
 
+    async def collect_garbage(
+        self,
+        *,
+        stale_unknown_days: int = 14,
+        stale_unknown_min_failures: int = 5,
+        delivered_days: int = 180,
+    ) -> dict[str, int]:
+        """Prune packages not worth keeping — see
+        :meth:`PackageRepository.gc_packages`. Returns per-sweep delete counts."""
+        return await self._repository.gc_packages(
+            stale_unknown_days=stale_unknown_days,
+            stale_unknown_min_failures=stale_unknown_min_failures,
+            delivered_days=delivered_days,
+        )
+
     async def mark_delivered(self, package_id: int) -> dict | None:
         """Manually mark a package as delivered.
 

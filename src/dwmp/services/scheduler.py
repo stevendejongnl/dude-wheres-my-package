@@ -11,15 +11,26 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL_MINUTES = 30
 
+# Garbage-collector defaults (overridable per-deploy via env in app.py).
+DEFAULT_GC_STALE_UNKNOWN_DAYS = 14
+DEFAULT_GC_DELIVERED_DAYS = 180
+
 
 class PackageScheduler:
     def __init__(
         self,
         tracking_service: TrackingService,
         interval_minutes: int = DEFAULT_INTERVAL_MINUTES,
+        *,
+        gc_enabled: bool = True,
+        gc_stale_unknown_days: int = DEFAULT_GC_STALE_UNKNOWN_DAYS,
+        gc_delivered_days: int = DEFAULT_GC_DELIVERED_DAYS,
     ) -> None:
         self._service = tracking_service
         self._interval = interval_minutes
+        self._gc_enabled = gc_enabled
+        self._gc_stale_unknown_days = gc_stale_unknown_days
+        self._gc_delivered_days = gc_delivered_days
         self._scheduler = AsyncIOScheduler()
 
     def start(self) -> None:
@@ -37,8 +48,20 @@ class PackageScheduler:
             id="reauth_probe",
             replace_existing=True,
         )
+        if self._gc_enabled:
+            self._scheduler.add_job(
+                self._collect_garbage,
+                "interval",
+                hours=24,
+                id="collect_garbage",
+                replace_existing=True,
+            )
         self._scheduler.start()
-        logger.info("Scheduler started — polling every %d minutes", self._interval)
+        logger.info(
+            "Scheduler started — polling every %d minutes, GC %s",
+            self._interval,
+            "enabled" if self._gc_enabled else "disabled",
+        )
 
     def stop(self) -> None:
         self._scheduler.shutdown(wait=False)
@@ -131,6 +154,30 @@ class PackageScheduler:
         deleted = await self._service.delete_old_notifications(days=30)
         if deleted:
             logger.info("Cleaned up %d old notifications", deleted)
+
+    async def _collect_garbage(self) -> None:
+        """Once per day, delete packages not worth keeping: account- or
+        manually-added parcels stuck at UNKNOWN that the carrier never
+        resolved, and delivered/returned parcels past the retention window.
+        Housekeeping only — logged, never notified. See the ``gc_*`` params
+        on :class:`PackageScheduler` and
+        :meth:`PackageRepository.gc_packages`.
+        """
+        try:
+            result = await self._service.collect_garbage(
+                stale_unknown_days=self._gc_stale_unknown_days,
+                stale_unknown_min_failures=MAX_CONSECUTIVE_FAILURES,
+                delivered_days=self._gc_delivered_days,
+            )
+        except Exception:
+            logger.exception("Garbage collection failed")
+            return
+        if result["stale_unknown"] or result["delivered"]:
+            logger.info(
+                "Garbage collection: pruned %d dead-unknown + %d aged-delivered package(s)",
+                result["stale_unknown"],
+                result["delivered"],
+            )
 
     async def _reauth_probe(self) -> None:
         """Once per day, probe auth_failed accounts to see if they can recover.

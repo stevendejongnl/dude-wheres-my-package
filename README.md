@@ -415,6 +415,9 @@ docker run -p 8000:8000 -v dwmp-data:/app/data dwmp
 |----------|---------|-------------|
 | `DB_PATH` | `dwmp.db` | SQLite database file path |
 | `POLL_INTERVAL_MINUTES` | `30` | Background polling interval |
+| `GC_ENABLED` | `true` | Daily garbage collector. Set `false`/`0`/`no` to disable. Prunes parcels stuck at `unknown` that the carrier never resolved (`GC_STALE_UNKNOWN_DAYS` old **and** past `MAX_CONSECUTIVE_FAILURES` failed lookups, no scan events — account- or manually-added), plus delivered/returned history past the retention window. Deletions cascade to events and notifications; housekeeping only, never notified. |
+| `GC_STALE_UNKNOWN_DAYS` | `14` | Age threshold before a dead `unknown` parcel is pruned. |
+| `GC_DELIVERED_DAYS` | `180` | Delete `delivered`/`returned` parcels not updated in this many days. `0` keeps delivered history forever. |
 | `PASSWORD_HASH` | *(unset)* | Argon2 hash of the login password. Unset → open access. See *Authentication* above for how to generate it. |
 | `JWT_SECRET` | *(random)* | HS256 signing secret for session JWTs. Defaults to a per-process random value, so sessions invalidate on every restart unless you pin it. |
 | `TZ` | `Europe/Amsterdam` | Display timezone for rendered dates/times in the web UI. |

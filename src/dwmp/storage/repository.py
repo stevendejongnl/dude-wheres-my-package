@@ -478,6 +478,58 @@ class PackageRepository:
         await self.db.commit()
         return cursor.rowcount > 0
 
+    async def gc_packages(
+        self,
+        *,
+        stale_unknown_days: int,
+        stale_unknown_min_failures: int,
+        delivered_days: int,
+    ) -> dict[str, int]:
+        """Delete packages no longer worth keeping. Two independent sweeps:
+
+        - Dead parcels: status still ``unknown`` with no tracking events after
+          ``stale_unknown_days`` days *and* ``stale_unknown_min_failures``
+          failed lookups — the carrier never resolved them (orphaned account
+          labels, retailer-side return barcodes, typo'd manual numbers).
+        - Aged history: ``delivered`` / ``returned`` parcels not updated for
+          ``delivered_days`` days. ``delivered_days <= 0`` disables this sweep.
+
+        tracking_events and notifications cascade-delete with the package
+        (schema FKs + ``PRAGMA foreign_keys = ON`` from :meth:`init`).
+        """
+        now = datetime.now(UTC)
+        stale_cutoff = (now - timedelta(days=stale_unknown_days)).isoformat()
+
+        stale_cur = await self.db.execute(
+            """DELETE FROM packages
+               WHERE current_status = 'unknown'
+                 AND consecutive_failures >= ?
+                 AND created_at < ?
+                 AND NOT EXISTS (
+                     SELECT 1 FROM tracking_events
+                     WHERE tracking_events.package_id = packages.id
+                 )""",
+            (stale_unknown_min_failures, stale_cutoff),
+        )
+        stale_deleted = stale_cur.rowcount
+
+        delivered_deleted = 0
+        if delivered_days > 0:
+            delivered_cutoff = (now - timedelta(days=delivered_days)).isoformat()
+            del_cur = await self.db.execute(
+                """DELETE FROM packages
+                   WHERE current_status IN ('delivered', 'returned')
+                     AND updated_at < ?""",
+                (delivered_cutoff,),
+            )
+            delivered_deleted = del_cur.rowcount
+
+        await self.db.commit()
+        return {
+            "stale_unknown": stale_deleted,
+            "delivered": delivered_deleted,
+        }
+
     async def update_status(
         self,
         package_id: int,

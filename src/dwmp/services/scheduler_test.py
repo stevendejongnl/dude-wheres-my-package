@@ -373,3 +373,177 @@ async def test_consecutive_failures_reset_on_success(repo):
 
     pkg = await repo.get_package(pkg_id)
     assert pkg["consecutive_failures"] == 0
+
+
+# --- Garbage collection ---
+
+async def _make_stale_unknown(repo, tracking_number, *, source="account",
+                              failures=5, age_days=20, events=False):
+    pkg_id = await repo.add_package(
+        tracking_number=tracking_number, carrier="stub", source=source,
+    )
+    old_ts = (datetime.now(UTC) - timedelta(days=age_days)).isoformat()
+    await repo.db.execute(
+        "UPDATE packages SET consecutive_failures = ?, created_at = ? WHERE id = ?",
+        (failures, old_ts, pkg_id),
+    )
+    if events:
+        await repo.add_event(
+            package_id=pkg_id, timestamp=datetime(2026, 1, 1, tzinfo=UTC),
+            status="pre_transit", description="Registered",
+        )
+    await repo.db.commit()
+    return pkg_id
+
+
+async def test_gc_prunes_stale_unknown_account_package(repo):
+    service = TrackingService(repository=repo, carriers={"stub": StubCarrier()})
+    scheduler = PackageScheduler(tracking_service=service)
+    pkg_id = await _make_stale_unknown(repo, "ORPHAN-1")
+
+    await scheduler._collect_garbage()
+
+    assert await repo.get_package(pkg_id) is None
+
+
+async def test_gc_prunes_stale_unknown_manual_package(repo):
+    """User picked 'Both' — a manually-added number stuck at unknown is pruned too."""
+    service = TrackingService(repository=repo, carriers={"stub": StubCarrier()})
+    scheduler = PackageScheduler(tracking_service=service)
+    pkg_id = await _make_stale_unknown(repo, "TYPO-1", source="manual")
+
+    await scheduler._collect_garbage()
+
+    assert await repo.get_package(pkg_id) is None
+
+
+async def test_gc_keeps_recent_unknown(repo):
+    service = TrackingService(repository=repo, carriers={"stub": StubCarrier()})
+    scheduler = PackageScheduler(tracking_service=service)
+    pkg_id = await _make_stale_unknown(repo, "FRESH-1", age_days=3)
+
+    await scheduler._collect_garbage()
+
+    assert await repo.get_package(pkg_id) is not None
+
+
+async def test_gc_keeps_unknown_below_failure_threshold(repo):
+    service = TrackingService(repository=repo, carriers={"stub": StubCarrier()})
+    scheduler = PackageScheduler(tracking_service=service)
+    pkg_id = await _make_stale_unknown(repo, "MAYBE-1", failures=3)
+
+    await scheduler._collect_garbage()
+
+    assert await repo.get_package(pkg_id) is not None
+
+
+async def test_gc_keeps_unknown_with_events(repo):
+    """UNKNOWN but with real scan history — could be a status-mapping gap, not
+    garbage. Left alone so it stays visible."""
+    service = TrackingService(repository=repo, carriers={"stub": StubCarrier()})
+    scheduler = PackageScheduler(tracking_service=service)
+    pkg_id = await _make_stale_unknown(repo, "HASEVENTS-1", events=True)
+
+    await scheduler._collect_garbage()
+
+    assert await repo.get_package(pkg_id) is not None
+
+
+async def test_gc_prunes_old_delivered_and_cascades(repo):
+    service = TrackingService(repository=repo, carriers={"stub": StubCarrier()})
+    scheduler = PackageScheduler(tracking_service=service)
+
+    pkg_id = await repo.add_package(tracking_number="OLD-DEL-1", carrier="stub")
+    await repo.update_status(pkg_id, "delivered")
+    await repo.add_event(
+        package_id=pkg_id, timestamp=datetime(2026, 1, 1, tzinfo=UTC),
+        status="delivered", description="Delivered",
+    )
+    await repo.add_notification(
+        package_id=pkg_id, old_status="in_transit", new_status="delivered",
+        tracking_number="OLD-DEL-1", carrier="stub", label=None,
+    )
+    old_ts = (datetime.now(UTC) - timedelta(days=200)).isoformat()
+    await repo.db.execute(
+        "UPDATE packages SET updated_at = ? WHERE id = ?", (old_ts, pkg_id)
+    )
+    await repo.db.commit()
+
+    await scheduler._collect_garbage()
+
+    assert await repo.get_package(pkg_id) is None
+    assert await repo.get_events(pkg_id) == []
+    rows = await (await repo.db.execute(
+        "SELECT COUNT(*) FROM notifications WHERE package_id = ?", (pkg_id,)
+    )).fetchone()
+    assert rows[0] == 0
+
+
+async def test_gc_keeps_recent_delivered(repo):
+    service = TrackingService(repository=repo, carriers={"stub": StubCarrier()})
+    scheduler = PackageScheduler(tracking_service=service)
+
+    pkg_id = await repo.add_package(tracking_number="NEW-DEL-1", carrier="stub")
+    await repo.update_status(pkg_id, "delivered")
+    ts = (datetime.now(UTC) - timedelta(days=100)).isoformat()
+    await repo.db.execute(
+        "UPDATE packages SET updated_at = ? WHERE id = ?", (ts, pkg_id)
+    )
+    await repo.db.commit()
+
+    await scheduler._collect_garbage()
+
+    assert await repo.get_package(pkg_id) is not None
+
+
+async def test_gc_delivered_days_zero_disables_history_sweep(repo):
+    service = TrackingService(repository=repo, carriers={"stub": StubCarrier()})
+    scheduler = PackageScheduler(tracking_service=service, gc_delivered_days=0)
+
+    pkg_id = await repo.add_package(tracking_number="ANCIENT-1", carrier="stub")
+    await repo.update_status(pkg_id, "delivered")
+    old_ts = (datetime.now(UTC) - timedelta(days=999)).isoformat()
+    await repo.db.execute(
+        "UPDATE packages SET updated_at = ? WHERE id = ?", (old_ts, pkg_id)
+    )
+    await repo.db.commit()
+
+    await scheduler._collect_garbage()
+
+    assert await repo.get_package(pkg_id) is not None
+
+
+async def test_gc_leaves_active_packages_alone(repo):
+    service = TrackingService(repository=repo, carriers={"stub": StubCarrier()})
+    scheduler = PackageScheduler(tracking_service=service)
+
+    in_transit = await repo.add_package(tracking_number="MOVING-1", carrier="stub")
+    await repo.update_status(in_transit, "in_transit")
+    old_ts = (datetime.now(UTC) - timedelta(days=400)).isoformat()
+    await repo.db.execute(
+        "UPDATE packages SET updated_at = ?, created_at = ? WHERE id = ?",
+        (old_ts, old_ts, in_transit),
+    )
+    await repo.db.commit()
+
+    await scheduler._collect_garbage()
+
+    assert await repo.get_package(in_transit) is not None
+
+
+async def test_gc_job_registered_only_when_enabled(repo):
+    service = TrackingService(repository=repo, carriers={"stub": StubCarrier()})
+
+    on = PackageScheduler(tracking_service=service, gc_enabled=True)
+    on.start()
+    try:
+        assert on._scheduler.get_job("collect_garbage") is not None
+    finally:
+        on.stop()
+
+    off = PackageScheduler(tracking_service=service, gc_enabled=False)
+    off.start()
+    try:
+        assert off._scheduler.get_job("collect_garbage") is None
+    finally:
+        off.stop()
