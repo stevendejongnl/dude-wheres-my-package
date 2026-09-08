@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.66.3 (2026-09-08)
+
+### Bug Fixes
+
+- Stop stuck-unknown and duplicate account packages lingering as active
+  ([`3d1cd9a`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/3d1cd9ab04a5c9043b66beb143a907ff052cca31))
+
+
 ## v1.66.2 (2026-08-31)
 
 ### Bug Fixes
