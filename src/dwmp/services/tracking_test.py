@@ -80,6 +80,7 @@ async def test_list_carriers(service: TrackingService):
 
 
 async def test_add_and_get_package(service: TrackingService):
+    """add_package fetches immediately, so the stub's result is already applied."""
     pkg = await service.add_package(
         tracking_number="TEST1", carrier="stub", label="Test"
     )
@@ -87,14 +88,22 @@ async def test_add_and_get_package(service: TrackingService):
 
     full = await service.get_package(pkg["id"])
     assert full is not None
-    assert full["events"] == []
+    assert len(full["events"]) == 1
+    assert full["events"][0]["description"] == "On its way"
 
 
-async def test_refresh_package_updates_status(service: TrackingService):
+async def test_add_package_fetches_immediately(service: TrackingService):
     pkg = await service.add_package(tracking_number="REF1", carrier="stub")
-    assert pkg["current_status"] == "unknown"
+    assert pkg["current_status"] == "in_transit"
+    assert len(pkg["events"]) == 1
+    assert pkg["events"][0]["description"] == "On its way"
 
-    refreshed = await service.refresh_package(pkg["id"])
+
+async def test_refresh_package_updates_status(service: TrackingService, repo):
+    """Explicit refresh_package still works standalone, independent of add_package."""
+    pkg_id = await repo.add_package(tracking_number="REF2", carrier="stub")
+
+    refreshed = await service.refresh_package(pkg_id)
     assert refreshed is not None
     assert refreshed["current_status"] == "in_transit"
     assert len(refreshed["events"]) == 1
@@ -116,7 +125,7 @@ async def test_refresh_nonexistent_returns_none(service: TrackingService):
 
 async def test_mark_delivered_sets_status_and_event(service: TrackingService):
     pkg = await service.add_package(tracking_number="STALE1", carrier="stub")
-    assert pkg["current_status"] == "unknown"
+    assert pkg["current_status"] == "in_transit"
 
     resolved = await service.mark_delivered(pkg["id"])
     assert resolved is not None
@@ -135,11 +144,11 @@ async def test_mark_delivered_nonexistent_returns_none(service: TrackingService)
 # --- Notification tests ---
 
 
-async def test_refresh_creates_notification_on_status_change(service: TrackingService):
+async def test_add_package_creates_notification_on_immediate_fetch(service: TrackingService):
+    """The eager fetch inside add_package still goes through the same
+    status-change notification path as an explicit refresh."""
     pkg = await service.add_package(tracking_number="NCHG1", carrier="stub")
-    assert pkg["current_status"] == "unknown"
-
-    await service.refresh_package(pkg["id"])
+    assert pkg["current_status"] == "in_transit"
 
     notifications = await service.list_notifications()
     assert len(notifications) == 1
@@ -149,13 +158,14 @@ async def test_refresh_creates_notification_on_status_change(service: TrackingSe
 
 
 async def test_refresh_no_notification_when_status_unchanged(service: TrackingService):
+    # add_package's own immediate fetch already goes unknown -> in_transit
+    # (1 notification); both explicit refreshes below are in_transit -> in_transit.
     pkg = await service.add_package(tracking_number="NSAME1", carrier="stub")
+    assert len(await service.list_notifications()) == 1
 
-    # First refresh: unknown -> in_transit (creates notification)
     await service.refresh_package(pkg["id"])
     assert len(await service.list_notifications()) == 1
 
-    # Second refresh: in_transit -> in_transit (no new notification)
     await service.refresh_package(pkg["id"])
     assert len(await service.list_notifications()) == 1
 
@@ -668,10 +678,12 @@ async def test_refresh_empty_unknown_increments_failures_from_unknown(repo):
     accumulate consecutive_failures — otherwise it never trips the scheduler's
     skip threshold and lingers on the Active list forever."""
     service = TrackingService(repository=repo, carriers={"empty-unknown": EmptyUnknownCarrier()})
+    # add_package's own immediate fetch already counts as the 1st failure.
     pkg = await service.add_package(tracking_number="ORPH-1", carrier="empty-unknown")
     assert pkg["current_status"] == "unknown"
+    assert pkg["consecutive_failures"] == 1
 
-    for expected in (1, 2, 3):
+    for expected in (2, 3, 4):
         refreshed = await service.refresh_package(pkg["id"])
         assert refreshed["current_status"] == "unknown"
         assert refreshed["consecutive_failures"] == expected

@@ -116,15 +116,16 @@ async def test_poll_syncs_accounts_and_manual_packages(repo):
         "stub", "user", "pass", lookback_days=30
     )
 
-    # Add a manual package
+    # Add a manual package (this itself fetches once, immediately)
     await service.add_package(tracking_number="MANUAL1", carrier="stub")
+    assert carrier.track_count == 1
 
     await scheduler._poll_all()
 
     # Account was synced
     assert carrier.sync_count == 1
-    # Manual package was refreshed
-    assert carrier.track_count == 1
+    # Manual package was refreshed again by the poll cycle
+    assert carrier.track_count == 2
 
 
 async def test_poll_skips_sync_disabled_accounts(repo):

@@ -777,7 +777,20 @@ class TrackingService:
             postal_code=postal_code,
             source="manual",
         )
-        pkg = await self._repository.get_package(pkg_id)
+
+        # Fetch tracking data immediately instead of leaving the package at
+        # UNKNOWN until the next scheduled poll (up to 30 min away). Best
+        # effort: any failure here must not stop the package from being
+        # added — the scheduler will retry it on the next cycle regardless.
+        try:
+            pkg = await self.refresh_package(pkg_id)
+        except Exception:
+            logger.exception(
+                "Initial fetch failed for new package %d (%s)", pkg_id, carrier
+            )
+            pkg = None
+        if pkg is None:
+            pkg = await self._repository.get_package(pkg_id)
         assert pkg is not None
         return pkg
 
