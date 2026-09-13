@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.69.0 (2026-09-13)
+
+### Features
+
+- Add inline label editing on the packages page
+  ([`b9e4b73`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/b9e4b73998e2e704819f14815a7f458cab26fd12))
+
+
 ## v1.68.1 (2026-09-13)
 
 ### Bug Fixes
