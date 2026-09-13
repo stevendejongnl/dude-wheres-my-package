@@ -192,6 +192,43 @@ curl -X POST https://dwmp.madebysteven.nl/api/v1/packages/<id>/refresh
 
 **Note:** Trunkrs account sync is not supported. Parcels are tracked individually.
 
+### Cainiao (AliExpress + China → Europe parcels)
+
+**Auth type:** public tracking — no account needed.
+
+AliExpress orders (and most other China-origin parcels) ship through dozens
+of different last-mile carriers — Cainiao Warehouse, China Post, 4PX,
+Yanwen, PDN Express, YunExpress, and more — but every one of them reports
+into **Cainiao Global**, AliExpress's umbrella logistics tracker, keyed by
+the tracking number shown on your AliExpress order. One integration covers
+all of them; no need to know which sub-carrier actually delivers.
+
+**Steps:**
+
+Add a Cainiao/AliExpress parcel directly — no postal code needed:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/packages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tracking_number": "<your AliExpress tracking number, e.g. PDN0070419160>",
+    "carrier": "cainiao"
+  }'
+```
+
+Refresh to fetch the latest tracking status:
+
+```bash
+curl -X POST https://dwmp.madebysteven.nl/api/v1/packages/<id>/refresh
+```
+
+**API:** `global.cainiao.com/global/detail.json` — public, unauthenticated,
+returns the full scan history in English regardless of which underlying
+carrier is handling the parcel.
+
+**Note:** There's no AliExpress account sync (see below) — parcels are
+tracked individually by tracking number, same as GLS and Trunkrs.
+
 ### Manual Tracking (any carrier)
 
 You can also track individual packages without an account:

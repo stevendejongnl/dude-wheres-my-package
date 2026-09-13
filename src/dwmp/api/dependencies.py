@@ -1,6 +1,7 @@
 from functools import lru_cache
 
 from dwmp.carriers.amazon import Amazon
+from dwmp.carriers.cainiao import Cainiao
 from dwmp.carriers.dhl import DHL
 from dwmp.carriers.dpd import DPD
 from dwmp.carriers.dragonfly import Dragonfly
@@ -37,5 +38,6 @@ def get_tracking_service() -> TrackingService:
             "trunkrs": Trunkrs(),
             "ups": UPS(),
             "dragonfly": Dragonfly(),
+            "cainiao": Cainiao(),
         },
     )
