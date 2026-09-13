@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.68.0 (2026-09-13)
+
+### Features
+
+- Add Cainiao carrier for AliExpress and China-origin parcels
+  ([`76d257c`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/76d257ce4292919979911cf7a2f6f4378728d66d))
+
+
 ## v1.67.0 (2026-09-08)
 
 ### Features
