@@ -429,6 +429,58 @@ async def test_track_package_save_dpd_requires_postal_code(client: AsyncClient, 
     assert await repo.list_packages() == []
 
 
+async def test_edit_package_label_form_prefills_existing_label(client: AsyncClient, repo):
+    pkg_id = await repo.add_package(
+        tracking_number="LBL1", carrier="postnl", label="Old label"
+    )
+    response = await client.get(f"/packages/{pkg_id}/label/edit")
+    assert response.status_code == 200
+    assert 'value="Old label"' in response.text
+
+
+async def test_edit_package_label_form_404_for_missing_package(client: AsyncClient):
+    response = await client.get("/packages/999/label/edit")
+    assert response.status_code == 404
+
+
+async def test_edit_package_label_form_cancel_returns_empty(client: AsyncClient):
+    response = await client.get("/packages/1/label/edit/cancel")
+    assert response.status_code == 200
+    assert response.text == ""
+
+
+async def test_edit_package_label_save_updates_label(client: AsyncClient, repo):
+    pkg_id = await repo.add_package(tracking_number="LBL2", carrier="postnl")
+    response = await client.post(
+        f"/packages/{pkg_id}/label/edit/save", data={"label": "New label"}
+    )
+    assert response.status_code == 200
+    assert "New label" in response.text
+
+    pkg = await repo.get_package(pkg_id)
+    assert pkg["label"] == "New label"
+
+
+async def test_edit_package_label_save_blank_clears_label(client: AsyncClient, repo):
+    pkg_id = await repo.add_package(
+        tracking_number="LBL3", carrier="postnl", label="Something"
+    )
+    response = await client.post(
+        f"/packages/{pkg_id}/label/edit/save", data={"label": "   "}
+    )
+    assert response.status_code == 200
+
+    pkg = await repo.get_package(pkg_id)
+    assert pkg["label"] is None
+
+
+async def test_edit_package_label_save_404_for_missing_package(client: AsyncClient):
+    response = await client.post(
+        "/packages/999/label/edit/save", data={"label": "x"}
+    )
+    assert response.status_code == 404
+
+
 def test_enrich_package_sets_effective_tracking_url_from_db():
     pkg = {
         "carrier": "dpd",

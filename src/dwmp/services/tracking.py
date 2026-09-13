@@ -856,6 +856,16 @@ class TrackingService:
         )
         return await self.get_package(package_id)
 
+    async def update_package_label(self, package_id: int, label: str | None) -> dict | None:
+        """User-driven rename — e.g. "Headphones" instead of a carrier's
+        generic order description. Overwrites unconditionally, unlike the
+        account-sync backfill which only fills a previously empty label."""
+        pkg = await self._repository.get_package(package_id)
+        if pkg is None:
+            return None
+        await self._repository.update_package_label(package_id, label)
+        return await self.get_package(package_id)
+
     async def refresh_package(self, package_id: int) -> dict | None:
         pkg = await self._repository.get_package(package_id)
         if pkg is None:

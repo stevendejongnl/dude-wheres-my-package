@@ -135,6 +135,17 @@
       opacity: 0.6; pointer-events: none;
       transition: opacity 0.15s ease-out;
     }
+    .label-edit-form {
+      display: flex; gap: 8px; align-items: center;
+      padding: 8px 0 4px;
+    }
+    .label-edit-form input {
+      padding: 6px 10px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 0.8rem;
+      font-family: inherit;
+    }
+    .label-edit-form input:focus { outline: none; border-color: var(--accent); }
 
     /* Package metadata */
     .pkg-metadata {

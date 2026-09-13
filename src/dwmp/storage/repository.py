@@ -581,12 +581,13 @@ class PackageRepository:
         )
         await self.db.commit()
 
-    async def update_package_label(self, package_id: int, label: str) -> None:
-        """Backfill label on a package row.
+    async def update_package_label(self, package_id: int, label: str | None) -> None:
+        """Set (or clear, with ``label=None``) the label on a package row.
 
-        Used during account sync when the carrier now surfaces a label it
-        didn't before (e.g. a PostNL parcel synced before the GraphQL `title`
-        field was mapped to label).
+        Used both to backfill a label during account sync (when the carrier
+        now surfaces one it didn't before — e.g. a PostNL parcel synced
+        before the GraphQL `title` field was mapped to label) and for a
+        user-driven rename via ``TrackingService.update_package_label``.
         """
         now = datetime.now(UTC).isoformat()
         await self.db.execute(

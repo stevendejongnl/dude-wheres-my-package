@@ -141,6 +141,29 @@ async def test_mark_delivered_nonexistent_returns_none(service: TrackingService)
     assert result is None
 
 
+async def test_update_package_label_renames(service: TrackingService):
+    pkg = await service.add_package(
+        tracking_number="LBL1", carrier="stub", label="Old"
+    )
+    updated = await service.update_package_label(pkg["id"], "New")
+    assert updated is not None
+    assert updated["label"] == "New"
+
+
+async def test_update_package_label_clears_with_none(service: TrackingService):
+    pkg = await service.add_package(
+        tracking_number="LBL2", carrier="stub", label="Something"
+    )
+    updated = await service.update_package_label(pkg["id"], None)
+    assert updated is not None
+    assert updated["label"] is None
+
+
+async def test_update_package_label_nonexistent_returns_none(service: TrackingService):
+    result = await service.update_package_label(999, "X")
+    assert result is None
+
+
 # --- Notification tests ---
 
 

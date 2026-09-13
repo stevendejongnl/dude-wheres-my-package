@@ -80,6 +80,13 @@
         <span class="htmx-indicator"><span class="spinner"></span></span>
       </button>
       {% endif %}
+      <button class="btn btn-ghost btn-sm"
+        hx-get="{{ base_path }}/packages/{{ pkg.id }}/label/edit"
+        hx-target="#pkg-label-form-{{ pkg.id }}"
+        hx-swap="innerHTML"
+        onclick="event.stopPropagation()">
+        {{ 'Rename' if pkg.label else 'Add label' }}
+      </button>
       <button class="btn btn-danger btn-sm"
         hx-delete="{{ base_path }}/api/v1/packages/{{ pkg.id }}"
         hx-target="#pkg-{{ pkg.id }}"
@@ -88,6 +95,7 @@
         Delete
       </button>
     </div>
+    <div id="pkg-label-form-{{ pkg.id }}"></div>
 
     <details class="pkg-metadata">
       <summary>Details</summary>

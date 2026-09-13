@@ -743,6 +743,46 @@ async def resolve_package_view(
     return templates.TemplateResponse(request, "_package_card.html", ctx)
 
 
+@router.get("/packages/{package_id}/label/edit", response_class=HTMLResponse)
+async def edit_package_label_form(
+    request: Request,
+    package_id: int,
+    service: TrackingService = Depends(get_tracking_service),
+):
+    """HTMX endpoint: render the inline label-edit form for one package."""
+    pkg = await service.get_package(package_id)
+    if pkg is None:
+        raise HTTPException(status_code=404, detail="Package not found")
+    ctx = {"pkg": pkg, "base_path": _base_path(request)}
+    return templates.TemplateResponse(request, "_package_label_edit_form.html", ctx)
+
+
+@router.get("/packages/{package_id}/label/edit/cancel", response_class=HTMLResponse)
+async def edit_package_label_form_cancel(package_id: int):
+    """Empty response — used to clear the inline label-edit form via HTMX swap."""
+    return HTMLResponse("")
+
+
+@router.post("/packages/{package_id}/label/edit/save", response_class=HTMLResponse)
+async def edit_package_label_save(
+    request: Request,
+    package_id: int,
+    service: TrackingService = Depends(get_tracking_service),
+    label: str = Form(default=""),
+):
+    """HTMX endpoint: save a package's label and return the updated card."""
+    pkg = await service.update_package_label(package_id, label.strip() or None)
+    if pkg is None:
+        raise HTTPException(status_code=404, detail="Package not found")
+    _enrich_package(pkg)
+    ctx = {
+        "pkg": pkg,
+        "base_path": _base_path(request),
+        "expanded": True,
+    }
+    return templates.TemplateResponse(request, "_package_card.html", ctx)
+
+
 # --- Notification views ---
 
 

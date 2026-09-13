@@ -1,0 +1,22 @@
+{#
+  Inline label-edit form for one package card — swapped into
+  #pkg-label-form-{{ pkg.id }} via HTMX.
+
+  Context:
+    pkg       — package dict (id, label)
+    base_path — reverse-proxy prefix
+#}
+<form class="label-edit-form"
+  hx-post="{{ base_path }}/packages/{{ pkg.id }}/label/edit/save"
+  hx-target="#pkg-{{ pkg.id }}"
+  hx-swap="outerHTML"
+  onclick="event.stopPropagation()">
+  <input type="text" name="label" value="{{ pkg.label or '' }}"
+    placeholder="e.g. Headphones from Dave" autocomplete="off" autofocus
+    style="flex:1;min-width:0;">
+  <button type="submit" class="btn btn-primary btn-sm">Save</button>
+  <button type="button" class="btn btn-ghost btn-sm"
+    hx-get="{{ base_path }}/packages/{{ pkg.id }}/label/edit/cancel"
+    hx-target="#pkg-label-form-{{ pkg.id }}"
+    hx-swap="innerHTML">Cancel</button>
+</form>
