@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.68.1 (2026-09-13)
+
+### Bug Fixes
+
+- Fetch tracking data immediately when a package is added manually
+  ([`49b1c16`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/49b1c16103d1608a7350ae51f6d7582528073aad))
+
+
 ## v1.68.0 (2026-09-13)
 
 ### Features
