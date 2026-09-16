@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS tracking_events (
     status TEXT NOT NULL,
     description TEXT NOT NULL,
     location TEXT,
+    proof_photos TEXT,
     UNIQUE(package_id, timestamp, status)
 );
 
@@ -234,6 +235,17 @@ class PackageRepository:
             await self.db.execute(
                 "ALTER TABLE packages ADD COLUMN resolved_manually "
                 "INTEGER NOT NULL DEFAULT 0"
+            )
+            await self.db.commit()
+
+        # v1.70: add tracking_events.proof_photos (JSON array of image URLs)
+        # for carriers that expose delivery proof photos — currently PDN
+        # Express, looked up via Cainiao's PDN-specific enrichment call.
+        cursor = await self.db.execute("PRAGMA table_info(tracking_events)")
+        event_cols = {col["name"] for col in await cursor.fetchall()}
+        if "proof_photos" not in event_cols:
+            await self.db.execute(
+                "ALTER TABLE tracking_events ADD COLUMN proof_photos TEXT"
             )
             await self.db.commit()
 
@@ -647,18 +659,31 @@ class PackageRepository:
         status: str,
         description: str,
         location: str | None = None,
+        proof_photos: list[str] | None = None,
     ) -> None:
+        photos_json = json.dumps(proof_photos) if proof_photos else None
         await self.db.execute(
             """INSERT OR IGNORE INTO tracking_events
-               (package_id, timestamp, status, description, location)
-               SELECT ?, ?, ?, ?, ?
+               (package_id, timestamp, status, description, location, proof_photos)
+               SELECT ?, ?, ?, ?, ?, ?
                WHERE NOT EXISTS (
                    SELECT 1 FROM tracking_events
                    WHERE package_id = ? AND status = ? AND description = ?
                )""",
-            (package_id, timestamp.isoformat(), status, description, location,
+            (package_id, timestamp.isoformat(), status, description, location, photos_json,
              package_id, status, description),
         )
+        if photos_json:
+            # The event may already exist from an earlier sync (e.g. before
+            # a postal code was on file to unlock PDN's proof photos) — the
+            # INSERT OR IGNORE above is a no-op in that case, so backfill
+            # the photos onto the existing row instead of losing them.
+            await self.db.execute(
+                """UPDATE tracking_events SET proof_photos = ?
+                   WHERE package_id = ? AND status = ? AND description = ?
+                   AND proof_photos IS NULL""",
+                (photos_json, package_id, status, description),
+            )
         await self.db.commit()
 
     async def get_events(self, package_id: int) -> list[dict]:
@@ -666,7 +691,11 @@ class PackageRepository:
             "SELECT * FROM tracking_events WHERE package_id = ? ORDER BY timestamp",
             (package_id,),
         )
-        return [dict(row) for row in await cursor.fetchall()]
+        events = [dict(row) for row in await cursor.fetchall()]
+        for event in events:
+            photos = event.get("proof_photos")
+            event["proof_photos"] = json.loads(photos) if photos else None
+        return events
 
     # --- Notification methods ---
 

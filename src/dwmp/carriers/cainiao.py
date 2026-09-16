@@ -1,3 +1,5 @@
+import logging
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import httpx
@@ -13,6 +15,8 @@ from dwmp.carriers.base import (
     no_date_fallback,
 )
 
+logger = logging.getLogger(__name__)
+
 # Cainiao Global — AliExpress's umbrella logistics tracker. AliExpress orders
 # ship through dozens of different Chinese/last-mile carriers (Cainiao
 # Warehouse, China Post, 4PX, Yanwen, PDN Express, YunExpress, ...) but every
@@ -20,6 +24,15 @@ from dwmp.carriers.base import (
 # number, so one integration covers "AliExpress and basically anything
 # shipped from China" without needing a carrier-specific scraper each.
 CAINIAO_TRACKING_URL = "https://global.cainiao.com/global/detail.json"
+
+# PDN Express is one of the many last-mile carriers Cainiao aggregates for
+# AliExpress/China-origin parcels (see module docstring above). Unlike the
+# others, PDN runs its own public tracking site with a richer JSON API that
+# — given the destination postal code as a privacy gate — also serves the
+# delivery proof photos (front door, parcel label, drop location) shown in
+# AliExpress's own tracking UI. Cainiao's aggregator API doesn't carry these
+# at all, so we call PDN directly as a best-effort enrichment step.
+PDN_TRACK_URL = "https://pdn.express/api/track"
 
 # Ordered substring matches against Cainiao's English "standerdDesc" event
 # text and stage group name (e.g. "In transit", "At customs"). Checked in
@@ -99,22 +112,65 @@ class Cainiao(CarrierBase):
             except httpx.HTTPError as exc:
                 raise CarrierTransientError(self.name, str(exc)) from exc
 
-        if response.status_code != 200:
-            raise CarrierTransientError(self.name, f"HTTP {response.status_code}")
+            if response.status_code != 200:
+                raise CarrierTransientError(self.name, f"HTTP {response.status_code}")
 
+            try:
+                payload = response.json()
+            except Exception as exc:
+                raise CarrierTransientError(self.name, f"bad JSON: {exc}") from exc
+
+            if not payload.get("success"):
+                return TrackingResult(
+                    tracking_number=tracking_number,
+                    carrier=self.name,
+                    status=TrackingStatus.UNKNOWN,
+                )
+
+            result = self._parse_tracking_response(tracking_number, payload)
+
+            postal_code = kwargs.get("postal_code", "")
+            if (
+                postal_code
+                and result.status == TrackingStatus.DELIVERED
+                and result.events
+                and tracking_number.upper().startswith("PDN")
+            ):
+                result = await self._attach_pdn_proof_photos(client, result, postal_code)
+
+            return result
+
+    async def _attach_pdn_proof_photos(
+        self, client: httpx.AsyncClient, result: TrackingResult, postal_code: str
+    ) -> TrackingResult:
+        """Best-effort enrichment: fetch PDN's own proof-of-delivery photos
+        and attach them to the delivered event. Never raises — a failure
+        here (network error, PDN API shape change, wrong postal code) just
+        means the package tracks normally without photos."""
         try:
+            response = await client.post(
+                PDN_TRACK_URL,
+                json={
+                    "action": "pod",
+                    "orderNo": result.tracking_number,
+                    "postcode": postal_code,
+                    "locale": "en",
+                },
+                headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
+                timeout=15,
+            )
             payload = response.json()
         except Exception as exc:
-            raise CarrierTransientError(self.name, f"bad JSON: {exc}") from exc
+            logger.info("PDN POD lookup failed for %s: %s", result.tracking_number, exc)
+            return result
 
-        if not payload.get("success"):
-            return TrackingResult(
-                tracking_number=tracking_number,
-                carrier=self.name,
-                status=TrackingStatus.UNKNOWN,
-            )
+        photos = payload.get("data") if payload.get("ok") else None
+        if not photos or not isinstance(photos, list):
+            return result
 
-        return self._parse_tracking_response(tracking_number, payload)
+        events = list(result.events)
+        events[-1] = replace(events[-1], proof_photos=photos)
+        return replace(result, events=events)
 
     async def sync_packages(
         self, tokens: AuthTokens, lookback_days: int = 30

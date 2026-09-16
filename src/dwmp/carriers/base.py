@@ -99,6 +99,10 @@ class TrackingEvent:
     status: TrackingStatus
     description: str
     location: str | None = None
+    # Carrier-hosted proof-of-delivery photo URLs (e.g. PDN's public POD
+    # endpoint). Only a handful of carriers expose these; None/empty for
+    # everyone else.
+    proof_photos: list[str] | None = None
 
 
 @dataclass(frozen=True)

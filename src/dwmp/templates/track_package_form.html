@@ -33,7 +33,7 @@
       <div class="form-group">
         <label for="track-carrier">Carrier</label>
         <select id="track-carrier" name="carrier" required
-          onchange="document.getElementById('track-postal-hint').style.display = ['gls','trunkrs','dpd'].includes(this.value) ? 'block' : 'none';">
+          onchange="document.getElementById('track-postal-hint').style.display = ['gls','trunkrs','dpd','cainiao'].includes(this.value) ? 'block' : 'none';">
           <option value="">Select a carrier…</option>
           {% for name in carriers %}
           <option value="{{ name }}">{{ name|capitalize }}</option>
@@ -60,6 +60,7 @@
           autocomplete="postal-code" placeholder="1234AB">
         <small class="form-help" id="track-postal-hint" style="display:none;">
           GLS, Trunkrs, and DPD require the delivery postal code to fetch tracking details.
+          For Cainiao, it's optional but unlocks delivery proof photos on PDN-handled parcels.
         </small>
       </div>
 
