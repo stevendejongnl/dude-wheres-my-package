@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.70.0 (2026-09-16)
+
+### Features
+
+- Show PDN delivery proof photos on Cainiao parcels
+  ([`b57d32c`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/b57d32c1b42c858edaaa85cc6114b3b1735ed638))
+
+
 ## v1.69.0 (2026-09-13)
 
 ### Features
