@@ -135,6 +135,15 @@
             <span class="timeline-loc">{{ event.location }}</span>
             {% endif %}
           </div>
+          {% if event.proof_photos %}
+          <div class="timeline-photos">
+            {% for photo in event.proof_photos %}
+            <a href="{{ photo }}" target="_blank" rel="noopener" onclick="event.stopPropagation()">
+              <img src="{{ photo }}" alt="Delivery proof photo" loading="lazy">
+            </a>
+            {% endfor %}
+          </div>
+          {% endif %}
         </div>
       </div>
       {% endfor %}

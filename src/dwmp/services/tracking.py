@@ -549,6 +549,7 @@ class TrackingService:
                         status=event.status.value,
                         description=event.description,
                         location=event.location,
+                        proof_photos=event.proof_photos,
                     )
 
             pkg = await self.get_package(pkg_id)
@@ -930,6 +931,7 @@ class TrackingService:
                 status=event.status.value,
                 description=event.description,
                 location=event.location,
+                proof_photos=event.proof_photos,
             )
 
         return await self.get_package(package_id)

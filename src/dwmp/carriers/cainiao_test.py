@@ -1,7 +1,10 @@
+import json
+
+import httpx
 import pytest
 
 from dwmp.carriers.base import AuthTokens, AuthType, TrackingStatus
-from dwmp.carriers.cainiao import Cainiao, _parse_status
+from dwmp.carriers.cainiao import CAINIAO_TRACKING_URL, PDN_TRACK_URL, Cainiao, _parse_status
 
 
 def test_cainiao_is_manual_token():
@@ -131,3 +134,105 @@ async def test_sync_not_supported():
     carrier = Cainiao()
     with pytest.raises(NotImplementedError, match="Cainiao account sync is not supported"):
         await carrier.sync_packages(AuthTokens(access_token="unused"))
+
+
+_DELIVERED_PAYLOAD = {
+    "success": True,
+    "module": [
+        {
+            "processInfo": {
+                "progressPointList": [{"pointName": "Delivered", "light": True}],
+            },
+            "detailList": [
+                {
+                    "time": 1789531099000,
+                    "standerdDesc": "[Netherlands,Amsterdam] Package delivered",
+                    "group": {"nodeDesc": "Delivered"},
+                },
+            ],
+        }
+    ],
+}
+
+
+def _mock_transport(pod_response: dict | None, pod_status: int = 200):
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url).startswith(CAINIAO_TRACKING_URL):
+            return httpx.Response(200, json=_DELIVERED_PAYLOAD)
+        if str(request.url) == PDN_TRACK_URL:
+            body = json.loads(request.content)
+            assert body["action"] == "pod"
+            assert body["orderNo"] == "PDN0070419160"
+            assert body["postcode"] == "1431RZ"
+            return httpx.Response(pod_status, json=pod_response or {})
+        raise AssertionError(f"unexpected request to {request.url}")
+
+    return httpx.MockTransport(handler)
+
+
+async def test_track_attaches_pdn_proof_photos():
+    photos = [
+        "https://img.pdn.express/prod/NL/POD/location/2026/09/a.png",
+        "https://img.pdn.express/prod/NL/POD/houseno/2026/09/b.png",
+    ]
+    client = httpx.AsyncClient(transport=_mock_transport({"ok": True, "data": photos}))
+    carrier = Cainiao(http_client=client)
+
+    result = await carrier.track("PDN0070419160", postal_code="1431RZ")
+
+    assert result.status == TrackingStatus.DELIVERED
+    assert result.events[-1].proof_photos == photos
+
+
+async def test_track_skips_pdn_lookup_without_postal_code():
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url).startswith(CAINIAO_TRACKING_URL)
+        return httpx.Response(200, json=_DELIVERED_PAYLOAD)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    carrier = Cainiao(http_client=client)
+
+    result = await carrier.track("PDN0070419160")
+
+    assert result.status == TrackingStatus.DELIVERED
+    assert result.events[-1].proof_photos is None
+
+
+async def test_track_skips_pdn_lookup_for_non_pdn_tracking_number():
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url).startswith(CAINIAO_TRACKING_URL)
+        return httpx.Response(200, json=_DELIVERED_PAYLOAD)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    carrier = Cainiao(http_client=client)
+
+    result = await carrier.track("YT1234567890CN", postal_code="1431RZ")
+
+    assert result.status == TrackingStatus.DELIVERED
+    assert result.events[-1].proof_photos is None
+
+
+async def test_track_survives_pdn_lookup_failure():
+    """A broken/unreachable PDN API must not break normal Cainiao tracking."""
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url).startswith(CAINIAO_TRACKING_URL):
+            return httpx.Response(200, json=_DELIVERED_PAYLOAD)
+        raise httpx.ConnectError("connection refused", request=request)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    carrier = Cainiao(http_client=client)
+
+    result = await carrier.track("PDN0070419160", postal_code="1431RZ")
+
+    assert result.status == TrackingStatus.DELIVERED
+    assert result.events[-1].proof_photos is None
+
+
+async def test_track_ignores_pdn_response_without_photos():
+    client = httpx.AsyncClient(transport=_mock_transport({"ok": False, "error": "postcode"}))
+    carrier = Cainiao(http_client=client)
+
+    result = await carrier.track("PDN0070419160", postal_code="1431RZ")
+
+    assert result.status == TrackingStatus.DELIVERED
+    assert result.events[-1].proof_photos is None

@@ -86,6 +86,55 @@ async def test_add_and_get_events(repo: PackageRepository):
     assert events[1]["status"] == "out_for_delivery"
 
 
+async def test_add_event_with_proof_photos(repo: PackageRepository):
+    pkg_id = await repo.add_package(tracking_number="POD1", carrier="cainiao")
+
+    await repo.add_event(
+        package_id=pkg_id,
+        timestamp=datetime(2026, 9, 16, 11, 58, tzinfo=UTC),
+        status="delivered",
+        description="Package delivered",
+        proof_photos=["https://img.pdn.express/a.png", "https://img.pdn.express/b.png"],
+    )
+
+    events = await repo.get_events(pkg_id)
+    assert events[0]["proof_photos"] == [
+        "https://img.pdn.express/a.png", "https://img.pdn.express/b.png",
+    ]
+
+
+async def test_get_events_proof_photos_defaults_to_none(repo: PackageRepository):
+    pkg_id = await repo.add_package(tracking_number="NOPOD1", carrier="postnl")
+    await repo.add_event(
+        package_id=pkg_id,
+        timestamp=datetime(2026, 4, 11, 10, 0, tzinfo=UTC),
+        status="in_transit",
+        description="On its way",
+    )
+
+    events = await repo.get_events(pkg_id)
+    assert events[0]["proof_photos"] is None
+
+
+async def test_add_event_backfills_proof_photos_onto_existing_event(repo: PackageRepository):
+    """Photos can become available after the event was already stored —
+    e.g. the delivered event synced before a postal code was on file to
+    unlock PDN's POD lookup. A later sync with photos should update the
+    existing row rather than silently dropping them."""
+    pkg_id = await repo.add_package(tracking_number="POD2", carrier="cainiao")
+    ts = datetime(2026, 9, 16, 11, 58, tzinfo=UTC)
+
+    await repo.add_event(pkg_id, ts, "delivered", "Package delivered")
+    await repo.add_event(
+        pkg_id, ts, "delivered", "Package delivered",
+        proof_photos=["https://img.pdn.express/a.png"],
+    )
+
+    events = await repo.get_events(pkg_id)
+    assert len(events) == 1
+    assert events[0]["proof_photos"] == ["https://img.pdn.express/a.png"]
+
+
 async def test_duplicate_event_is_ignored(repo: PackageRepository):
     pkg_id = await repo.add_package(tracking_number="DUP1", carrier="postnl")
     ts = datetime(2026, 4, 11, 10, 0, tzinfo=UTC)
