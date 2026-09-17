@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.70.1 (2026-09-17)
+
+### Bug Fixes
+
+- Follow Cainiao's copyRealMailNo pivot for AliExpress placeholder numbers
+  ([`825c4a2`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/825c4a24c8795126cbb74d1ba11c62742fd70e7b))
+
+
 ## v1.70.0 (2026-09-16)
 
 ### Features
