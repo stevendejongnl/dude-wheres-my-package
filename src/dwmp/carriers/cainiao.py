@@ -102,23 +102,7 @@ class Cainiao(CarrierBase):
 
     async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
         async with self._get_client() as client:
-            try:
-                response = await client.get(
-                    CAINIAO_TRACKING_URL,
-                    params={"mailNos": tracking_number, "lang": "en-US"},
-                    headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
-                    timeout=15,
-                )
-            except httpx.HTTPError as exc:
-                raise CarrierTransientError(self.name, str(exc)) from exc
-
-            if response.status_code != 200:
-                raise CarrierTransientError(self.name, f"HTTP {response.status_code}")
-
-            try:
-                payload = response.json()
-            except Exception as exc:
-                raise CarrierTransientError(self.name, f"bad JSON: {exc}") from exc
+            payload = await self._fetch_payload(client, tracking_number)
 
             if not payload.get("success"):
                 return TrackingResult(
@@ -126,6 +110,24 @@ class Cainiao(CarrierBase):
                     carrier=self.name,
                     status=TrackingStatus.UNKNOWN,
                 )
+
+            modules = payload.get("module") or []
+            mod = modules[0] if modules else {}
+            # AliExpress often hands out a placeholder order-level number
+            # before the seller's actual shipment gets a real carrier
+            # tracking number. Cainiao's aggregator flags this via
+            # copyRealMailNo, and the placeholder's own detailList stays
+            # permanently empty — polling it forever would never surface
+            # any events. Follow the pivot transparently, one hop, and keep
+            # reporting it under the number the user originally added.
+            pivot = mod.get("copyRealMailNo")
+            if pivot and pivot != tracking_number and not mod.get("detailList"):
+                try:
+                    pivot_payload = await self._fetch_payload(client, pivot)
+                except CarrierTransientError:
+                    pivot_payload = None
+                if pivot_payload and pivot_payload.get("success"):
+                    payload = pivot_payload
 
             result = self._parse_tracking_response(tracking_number, payload)
 
@@ -139,6 +141,25 @@ class Cainiao(CarrierBase):
                 result = await self._attach_pdn_proof_photos(client, result, postal_code)
 
             return result
+
+    async def _fetch_payload(self, client: httpx.AsyncClient, mail_no: str) -> dict:
+        try:
+            response = await client.get(
+                CAINIAO_TRACKING_URL,
+                params={"mailNos": mail_no, "lang": "en-US"},
+                headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
+                timeout=15,
+            )
+        except httpx.HTTPError as exc:
+            raise CarrierTransientError(self.name, str(exc)) from exc
+
+        if response.status_code != 200:
+            raise CarrierTransientError(self.name, f"HTTP {response.status_code}")
+
+        try:
+            return response.json()
+        except Exception as exc:
+            raise CarrierTransientError(self.name, f"bad JSON: {exc}") from exc
 
     async def _attach_pdn_proof_photos(
         self, client: httpx.AsyncClient, result: TrackingResult, postal_code: str
