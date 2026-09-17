@@ -236,3 +236,115 @@ async def test_track_ignores_pdn_response_without_photos():
 
     assert result.status == TrackingStatus.DELIVERED
     assert result.events[-1].proof_photos is None
+
+
+async def test_track_follows_copy_real_mail_no_pivot():
+    """AliExpress placeholder order numbers (empty detailList, a
+    copyRealMailNo pointing at the actual carrier tracking number) must be
+    followed transparently — otherwise polling the placeholder forever
+    never surfaces any events."""
+    placeholder_payload = {
+        "success": True,
+        "module": [
+            {
+                "mailNo": "AP00841686101438",
+                "status": "SELLER_PREPARING",
+                "detailList": [],
+                "copyRealMailNo": "AP00844688431450",
+            }
+        ],
+    }
+    real_payload = {
+        "success": True,
+        "module": [
+            {
+                "mailNo": "AP00844688431450",
+                "processInfo": {"progressPointList": [{"pointName": "Delivered"}]},
+                "detailList": [
+                    {
+                        "time": 1789289340000,
+                        "standerdDesc": "Departed from facility",
+                        "group": {"nodeDesc": "In transit"},
+                    },
+                ],
+            }
+        ],
+    }
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        mail_no = request.url.params["mailNos"]
+        if mail_no == "AP00841686101438":
+            return httpx.Response(200, json=placeholder_payload)
+        if mail_no == "AP00844688431450":
+            return httpx.Response(200, json=real_payload)
+        raise AssertionError(f"unexpected mailNos {mail_no}")
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    carrier = Cainiao(http_client=client)
+
+    result = await carrier.track("AP00841686101438")
+
+    # Reported under the tracking number the user originally added, but
+    # carrying the pivot number's real events.
+    assert result.tracking_number == "AP00841686101438"
+    assert result.status == TrackingStatus.IN_TRANSIT
+    assert len(result.events) == 1
+    assert result.events[0].description == "Departed from facility"
+
+
+async def test_track_does_not_pivot_when_own_detail_list_present():
+    payload = {
+        "success": True,
+        "module": [
+            {
+                "mailNo": "AP1",
+                "processInfo": {"progressPointList": []},
+                "detailList": [
+                    {"time": 1789289340000, "standerdDesc": "In transit"},
+                ],
+                "copyRealMailNo": "AP2",
+            }
+        ],
+    }
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["mailNos"] == "AP1"
+        return httpx.Response(200, json=payload)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    carrier = Cainiao(http_client=client)
+
+    result = await carrier.track("AP1")
+
+    assert result.tracking_number == "AP1"
+    assert len(result.events) == 1
+
+
+async def test_track_pivot_lookup_failure_falls_back_to_placeholder_result():
+    """If the pivot lookup itself fails, still return the (empty)
+    placeholder result rather than blowing up the whole refresh."""
+    placeholder_payload = {
+        "success": True,
+        "module": [
+            {
+                "mailNo": "AP1",
+                "detailList": [],
+                "copyRealMailNo": "AP2",
+            }
+        ],
+    }
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        mail_no = request.url.params["mailNos"]
+        if mail_no == "AP1":
+            return httpx.Response(200, json=placeholder_payload)
+        raise httpx.ConnectError("connection refused", request=request)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    carrier = Cainiao(http_client=client)
+
+    result = await carrier.track("AP1")
+
+    assert result.tracking_number == "AP1"
+    assert result.status == TrackingStatus.UNKNOWN
+    assert result.events == []
