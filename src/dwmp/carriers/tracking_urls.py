@@ -18,6 +18,9 @@ _TRUNKRS_ROOT = "https://parcel.trunkrs.nl/"
 _GLS_DEEP = "https://gls-group.com/GROUP/en/parcel-tracking/?match={tn}&postalCode={postal_code}"
 _GLS_ROOT = "https://gls-group.com/GROUP/en/parcel-tracking/?match={tn}"
 
+_GOFO_DEEP = "https://www.gofo.com/nl/tracking-results/?id={tn}&needPod=true&podCode={postal_code}"
+_GOFO_ROOT = "https://www.gofo.com/nl/tracking-results/?id={tn}"
+
 
 def public_tracking_url(
     carrier: str,
@@ -45,6 +48,11 @@ def public_tracking_url(
             pc = postal_code.replace(" ", "").upper()
             return _GLS_DEEP.format(tn=tracking_number, postal_code=pc)
         return _GLS_ROOT.format(tn=tracking_number)
+
+    if carrier == "gofo":
+        if postal_code:
+            return _GOFO_DEEP.format(tn=tracking_number, postal_code=postal_code)
+        return _GOFO_ROOT.format(tn=tracking_number)
 
     template = _TEMPLATES.get(carrier)
     if template is None:

@@ -57,6 +57,19 @@ def test_trunkrs_without_postal_code_returns_root():
     assert url == "https://parcel.trunkrs.nl/"
 
 
+def test_gofo_returns_tracking_url_without_pod_code():
+    url = public_tracking_url("gofo", "GFNL26261188942030")
+    assert url == "https://www.gofo.com/nl/tracking-results/?id=GFNL26261188942030"
+
+
+def test_gofo_returns_tracking_url_with_pod_code():
+    url = public_tracking_url("gofo", "GFNL26261188942030", "800157")
+    assert url == (
+        "https://www.gofo.com/nl/tracking-results/"
+        "?id=GFNL26261188942030&needPod=true&podCode=800157"
+    )
+
+
 def test_amazon_returns_none():
     assert public_tracking_url("amazon", "123-456-789") is None
 

@@ -6,6 +6,7 @@ from dwmp.carriers.dhl import DHL
 from dwmp.carriers.dpd import DPD
 from dwmp.carriers.dragonfly import Dragonfly
 from dwmp.carriers.gls import GLS
+from dwmp.carriers.gofo import GoFo
 from dwmp.carriers.postnl import PostNL
 from dwmp.carriers.trunkrs import Trunkrs
 from dwmp.carriers.ups import UPS
@@ -36,6 +37,7 @@ def get_tracking_service() -> TrackingService:
             "dpd": DPD(),
             "gls": GLS(),
             "trunkrs": Trunkrs(),
+            "gofo": GoFo(),
             "ups": UPS(),
             "dragonfly": Dragonfly(),
             "cainiao": Cainiao(),

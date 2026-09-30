@@ -15,6 +15,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "argon2-cffi>=25.1.0",
     "pyjwt>=2.12.1",
+    "cryptography>=47.0.0",
     "python-multipart>=0.0.26",
     "playwright>=1.49",
     "playwright-stealth>=2.0.3",
