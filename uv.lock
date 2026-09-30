@@ -466,13 +466,14 @@ wheels = [
 
 [[package]]
 name = "dude-wheres-my-package"
-version = "1.70.1"
+version = "1.71.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
     { name = "apscheduler" },
     { name = "argon2-cffi" },
     { name = "beautifulsoup4" },
+    { name = "cryptography" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "jinja2" },
@@ -506,6 +507,7 @@ requires-dist = [
     { name = "apscheduler", specifier = ">=3.11" },
     { name = "argon2-cffi", specifier = ">=25.1.0" },
     { name = "beautifulsoup4", specifier = ">=4.13" },
+    { name = "cryptography", specifier = ">=47.0.0" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "jinja2", specifier = ">=3.1.6" },

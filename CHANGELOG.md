@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.71.0 (2026-09-30)
+
+### Features
+
+- Add GoFo carrier
+  ([`e6d7c16`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/e6d7c1658b3d0e0571a0735f586a4936869037cc))
+
+
 ## v1.70.1 (2026-09-17)
 
 ### Bug Fixes
