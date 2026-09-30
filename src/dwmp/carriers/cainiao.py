@@ -14,6 +14,7 @@ from dwmp.carriers.base import (
     TrackingStatus,
     no_date_fallback,
 )
+from dwmp.carriers.gofo import GoFo
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,16 @@ CAINIAO_TRACKING_URL = "https://global.cainiao.com/global/detail.json"
 # AliExpress's own tracking UI. Cainiao's aggregator API doesn't carry these
 # at all, so we call PDN directly as a best-effort enrichment step.
 PDN_TRACK_URL = "https://pdn.express/api/track"
+
+# GoFo (gofo.com) is another last-mile carrier Cainiao hands parcels off to
+# — inside the Netherlands specifically, recognizable by the same "GFxx"/
+# "CIxx" waybill prefix in both systems (unlike PDN, the tracking number
+# doesn't change across the handoff). Unlike PDN's proof-photo-only gap,
+# Cainiao's own feed for these numbers goes fully stale once GoFo takes
+# over — it just keeps repeating the last international-leg event forever —
+# so GoFo's own status/events/photos become authoritative for the domestic
+# leg once it recognizes the parcel.
+_GOFO_PREFIXES = ("GFNL", "CINL")
 
 # Ordered substring matches against Cainiao's English "standerdDesc" event
 # text and stage group name (e.g. "In transit", "At customs"). Checked in
@@ -132,7 +143,9 @@ class Cainiao(CarrierBase):
             result = self._parse_tracking_response(tracking_number, payload)
 
             postal_code = kwargs.get("postal_code", "")
-            if (
+            if tracking_number.upper().startswith(_GOFO_PREFIXES):
+                result = await self._merge_gofo_handoff(result, tracking_number, postal_code)
+            elif (
                 postal_code
                 and result.status == TrackingStatus.DELIVERED
                 and result.events
@@ -192,6 +205,33 @@ class Cainiao(CarrierBase):
         events = list(result.events)
         events[-1] = replace(events[-1], proof_photos=photos)
         return replace(result, events=events)
+
+    async def _merge_gofo_handoff(
+        self, result: TrackingResult, tracking_number: str, postal_code: str
+    ) -> TrackingResult:
+        """Best-effort: once GoFo recognizes a GFxx/CIxx parcel, append its
+        domestic-leg events (and any delivery-proof photos) on top of
+        Cainiao's own international-leg history, and let its status win —
+        Cainiao's own aggregator can sit hours behind the real delivery once
+        the handoff happens. Falls back to Cainiao's own result untouched if
+        GoFo doesn't know the parcel yet (still overseas) or the lookup
+        fails — never breaks normal tracking."""
+        try:
+            gofo_result = await GoFo(self._client).track(tracking_number, postal_code=postal_code)
+        except Exception as exc:
+            logger.info("GoFo handoff lookup failed for %s: %s", tracking_number, exc)
+            return result
+        if gofo_result.status == TrackingStatus.UNKNOWN or not gofo_result.events:
+            return result
+
+        cutoff = result.events[-1].timestamp if result.events else None
+        new_events = [e for e in gofo_result.events if cutoff is None or e.timestamp > cutoff]
+        if not new_events:
+            # GoFo has nothing newer than Cainiao already shows, but its
+            # status read is still the fresher one.
+            return replace(result, status=gofo_result.status)
+
+        return replace(result, status=gofo_result.status, events=[*result.events, *new_events])
 
     async def sync_packages(
         self, tokens: AuthTokens, lookback_days: int = 30

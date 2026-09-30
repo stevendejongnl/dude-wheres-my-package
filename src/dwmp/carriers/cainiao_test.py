@@ -320,6 +320,151 @@ async def test_track_does_not_pivot_when_own_detail_list_present():
     assert len(result.events) == 1
 
 
+_GOFO_INTL_LEG_PAYLOAD = {
+    "success": True,
+    "module": [
+        {
+            "processInfo": {"progressPointList": [{"pointName": "Netherlands", "light": True}]},
+            # Cainiao's API returns newest-first; _parse_tracking_response reverses it.
+            "detailList": [
+                {
+                    "time": 1790121600000,  # 2026-09-23T00:00:00Z
+                    "standerdDesc": "Out for delivery",
+                    "group": {"nodeDesc": "Out for delivery"},
+                },
+                {
+                    "time": 1790035200000,  # 2026-09-22T00:00:00Z
+                    "standerdDesc": "Import customs clearance complete",
+                    "group": {"nodeDesc": "At customs"},
+                },
+            ],
+        }
+    ],
+}
+
+
+def _gofo_event(process_code: str, content: str, date: str) -> dict:
+    return {
+        "processDate": date,
+        "processContent": content,
+        "processLocation": "",
+        "processCode": process_code,
+        "mainContent": content,
+        "subContent": None,
+        "trackStatus": "2",
+    }
+
+
+def _gofo_payload(waybill_no: str, events: list[dict], **extra) -> dict:
+    record = {
+        "waybillNo": waybill_no,
+        "trackingNumber": waybill_no,
+        "status": "Delivered",
+        "number": "3351041701",
+        "lastTrackEvent": events[0] if events else {},
+        "trackEventList": events,
+        "podImgList": [],
+        **extra,
+    }
+    return {"msg": "ok", "code": 200, "data": [record]}
+
+
+def _mock_transport_with_gofo(gofo_payload: dict):
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url).startswith(CAINIAO_TRACKING_URL):
+            return httpx.Response(200, json=_GOFO_INTL_LEG_PAYLOAD)
+        if "open-api/official/track/queryTrackV2" in str(request.url):
+            return httpx.Response(200, json=gofo_payload)
+        raise AssertionError(f"unexpected request to {request.url}")
+
+    return httpx.MockTransport(handler)
+
+
+async def test_track_appends_gofo_handoff_events_and_status():
+    """Cainiao's own feed is stuck at 'Out for delivery' (2026-09-23);
+    GoFo's domestic leg carries a later 'Delivered' event with photos."""
+    gofo_payload = _gofo_payload(
+        "GFNL26261188942030",
+        [_gofo_event("205", "Bezorgd op het bezorgadres", "2026-09-30T09:02:20.000+0200")],
+    )
+    client = httpx.AsyncClient(transport=_mock_transport_with_gofo(gofo_payload))
+    carrier = Cainiao(http_client=client)
+
+    result = await carrier.track("GFNL26261188942030", postal_code="800157")
+
+    assert result.status == TrackingStatus.DELIVERED
+    # Cainiao's 2 international events, plus GoFo's newer delivered event.
+    assert len(result.events) == 3
+    assert result.events[0].description == "Import customs clearance complete"
+    assert result.events[1].description == "Out for delivery"
+    assert result.events[2].description == "Bezorgd op het bezorgadres"
+    assert result.events[2].status == TrackingStatus.DELIVERED
+
+
+async def test_track_gofo_handoff_updates_status_without_duplicate_events():
+    """If GoFo has nothing newer than Cainiao already shows, keep Cainiao's
+    events untouched but still adopt GoFo's (fresher) status read."""
+    gofo_payload = _gofo_payload(
+        "GFNL26261188942030",
+        [_gofo_event("208", "Out for delivery", "2026-09-20T00:00:00.000+0200")],
+    )
+    client = httpx.AsyncClient(transport=_mock_transport_with_gofo(gofo_payload))
+    carrier = Cainiao(http_client=client)
+
+    result = await carrier.track("GFNL26261188942030", postal_code="800157")
+
+    assert result.status == TrackingStatus.OUT_FOR_DELIVERY
+    assert len(result.events) == 2
+
+
+async def test_track_gofo_handoff_not_yet_recognized_falls_back_to_cainiao():
+    """GoFo doesn't know the parcel yet (still overseas) — Cainiao's own
+    international-leg result is used untouched."""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url).startswith(CAINIAO_TRACKING_URL):
+            return httpx.Response(200, json=_GOFO_INTL_LEG_PAYLOAD)
+        if "open-api/official/track/queryTrackV2" in str(request.url):
+            return httpx.Response(200, json={"code": 200, "data": []})
+        raise AssertionError(f"unexpected request to {request.url}")
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    carrier = Cainiao(http_client=client)
+
+    result = await carrier.track("GFNL26261188942030")
+
+    assert result.status == TrackingStatus.OUT_FOR_DELIVERY
+    assert len(result.events) == 2
+
+
+async def test_track_survives_gofo_handoff_lookup_failure():
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url).startswith(CAINIAO_TRACKING_URL):
+            return httpx.Response(200, json=_GOFO_INTL_LEG_PAYLOAD)
+        raise httpx.ConnectError("connection refused", request=request)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    carrier = Cainiao(http_client=client)
+
+    result = await carrier.track("GFNL26261188942030", postal_code="800157")
+
+    assert result.status == TrackingStatus.OUT_FOR_DELIVERY
+    assert len(result.events) == 2
+
+
+async def test_track_skips_gofo_handoff_for_non_gofo_prefix():
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url).startswith(CAINIAO_TRACKING_URL)
+        return httpx.Response(200, json=_DELIVERED_PAYLOAD)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    carrier = Cainiao(http_client=client)
+
+    result = await carrier.track("YT1234567890CN", postal_code="800157")
+
+    assert result.status == TrackingStatus.DELIVERED
+
+
 async def test_track_pivot_lookup_failure_falls_back_to_placeholder_result():
     """If the pivot lookup itself fails, still return the (empty)
     placeholder result rather than blowing up the whole refresh."""
