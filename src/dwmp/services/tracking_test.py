@@ -164,6 +164,50 @@ async def test_update_package_label_nonexistent_returns_none(service: TrackingSe
     assert result is None
 
 
+async def test_update_package_postal_code_sets_and_refreshes(service: TrackingService):
+    pkg = await service.add_package(tracking_number="PC1", carrier="stub")
+    updated = await service.update_package_postal_code(pkg["id"], "1234AB")
+    assert updated is not None
+    assert updated["postal_code"] == "1234AB"
+    # Confirms refresh_package actually ran (StubCarrier's events persisted).
+    assert len(updated["events"]) == 1
+
+
+async def test_update_package_postal_code_clears_with_none(service: TrackingService):
+    pkg = await service.add_package(tracking_number="PC2", carrier="stub", postal_code="1234AB")
+    updated = await service.update_package_postal_code(pkg["id"], None)
+    assert updated is not None
+    assert not updated["postal_code"]
+
+
+async def test_update_package_postal_code_nonexistent_returns_none(service: TrackingService):
+    result = await service.update_package_postal_code(999, "1234AB")
+    assert result is None
+
+
+async def test_update_package_postal_code_survives_refresh_failure(service: TrackingService):
+    """A carrier error during the post-save refresh must not lose the saved
+    postal code — the row was already updated, just report what we have."""
+
+    class FailingCarrier(CarrierBase):
+        name = "failing"
+        auth_type = AuthType.CREDENTIALS
+
+        async def track(self, tracking_number: str, **kwargs: str) -> TrackingResult:
+            raise RuntimeError("boom")
+
+        async def sync_packages(self, tokens: AuthTokens, lookback_days: int = 30):
+            raise NotImplementedError
+
+    repo = service._repository
+    service = TrackingService(repository=repo, carriers={"failing": FailingCarrier()})
+    pkg_id = await repo.add_package(tracking_number="PC3", carrier="failing", source="manual")
+
+    updated = await service.update_package_postal_code(pkg_id, "1234AB")
+    assert updated is not None
+    assert updated["postal_code"] == "1234AB"
+
+
 # --- Notification tests ---
 
 

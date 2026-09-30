@@ -148,6 +148,14 @@
     }
     .label-edit-form input:focus { outline: none; border-color: var(--accent); }
 
+    /* Missing postal/pod code prompt */
+    .code-prompt-banner {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      background: #fdcb6e15; border: 1px solid #fdcb6e40; border-radius: 8px;
+      padding: 8px 10px; margin: 0 0 8px;
+    }
+    .code-prompt-text { font-size: 0.78rem; color: var(--text-dim); flex: 1; min-width: 180px; }
+
     /* Package metadata */
     .pkg-metadata {
       margin: 8px 0; border: 1px solid var(--border);

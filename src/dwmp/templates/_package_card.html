@@ -97,6 +97,20 @@
     </div>
     <div id="pkg-label-form-{{ pkg.id }}"></div>
 
+    {% if pkg.missing_code_prompt %}
+    <div class="code-prompt-banner">
+      <span class="code-prompt-text">⚠ {{ pkg.missing_code_prompt.message }}</span>
+      <button class="btn btn-primary btn-sm"
+        hx-get="{{ base_path }}/packages/{{ pkg.id }}/postal-code/edit"
+        hx-target="#pkg-postal-form-{{ pkg.id }}"
+        hx-swap="innerHTML"
+        onclick="event.stopPropagation()">
+        Add {{ pkg.missing_code_prompt.field_label }}
+      </button>
+    </div>
+    {% endif %}
+    <div id="pkg-postal-form-{{ pkg.id }}"></div>
+
     <details class="pkg-metadata">
       <summary>Details</summary>
       <div class="pkg-metadata-grid">
@@ -104,7 +118,14 @@
         <span class="meta-value">{{ pkg.source or 'manual' }}</span>
         {% if pkg.postal_code %}
         <span class="meta-label">Postal code</span>
-        <span class="meta-value"><code>{{ pkg.postal_code }}</code></span>
+        <span class="meta-value">
+          <code>{{ pkg.postal_code }}</code>
+          <button class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:0.7rem;"
+            hx-get="{{ base_path }}/packages/{{ pkg.id }}/postal-code/edit"
+            hx-target="#pkg-postal-form-{{ pkg.id }}"
+            hx-swap="innerHTML"
+            onclick="event.stopPropagation()">Edit</button>
+        </span>
         {% else %}
         <span class="meta-label">Postal code</span>
         <span class="meta-value meta-missing">not set</span>

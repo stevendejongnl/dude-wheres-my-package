@@ -867,6 +867,25 @@ class TrackingService:
         await self._repository.update_package_label(package_id, label)
         return await self.get_package(package_id)
 
+    async def update_package_postal_code(
+        self, package_id: int, postal_code: str | None
+    ) -> dict | None:
+        """User-driven postal/pod-code entry — e.g. filling in the code a
+        missing-code prompt asked for. Immediately refreshes the package so
+        the user sees the effect right away, same as add_package()'s initial
+        fetch, rather than waiting for the next scheduled poll."""
+        pkg = await self._repository.get_package(package_id)
+        if pkg is None:
+            return None
+        await self._repository.update_package_postal_code(package_id, postal_code or "")
+        try:
+            return await self.refresh_package(package_id)
+        except Exception:
+            logger.exception(
+                "Refresh after postal-code update failed for package %d", package_id
+            )
+            return await self.get_package(package_id)
+
     async def refresh_package(self, package_id: int) -> dict | None:
         pkg = await self._repository.get_package(package_id)
         if pkg is None:

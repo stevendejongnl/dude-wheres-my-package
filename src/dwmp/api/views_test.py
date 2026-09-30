@@ -7,7 +7,7 @@ from httpx import ASGITransport, AsyncClient
 import dwmp.api.views as _views_module
 from dwmp.api.app import create_app
 from dwmp.api.dependencies import get_repository, get_tracking_service
-from dwmp.api.views import _enrich_package
+from dwmp.api.views import _enrich_package, _missing_code_prompt
 from dwmp.carriers.base import (
     AuthTokens,
     AuthType,
@@ -481,6 +481,58 @@ async def test_edit_package_label_save_404_for_missing_package(client: AsyncClie
     assert response.status_code == 404
 
 
+async def test_missing_code_banner_shown_for_gls_without_postal_code(client: AsyncClient, repo):
+    pkg_id = await repo.add_package(tracking_number="GLS1", carrier="gls")
+    response = await client.get(f"/packages/{pkg_id}/card")
+    assert response.status_code == 200
+    assert "code-prompt-banner" in response.text
+    assert "Add Postal code" in response.text
+
+
+async def test_missing_code_banner_hidden_when_postal_code_set(client: AsyncClient, repo):
+    pkg_id = await repo.add_package(tracking_number="GLS2", carrier="gls", postal_code="1234AB")
+    response = await client.get(f"/packages/{pkg_id}/card")
+    assert response.status_code == 200
+    assert "code-prompt-banner" not in response.text
+
+
+async def test_edit_package_postal_code_form_prefills_existing_value(client: AsyncClient, repo):
+    pkg_id = await repo.add_package(tracking_number="GLS3", carrier="gls", postal_code="1234AB")
+    response = await client.get(f"/packages/{pkg_id}/postal-code/edit")
+    assert response.status_code == 200
+    assert 'value="1234AB"' in response.text
+
+
+async def test_edit_package_postal_code_form_404_for_missing_package(client: AsyncClient):
+    response = await client.get("/packages/999/postal-code/edit")
+    assert response.status_code == 404
+
+
+async def test_edit_package_postal_code_form_cancel_returns_empty(client: AsyncClient):
+    response = await client.get("/packages/1/postal-code/edit/cancel")
+    assert response.status_code == 200
+    assert response.text == ""
+
+
+async def test_edit_package_postal_code_save_updates_and_removes_banner(client: AsyncClient, repo):
+    pkg_id = await repo.add_package(tracking_number="GLS4", carrier="gls")
+    response = await client.post(
+        f"/packages/{pkg_id}/postal-code/edit/save", data={"postal_code": "1234AB"}
+    )
+    assert response.status_code == 200
+    assert "code-prompt-banner" not in response.text
+
+    pkg = await repo.get_package(pkg_id)
+    assert pkg["postal_code"] == "1234AB"
+
+
+async def test_edit_package_postal_code_save_404_for_missing_package(client: AsyncClient):
+    response = await client.post(
+        "/packages/999/postal-code/edit/save", data={"postal_code": "1234AB"}
+    )
+    assert response.status_code == 404
+
+
 def test_enrich_package_sets_effective_tracking_url_from_db():
     pkg = {
         "carrier": "dpd",
@@ -515,6 +567,60 @@ def test_enrich_package_effective_url_none_for_unknown_carrier():
     }
     _enrich_package(pkg)
     assert pkg["effective_tracking_url"] is None
+
+
+def test_missing_code_prompt_none_when_postal_code_set():
+    pkg = {"carrier": "gls", "tracking_number": "123", "postal_code": "1234AB"}
+    assert _missing_code_prompt(pkg) is None
+
+
+def test_missing_code_prompt_hard_required_carrier():
+    pkg = {"carrier": "gls", "tracking_number": "123", "postal_code": None}
+    prompt = _missing_code_prompt(pkg)
+    assert prompt is not None
+    assert prompt["field_label"] == "Postal code"
+    assert "GLS needs the delivery postal code" in prompt["message"]
+
+
+def test_missing_code_prompt_trunkrs_and_dpd_also_hard_required():
+    for carrier in ("trunkrs", "dpd"):
+        pkg = {"carrier": carrier, "tracking_number": "123", "postal_code": ""}
+        prompt = _missing_code_prompt(pkg)
+        assert prompt is not None
+        assert prompt["field_label"] == "Postal code"
+
+
+def test_missing_code_prompt_cainiao_gofo_handoff():
+    pkg = {"carrier": "cainiao", "tracking_number": "GFNL26261188942030", "postal_code": None}
+    prompt = _missing_code_prompt(pkg)
+    assert prompt is not None
+    assert prompt["field_label"] == "GoFo pod code"
+    assert "hands off to GoFo" in prompt["message"]
+
+
+def test_missing_code_prompt_cainiao_non_gofo_number_is_fine():
+    """A regular AliExpress/Cainiao parcel with no GoFo-style prefix never
+    needs a code — Cainiao's own tracking works fine without one."""
+    pkg = {"carrier": "cainiao", "tracking_number": "YT1234567890CN", "postal_code": None}
+    assert _missing_code_prompt(pkg) is None
+
+
+def test_missing_code_prompt_other_carriers_never_prompted():
+    for carrier in ("amazon", "postnl", "dhl", "ups", "dragonfly", "gofo"):
+        pkg = {"carrier": carrier, "tracking_number": "123", "postal_code": None}
+        assert _missing_code_prompt(pkg) is None
+
+
+def test_enrich_package_sets_missing_code_prompt():
+    pkg = {"carrier": "gls", "tracking_number": "123", "tracking_url": None, "events": [], "postal_code": None}
+    _enrich_package(pkg)
+    assert pkg["missing_code_prompt"] is not None
+
+
+def test_enrich_package_no_missing_code_prompt_when_set():
+    pkg = {"carrier": "gls", "tracking_number": "123", "tracking_url": None, "events": [], "postal_code": "1234AB"}
+    _enrich_package(pkg)
+    assert pkg["missing_code_prompt"] is None
 
 
 def test_enrich_package_delivery_window_converts_utc_to_amsterdam():

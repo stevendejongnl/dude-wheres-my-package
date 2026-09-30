@@ -13,6 +13,7 @@ from dwmp.api.auth import login_response, logout_response, verify_password
 from dwmp.api.dependencies import get_repository, get_tracking_service
 from dwmp.api.routes import _has_stored_credentials
 from dwmp.carriers.base import AuthType, CarrierAuthError
+from dwmp.carriers.cainiao import GOFO_HANDOFF_PREFIXES
 from dwmp.carriers.tracking_urls import public_tracking_url
 from dwmp.services.scheduler import MAX_CONSECUTIVE_FAILURES
 from dwmp.services.tracking import TrackingService
@@ -109,9 +110,55 @@ def _format_time_hm(ts_str: str) -> str:
         return ts_str[11:16] if ts_str else ""
 
 
+# Carriers whose track() hard-requires a postal code to return anything at
+# all (see each carrier's track() — GLS/Trunkrs/DPD return UNKNOWN without
+# one). Enforced at add-time in track_package_save(), but an account-synced
+# package can still end up missing one (e.g. the connected account itself
+# has no postal_code set), so it's re-checked here too.
+_POSTAL_REQUIRED_CARRIERS = ("gls", "trunkrs", "dpd")
+
+
+def _missing_code_prompt(pkg: dict) -> dict | None:
+    """Detect a package that needs a postal/pod code it doesn't have, for a
+    banner prompting the user to add one. Returns None when nothing's needed.
+
+    Two cases:
+    - Hard requirement (gls/trunkrs/dpd): tracking returns nothing at all
+      without a postal code.
+    - Last-mile handoff (cainiao -> gofo): tracking still works, but the
+      GFNL/CINL-prefixed parcel has been (or will be) handed off to GoFo for
+      Dutch delivery, and Cainiao's own feed goes stale once that happens —
+      the pod code (last 6 digits of the recipient's phone number) is what
+      unlocks GoFo's live status/events/photos in the merge. See
+      Cainiao._merge_gofo_handoff().
+    """
+    if pkg.get("postal_code"):
+        return None
+    carrier = pkg.get("carrier", "")
+    tracking_number = pkg.get("tracking_number", "")
+    if carrier in _POSTAL_REQUIRED_CARRIERS:
+        return {
+            "field_label": "Postal code",
+            "placeholder": "1234AB",
+            "message": f"{carrier.upper()} needs the delivery postal code to track this parcel at all.",
+        }
+    if carrier == "cainiao" and tracking_number.upper().startswith(GOFO_HANDOFF_PREFIXES):
+        return {
+            "field_label": "GoFo pod code",
+            "placeholder": "last 6 digits of phone",
+            "message": (
+                "This parcel hands off to GoFo for Dutch delivery. Add the "
+                "recipient's pod code (last 6 digits of their phone number) "
+                "for accurate status and delivery photos once it arrives."
+            ),
+        }
+    return None
+
+
 def _enrich_package(pkg: dict) -> dict:
     """Add computed fields for display."""
     events = pkg.get("events", [])
+    pkg["missing_code_prompt"] = _missing_code_prompt(pkg)
 
     # Sender: first pre_transit event whose description looks like a name rather
     # than a tracking status sentence. Carrier APIs mix both in pre_transit events
@@ -772,6 +819,48 @@ async def edit_package_label_save(
 ):
     """HTMX endpoint: save a package's label and return the updated card."""
     pkg = await service.update_package_label(package_id, label.strip() or None)
+    if pkg is None:
+        raise HTTPException(status_code=404, detail="Package not found")
+    _enrich_package(pkg)
+    ctx = {
+        "pkg": pkg,
+        "base_path": _base_path(request),
+        "expanded": True,
+    }
+    return templates.TemplateResponse(request, "_package_card.html", ctx)
+
+
+@router.get("/packages/{package_id}/postal-code/edit", response_class=HTMLResponse)
+async def edit_package_postal_code_form(
+    request: Request,
+    package_id: int,
+    service: TrackingService = Depends(get_tracking_service),
+):
+    """HTMX endpoint: render the inline postal/pod-code-edit form for one package."""
+    pkg = await service.get_package(package_id)
+    if pkg is None:
+        raise HTTPException(status_code=404, detail="Package not found")
+    _enrich_package(pkg)
+    ctx = {"pkg": pkg, "base_path": _base_path(request)}
+    return templates.TemplateResponse(request, "_package_postal_edit_form.html", ctx)
+
+
+@router.get("/packages/{package_id}/postal-code/edit/cancel", response_class=HTMLResponse)
+async def edit_package_postal_code_form_cancel(package_id: int):
+    """Empty response — used to clear the inline postal-code-edit form via HTMX swap."""
+    return HTMLResponse("")
+
+
+@router.post("/packages/{package_id}/postal-code/edit/save", response_class=HTMLResponse)
+async def edit_package_postal_code_save(
+    request: Request,
+    package_id: int,
+    service: TrackingService = Depends(get_tracking_service),
+    postal_code: str = Form(default=""),
+):
+    """HTMX endpoint: save a package's postal/pod code and immediately
+    refresh it — instant feedback, rather than waiting for the next poll."""
+    pkg = await service.update_package_postal_code(package_id, postal_code.strip() or None)
     if pkg is None:
         raise HTTPException(status_code=404, detail="Package not found")
     _enrich_package(pkg)

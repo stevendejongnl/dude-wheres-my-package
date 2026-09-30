@@ -43,7 +43,7 @@ PDN_TRACK_URL = "https://pdn.express/api/track"
 # over — it just keeps repeating the last international-leg event forever —
 # so GoFo's own status/events/photos become authoritative for the domestic
 # leg once it recognizes the parcel.
-_GOFO_PREFIXES = ("GFNL", "CINL")
+GOFO_HANDOFF_PREFIXES = ("GFNL", "CINL")
 
 # Ordered substring matches against Cainiao's English "standerdDesc" event
 # text and stage group name (e.g. "In transit", "At customs"). Checked in
@@ -143,7 +143,7 @@ class Cainiao(CarrierBase):
             result = self._parse_tracking_response(tracking_number, payload)
 
             postal_code = kwargs.get("postal_code", "")
-            if tracking_number.upper().startswith(_GOFO_PREFIXES):
+            if tracking_number.upper().startswith(GOFO_HANDOFF_PREFIXES):
                 result = await self._merge_gofo_handoff(result, tracking_number, postal_code)
             elif (
                 postal_code

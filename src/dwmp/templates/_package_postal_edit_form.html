@@ -1,0 +1,26 @@
+{#
+  Inline postal/pod-code-edit form for one package card — swapped into
+  #pkg-postal-form-{{ pkg.id }} via HTMX. Saving immediately refreshes the
+  package, so this doubles as "add the code the missing-code banner asked for
+  and see the effect right away".
+
+  Context:
+    pkg       — package dict (id, postal_code, missing_code_prompt)
+    base_path — reverse-proxy prefix
+#}
+<form class="label-edit-form"
+  hx-post="{{ base_path }}/packages/{{ pkg.id }}/postal-code/edit/save"
+  hx-target="#pkg-{{ pkg.id }}"
+  hx-swap="outerHTML"
+  hx-indicator="closest .card"
+  onclick="event.stopPropagation()">
+  <input type="text" name="postal_code" value="{{ pkg.postal_code or '' }}"
+    placeholder="{{ pkg.missing_code_prompt.placeholder if pkg.missing_code_prompt else '1234AB' }}"
+    autocomplete="off" autofocus
+    style="flex:1;min-width:0;">
+  <button type="submit" class="btn btn-primary btn-sm">Save</button>
+  <button type="button" class="btn btn-ghost btn-sm"
+    hx-get="{{ base_path }}/packages/{{ pkg.id }}/postal-code/edit/cancel"
+    hx-target="#pkg-postal-form-{{ pkg.id }}"
+    hx-swap="innerHTML">Cancel</button>
+</form>
