@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.73.0 (2026-09-30)
+
+### Features
+
+- Detect and prompt for missing postal/pod codes
+  ([`d43c363`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/d43c36367e5869a0f26a8cbcaecaa453b8c64f9c))
+
+
 ## v1.72.0 (2026-09-30)
 
 ### Features
