@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.72.0 (2026-09-30)
+
+### Features
+
+- Merge GoFo last-mile handoff into Cainiao tracking
+  ([`6cedc0b`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/6cedc0b4066b18b9b1a863bd44a871d4707838e9))
+
+
 ## v1.71.0 (2026-09-30)
 
 ### Features
