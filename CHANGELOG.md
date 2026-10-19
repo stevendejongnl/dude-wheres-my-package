@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.73.1 (2026-10-19)
+
+### Bug Fixes
+
+- Get past Amazon's passkey challenge during extension login
+  ([`eaad380`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/eaad3804b9c03c8c65461ddc3a4438f86d47f4c9))
+
+### Continuous Integration
+
+- Pin Python 3.13 for uv
+  ([`f2d0997`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/f2d099767d8b006c2d11860318a40799077f29c3))
+
+
 ## v1.73.0 (2026-09-30)
 
 ### Features
