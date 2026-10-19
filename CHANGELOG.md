@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.73.2 (2026-10-19)
+
+### Bug Fixes
+
+- Keep Amazon cookies between extension syncs
+  ([`16e5642`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/16e56429498d31c671fb75cb0a3f594e11e284d9))
+
+
 ## v1.73.1 (2026-10-19)
 
 ### Bug Fixes
