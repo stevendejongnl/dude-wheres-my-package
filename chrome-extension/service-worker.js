@@ -1194,6 +1194,8 @@ async function handleCarrierLogin(tabId, account) {
  *   - /ap/signin "password-only"— Amazon remembered the email, only #ap_password
  *   - /ax/claim  "ax-email"     — new claim flow: #ap_email_login inside
  *                                 #ap_login_form, then /ap/signin for password
+ *   - /ax/claim  "passkey"      — "Use your passkey" challenge; we can't do
+ *                                 WebAuthn, so click "Enter your password"
  *
  * Rather than branch per entry point, we run a detect → fill → submit →
  * wait-for-nav loop. Each iteration re-inspects the current DOM, so the
@@ -1285,6 +1287,14 @@ async function detectAmazonLoginState(tabId) {
         if (emailVisible && passVisible) return "combined";
         if (emailVisible) return "email-only";
         if (passVisible) return "password-only";
+
+        // Passkey challenge: offers "Enter your password" as an alternative.
+        // Checked after the password states because the password page keeps
+        // the passkey button around as a fallback.
+        if (
+          document.querySelector("#unified-passkey-form, #auth-signin-via-passkey-btn") &&
+          document.querySelector("a[href*='selectedChallengeType=password']")
+        ) return "passkey";
         return "none";
       },
     });
@@ -1328,6 +1338,12 @@ async function fillAndSubmitAmazonStep(tabId, state, email, password) {
           return false;
         }
 
+        if (stateArg === "passkey") {
+          // Two links share id #auth-signin-button (visible button + hidden
+          // anchor); both point at the password challenge, so match on href.
+          return clickFirst(["a[href*='selectedChallengeType=password']"]);
+        }
+
         if (stateArg === "combined") {
           setVal(document.querySelector("#ap_email"), e);
           setVal(document.querySelector("#ap_password"), p);
@@ -1340,7 +1356,14 @@ async function fillAndSubmitAmazonStep(tabId, state, email, password) {
         }
 
         if (stateArg === "password-only") {
-          if (!setVal(document.querySelector("#ap_password"), p)) return false;
+          const passEl = document.querySelector("#ap_password");
+          if (!setVal(passEl, p)) return false;
+          // On /ax/claim/auth #signInSubmit is a <span> wrapper; the real
+          // submit input sits inside the password's own form.
+          const formBtn = passEl.form?.querySelector(
+            "input[type='submit'], button[type='submit']",
+          );
+          if (formBtn) { formBtn.click(); return true; }
           return clickFirst(["#signInSubmit", "input[type='submit']"]);
         }
 
