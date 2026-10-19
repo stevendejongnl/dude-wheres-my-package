@@ -245,6 +245,7 @@ async function syncCarrierViaTab(account, opts = {}) {
       // Wipe all carrier session data before every login-URL sync. Stale cookies
       // and broken SSO state are the most common cause of silent login failures;
       // credentials are always stored at this point so we can re-login cleanly.
+      // Only carriers listed in CARRIER_AUTH_CLEAR are wiped (not amazon/postnl).
       if (urls.login) {
         await clearCarrierSiteData(account.carrier);
       }

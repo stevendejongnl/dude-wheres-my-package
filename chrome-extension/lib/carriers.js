@@ -61,11 +61,13 @@ export const CARRIER_SYNC_URLS = {
 //   storageOrigins — explicit origins for chrome.browsingData.remove;
 //                    localStorage / sessionStorage / cache can only be
 //                    filtered by full origin URL, not by domain suffix.
+//
+// amazon intentionally omitted: wiping its cookies throws away the device
+// trust Amazon ties to them, so every login looks like a new device and
+// Amazon asks for an SMS code. It also signs the user out of Amazon in
+// their own browser. The existing session is reused instead; the login
+// handler only fills the form when Amazon actually asks for it.
 export const CARRIER_AUTH_CLEAR = {
-  amazon: {
-    cookieDomain: "amazon.nl",
-    storageOrigins: ["https://www.amazon.nl"],
-  },
   dpd: {
     cookieDomain: "dpdgroup.com",
     storageOrigins: ["https://www.dpdgroup.com", "https://login.dpdgroup.com"],

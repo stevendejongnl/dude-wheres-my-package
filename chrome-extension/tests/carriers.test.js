@@ -70,7 +70,9 @@ describe("CARRIER_LOGIN_PATTERNS (amazon)", () => {
 // Carriers that intentionally have no CARRIER_AUTH_CLEAR entry.
 // postnl: clearing site data destroys the CDC session; we rely on silent SSO
 // via triggerlogin instead, so the session must be preserved across cycles.
-const AUTH_CLEAR_EXEMPT = new Set(["postnl"]);
+// amazon: clearing cookies drops device trust, so Amazon asks for an SMS
+// code on every login.
+const AUTH_CLEAR_EXEMPT = new Set(["postnl", "amazon"]);
 
 describe("CARRIER_AUTH_CLEAR", () => {
   it("has an entry for every carrier with an auto-login URL (except exempt carriers)", () => {
