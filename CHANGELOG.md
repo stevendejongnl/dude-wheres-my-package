@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.73.3 (2026-11-18)
+
+### Bug Fixes
+
+- Close sync tab after a solved Cloudflare challenge
+  ([`a8ee020`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/a8ee0206dd38f6576b745bfd57dcad0cd23c60fa))
+
+### Chores
+
+- Add capture-only Cloudflare challenge watcher for the Kasm browser
+  ([`23b0dc2`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/23b0dc2e08bf05a10a5cadaaae46bd11809809c8))
+
+- Click the Turnstile checkbox from the cf-watch watcher
+  ([`3b2fdbe`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/3b2fdbe0028a21433b58a6429b5ee3c4b8240e47))
+
+
 ## v1.73.2 (2026-10-19)
 
 ### Bug Fixes
