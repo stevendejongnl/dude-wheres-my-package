@@ -460,6 +460,7 @@ async function syncCarrierViaTab(account, opts = {}) {
     if (isCloudflareChallenge(html)) {
       log.warn("sync", `${account.carrier}: Cloudflare challenge detected`);
       await chrome.tabs.update(tabId, { active: true });
+      const closeTabAfterChallenge = shouldCloseTab;
       shouldCloseTab = false;
       notifyCloudflareChallenge(account.carrier);
       await storeSyncResult(account.id, false, "Cloudflare challenge — solve in the tab to continue");
@@ -477,6 +478,8 @@ async function syncCarrierViaTab(account, opts = {}) {
       }
 
       log.info("sync", `${account.carrier}: Cloudflare challenge solved, resuming sync`);
+      // Challenge is over: restore the normal cleanup so the tab closes.
+      shouldCloseTab = closeTabAfterChallenge;
       await waitForUrlStable(tabId);
       html = await captureTabHtml(tabId);
       if (!html) {
