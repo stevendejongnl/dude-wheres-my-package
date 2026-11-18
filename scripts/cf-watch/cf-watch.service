@@ -1,0 +1,14 @@
+[Unit]
+Description=Cloudflare challenge screenshot watcher (capture only)
+After=kasmvnc@chromium.service
+Wants=kasmvnc@chromium.service
+
+[Service]
+User=chromium
+Environment=DISPLAY=:1
+ExecStart=/usr/bin/python3 /opt/cf-watch/cf_watch.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
