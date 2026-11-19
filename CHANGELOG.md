@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.73.5 (2026-11-19)
+
+### Bug Fixes
+
+- Dismiss DPD cookie banner and log in when parcels page is logged out
+  ([`b6c9100`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/b6c91004b32f7dcbda0550133a0cab38d206b5b5))
+
+
 ## v1.73.4 (2026-11-19)
 
 ### Bug Fixes
