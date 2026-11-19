@@ -481,11 +481,54 @@ async function syncCarrierViaTab(account, opts = {}) {
       // Challenge is over: restore the normal cleanup so the tab closes.
       shouldCloseTab = closeTabAfterChallenge;
       await waitForUrlStable(tabId);
+
+      // The interstitial can hide the login page, so the pre-challenge login
+      // check never saw it. Re-check now and log in if the session is gone.
+      const solvedTabInfo = await chrome.tabs.get(tabId);
+      const solvedOnLogin =
+        isCarrierLoginPage(account.carrier, solvedTabInfo.url) || (await hasLoginForm(tabId));
+      if (solvedOnLogin) {
+        log.info("sync", `${account.carrier}: login page after Cloudflare solve`, { url: solvedTabInfo.url });
+        const loggedIn = await handleCarrierLogin(tabId, account);
+        if (!loggedIn) {
+          await storeSyncResult(account.id, false, "Login failed after Cloudflare challenge");
+          return;
+        }
+        await waitForUrlStable(tabId);
+      }
+      if (urls.login) {
+        const solvedUrl = (await chrome.tabs.get(tabId)).url || "";
+        if (!solvedUrl.startsWith(urls.parcels)) {
+          await chrome.tabs.update(tabId, { url: urls.parcels });
+          await waitForTabLoad(tabId);
+          await waitForUrlStable(tabId);
+        }
+      }
+      await sleep(RENDER_WAIT_MS);
+
+      // A second Cloudflare widget can show after login. Wait for it to clear.
       html = await captureTabHtml(tabId);
+      if (html && hasTurnstileWidget(html)) {
+        log.warn("sync", `${account.carrier}: Turnstile widget on page after login, waiting`);
+        const cleared = await waitForTurnstileClear(tabId, 90 * 1000);
+        if (!cleared) {
+          await storeSyncResult(account.id, false, "Cloudflare checkbox after login not cleared — sync skipped");
+          return;
+        }
+        await sleep(RENDER_WAIT_MS);
+        html = await captureTabHtml(tabId);
+      }
       if (!html) {
         await storeSyncResult(account.id, false, "Could not capture page after Cloudflare solve");
         return;
       }
+    }
+
+    // A logged-out page parses to 0 parcels and would be reported as success.
+    if (isLoggedOutParcelsPage(account.carrier, html)) {
+      log.error("sync", `${account.carrier}: captured page is logged out`, { htmlBytes: html.length });
+      await storeSyncResult(account.id, false, "Not logged in -- page shows login prompt");
+      return;
     }
 
     // Detect carrier error/outage page (e.g. DPD "Technical issue occurred").
@@ -760,6 +803,35 @@ function isCloudflareChallenge(html) {
     lower.includes("performing security verification") ||
     lower.includes("verify you are human")
   );
+}
+
+// Embedded Turnstile widget anywhere in the page (not a full interstitial,
+// so the title does not change and isCloudflareChallenge misses it).
+function hasTurnstileWidget(html) {
+  const lower = html.toLowerCase();
+  return lower.includes("cf-turnstile") || lower.includes("challenges.cloudflare.com/turnstile");
+}
+
+async function waitForTurnstileClear(tabId, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await sleep(3000);
+    try {
+      const html = await captureTabHtml(tabId);
+      if (html && !hasTurnstileWidget(html) && !isCloudflareChallenge(html)) return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+// Logged-out detection per carrier. Conservative: only DPD, whose logged-out
+// parcels page shows a "Login/Register" nav entry and no sign-out link.
+function isLoggedOutParcelsPage(carrier, html) {
+  if (carrier !== "dpd") return false;
+  const lower = html.toLowerCase();
+  return /login\s*\/\s*regist/.test(lower) && !/log\s*out|logout|uitloggen/.test(lower);
 }
 
 function notifyCloudflareChallenge(carrier) {
