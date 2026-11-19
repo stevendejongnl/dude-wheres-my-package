@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.74.0 (2026-11-19)
+
+### Features
+
+- **cf-watch**: Capture DPD window screenshots every 15s
+  ([`df721eb`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/df721ebbd8a5d8f20893dc4a1a394c18179711e8))
+
+
 ## v1.73.5 (2026-11-19)
 
 ### Bug Fixes
