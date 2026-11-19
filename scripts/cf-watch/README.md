@@ -8,6 +8,9 @@ it saves a screenshot. After 8 seconds it finds the Turnstile checkbox with a te
 2 clicks per challenge. After that, the extension's Telegram alert and 3-minute human wait
 take over.
 
+While a DPD window is open, it also saves a screenshot every 15 seconds (`dpd-*.png`, newest 60
+kept). These show in-page widgets that do not change the window title. It never clicks on them.
+
 Set `CF_WATCH_CLICK=0` in the service environment to run capture-only.
 
 ## Install (in the browser container)

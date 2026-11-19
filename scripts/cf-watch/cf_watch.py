@@ -7,6 +7,10 @@ template match and clicks it with xdotool (real OS input, no CDP). It makes
 at most MAX_ATTEMPTS clicks per challenge. After that, the extension's
 Telegram alert and human wait take over.
 
+While a DPD window is open, it also saves a screenshot every DPD_GAP_SECONDS
+(files named dpd-*.png). These show in-page widgets that do not change the
+window title, such as a second checkbox after login. It never clicks on them.
+
 Set CF_WATCH_CLICK=0 to run in capture-only mode.
 """
 import os
@@ -22,6 +26,8 @@ from PIL import Image
 POLL_SECONDS = 3
 MIN_GAP_SECONDS = 20
 KEEP_FILES = 30
+DPD_GAP_SECONDS = 15
+DPD_KEEP_FILES = 60
 SETTLE_SECONDS = 8
 RETRY_GAP_SECONDS = 25
 MAX_ATTEMPTS = 2
@@ -30,6 +36,7 @@ OUT_DIR = os.environ.get("CF_CAPTURE_DIR", "/home/chromium/cf-captures")
 CLICK = os.environ.get("CF_WATCH_CLICK", "1") != "0"
 TEMPLATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "checkbox.png")
 TITLE_RE = re.compile(r"just a moment|verify you are human|checking your browser", re.I)
+DPD_RE = re.compile(r"dpd", re.I)
 
 
 def gray(img):
@@ -87,9 +94,12 @@ def screenshot(path):
     subprocess.run(["scrot", "-o", path], check=True, timeout=20)
 
 
-def prune():
-    files = sorted(f for f in os.listdir(OUT_DIR) if f.endswith(".png") and f[0].isdigit())
-    for old in files[:-KEEP_FILES]:
+def prune(prefix="", keep=KEEP_FILES):
+    files = sorted(
+        f for f in os.listdir(OUT_DIR)
+        if f.endswith(".png") and (f.startswith(prefix) if prefix else f[0].isdigit())
+    )
+    for old in files[:-keep]:
         os.remove(os.path.join(OUT_DIR, old))
 
 
@@ -132,6 +142,7 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     template = Image.open(TEMPLATE_PATH).convert("RGB")
     last_capture = 0.0
+    last_dpd_capture = 0.0
     active_since = None
     attempts = 0
     last_attempt = 0.0
@@ -139,8 +150,17 @@ def main():
     print(f"cf-watch started (click={'on' if CLICK else 'off'})", flush=True)
     while True:
         try:
-            hits = [t for t in window_titles() if TITLE_RE.search(t)]
+            titles = window_titles()
+            hits = [t for t in titles if TITLE_RE.search(t)]
             now = time.time()
+            if not hits and now - last_dpd_capture >= DPD_GAP_SECONDS:
+                dpd = [t for t in titles if DPD_RE.search(t)]
+                if dpd:
+                    path = os.path.join(OUT_DIR, "dpd-" + time.strftime("%Y%m%d-%H%M%S") + ".png")
+                    screenshot(path)
+                    last_dpd_capture = now
+                    prune("dpd-", DPD_KEEP_FILES)
+                    print(f"dpd window {dpd[0]!r}: saved {path}", flush=True)
             if not hits:
                 if active_since is not None:
                     print(f"challenge gone after {now - active_since:.0f}s, {attempts} click(s)", flush=True)
