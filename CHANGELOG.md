@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.73.4 (2026-11-19)
+
+### Bug Fixes
+
+- Re-check DPD login and Turnstile after Cloudflare solve
+  ([`b49a178`](https://github.com/stevendejongnl/dude-wheres-my-package/commit/b49a17885a5d7e9cdbe536fcd96e5a1441aa2129))
+
+
 ## v1.73.3 (2026-11-18)
 
 ### Bug Fixes
