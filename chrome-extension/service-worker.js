@@ -506,22 +506,48 @@ async function syncCarrierViaTab(account, opts = {}) {
       }
       await sleep(RENDER_WAIT_MS);
 
-      // A second Cloudflare widget can show after login. Wait for it to clear.
+      // The cookie dialog is a modal: it blocks the page until dismissed.
+      await dismissCookieBanner(tabId);
+
+      // A second Cloudflare widget can show after login. Give it time to clear,
+      // but do not fail on it: the logged-out check below catches a real block.
       html = await captureTabHtml(tabId);
       if (html && hasTurnstileWidget(html)) {
-        log.warn("sync", `${account.carrier}: Turnstile widget on page after login, waiting`);
-        const cleared = await waitForTurnstileClear(tabId, 90 * 1000);
-        if (!cleared) {
-          await storeSyncResult(account.id, false, "Cloudflare checkbox after login not cleared — sync skipped");
-          return;
-        }
-        await sleep(RENDER_WAIT_MS);
+        log.warn("sync", `${account.carrier}: Turnstile widget on page, waiting`);
+        const cleared = await waitForTurnstileClear(tabId, 20 * 1000);
+        if (!cleared) log.warn("sync", `${account.carrier}: Turnstile widget still present, continuing`);
         html = await captureTabHtml(tabId);
       }
       if (!html) {
         await storeSyncResult(account.id, false, "Could not capture page after Cloudflare solve");
         return;
       }
+    }
+
+    // The parcels page can load logged out with no login form (DPD shows a
+    // "Login" button). Open the login URL and sign in once.
+    if (urls.login && isLoggedOutParcelsPage(account.carrier, html)) {
+      log.warn("sync", `${account.carrier}: parcels page is logged out, logging in via ${urls.login}`);
+      await dismissCookieBanner(tabId);
+      await chrome.tabs.update(tabId, { url: urls.login });
+      await waitForTabLoad(tabId);
+      await waitForUrlStable(tabId);
+      await dismissCookieBanner(tabId);
+      const reTabInfo = await chrome.tabs.get(tabId);
+      if (isCarrierLoginPage(account.carrier, reTabInfo.url) || (await hasLoginForm(tabId))) {
+        const loggedIn = await handleCarrierLogin(tabId, account);
+        if (!loggedIn) {
+          await storeSyncResult(account.id, false, "Login failed -- check credentials");
+          return;
+        }
+        await waitForUrlStable(tabId);
+      }
+      await chrome.tabs.update(tabId, { url: urls.parcels });
+      await waitForTabLoad(tabId);
+      await waitForUrlStable(tabId);
+      await dismissCookieBanner(tabId);
+      await sleep(RENDER_WAIT_MS);
+      html = (await captureTabHtml(tabId)) || html;
     }
 
     // A logged-out page parses to 0 parcels and would be reported as success.
@@ -808,8 +834,49 @@ function isCloudflareChallenge(html) {
 // Embedded Turnstile widget anywhere in the page (not a full interstitial,
 // so the title does not change and isCloudflareChallenge misses it).
 function hasTurnstileWidget(html) {
-  const lower = html.toLowerCase();
-  return lower.includes("cf-turnstile") || lower.includes("challenges.cloudflare.com/turnstile");
+  return /<iframe[^>]+src=["'][^"']*challenges\.cloudflare\.com/i.test(html);
+}
+
+// Click the cookie consent button, if a dialog is showing. Looks inside open
+// shadow roots too. Prefers "reject all". Returns the clicked label or null.
+async function dismissCookieBanner(tabId, timeoutMs = 6000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          const reject = /^(reject all|decline all|alles weigeren|alles afwijzen|weiger alles)$/i;
+          const accept = /^(accept all|alles accepteren|accepteer alles|alles toestaan)$/i;
+          const buttons = [];
+          const walk = (root) => {
+            for (const el of root.querySelectorAll("*")) {
+              if (el.shadowRoot) walk(el.shadowRoot);
+              if (el.matches("button, a, [role='button']")) buttons.push(el);
+            }
+          };
+          walk(document);
+          const label = (el) => (el.textContent || "").trim().replace(/\s+/g, " ");
+          const pick =
+            buttons.find((b) => reject.test(label(b))) || buttons.find((b) => accept.test(label(b)));
+          if (!pick) return null;
+          const text = label(pick);
+          pick.click();
+          return text;
+        },
+      });
+      const clicked = results?.[0]?.result;
+      if (clicked) {
+        log.info("sync", "Cookie banner dismissed", { button: clicked });
+        await sleep(1000);
+        return clicked;
+      }
+    } catch {
+      return null;
+    }
+    await sleep(1000);
+  }
+  return null;
 }
 
 async function waitForTurnstileClear(tabId, timeoutMs) {
